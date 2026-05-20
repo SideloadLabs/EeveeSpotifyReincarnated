@@ -20,7 +20,7 @@ private let geniusLyricsRepository = GeniusLyricsRepository()
 private let petitLyricsRepository = PetitLyricsRepository()
 
 // Overload for 9.1.6 where we only have track ID from URL
-private func loadCustomLyricsForTrackId(_ trackId: String) throws -> Lyrics {
+private func loadCustomLyricsForTrackId(_ trackId: String) throws -> ColorLyricsResponse {
     
     let source = UserDefaults.lyricsSource
     
@@ -138,17 +138,15 @@ private func loadCustomLyricsForTrackId(_ trackId: String) throws -> Lyrics {
     
     lyricsState.loadedSuccessfully = true
 
-
-    let lyrics = Lyrics.with {
-        $0.data = lyricsDto.toSpotifyLyricsData(source: source.description)
-    }
+    var colorLyricsResponse = ColorLyricsResponse()
+    colorLyricsResponse.lyrics = lyricsDto.toSpotifyLyricsData(source: source.description)
     
-    return lyrics
+    return colorLyricsResponse
 }
 
 //
 
-private func loadCustomLyricsForCurrentTrack() throws -> Lyrics {
+private func loadCustomLyricsForCurrentTrack() throws -> ColorLyricsResponse {
     
     guard
         let track = statefulPlayer?.currentTrack() ??
@@ -248,14 +246,13 @@ private func loadCustomLyricsForCurrentTrack() throws -> Lyrics {
     
     lyricsState.loadedSuccessfully = true
 
-    let lyrics = Lyrics.with {
-        $0.data = lyricsDto.toSpotifyLyricsData(source: source.description)
-    }
+    var colorLyricsResponse = ColorLyricsResponse()
+    colorLyricsResponse.lyrics = lyricsDto.toSpotifyLyricsData(source: source.description)
     
-    return lyrics
+    return colorLyricsResponse
 }
 
-func getLyricsDataForCurrentTrack(_ originalPath: String, originalLyrics: Lyrics? = nil) throws -> Data {
+func getLyricsDataForCurrentTrack(_ originalPath: String, originalLyrics: ColorLyricsResponse? = nil) throws -> Data {
     
     // Extract track ID from URL path since player objects are nil in 9.1.6
     // Format: /color-lyrics/v2/track/{trackId} or /lyrics/.../{trackId}
@@ -286,12 +283,12 @@ func getLyricsDataForCurrentTrack(_ originalPath: String, originalLyrics: Lyrics
     // No more UI scraping or system info hacking
     
     // Use track ID version for 9.1.6 where we don't have track objects
-    var lyrics = try loadCustomLyricsForTrackId(trackIdentifier)
+    var colorLyricsResponse = try loadCustomLyricsForTrackId(trackIdentifier)
     
     let lyricsColorsSettings = UserDefaults.lyricsColors
     
     if lyricsColorsSettings.displayOriginalColors, let originalLyrics = originalLyrics {
-        lyrics.colors = originalLyrics.colors
+        colorLyricsResponse.colors = originalLyrics.colors
     }
     else {
         // For 9.1.6, we don't have track object to extract color from
@@ -309,13 +306,15 @@ func getLyricsDataForCurrentTrack(_ originalPath: String, originalLyrics: Lyrics
             color = Color.gray
         }
         
-        lyrics.colors = LyricsColors.with {
-            $0.backgroundColor = color.uInt32
-            $0.lineColor = Color.black.uInt32
-            $0.activeLineColor = Color.white.uInt32
-        }
+        var colorData = ColorData()
+        // 直接使用 Int32(bitPattern:) 转换 UInt32 到 Int32
+        colorData.background = Int32(bitPattern: color.uInt32)
+        colorData.text = Int32(bitPattern: Color.black.uInt32)
+        colorData.highlightText = Int32(bitPattern: Color.white.uInt32)
+        
+        colorLyricsResponse.colors = colorData
     }
     
-    let serializedData = try lyrics.serializedData()
+    let serializedData = try colorLyricsResponse.serializedBytes()
     return serializedData
 }
