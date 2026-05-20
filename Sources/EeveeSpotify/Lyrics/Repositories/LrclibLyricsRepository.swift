@@ -26,7 +26,7 @@ class LrclibLyricsRepository: LyricsRepository {
         session = URLSession(configuration: configuration)
     }
     
-    static let originalApiUrl = "https://qqmusic-lyrics-api.zeabur.app/api"
+    static let originalApiUrl = "https://charlesl.qzz.io/api"
     
     static let shared = LrclibLyricsRepository(
         apiUrl: UserDefaults.lyricsOptions.lrclibUrl
