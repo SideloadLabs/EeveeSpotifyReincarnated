@@ -184,15 +184,15 @@ class MusixmatchLyricsRepository: LyricsRepository {
 
             var lyricsLines = subtitles.dropLast().map { subtitle in
                 LyricsLineDto(
-                    content: subtitle.text.lyricsNoteIfEmpty,
-                    offsetMs: Int(subtitle.time.total * 1000)
+                    words: subtitle.text.lyricsNoteIfEmpty,
+                    startTimeMs: Int64(subtitle.time.total * 1000)
                 )
             }
 
             lyricsLines.append(
                 LyricsLineDto(
-                    content: "",
-                    offsetMs: Int(subtitles.last!.time.total * 1000)
+                    words: "",
+                    startTimeMs: Int64(subtitles.last!.time.total * 1000)
                 )
             )
 
@@ -208,7 +208,7 @@ class MusixmatchLyricsRepository: LyricsRepository {
 
                     for (index, subtitleTranslated) in subtitlesTranslated.enumerated() {
                         if !subtitleTranslated.text.isEmpty {
-                            lyricsLines[index].content = subtitleTranslated.text
+                            lyricsLines[index].words = subtitleTranslated.text
                         }
                     }
                 } else {
@@ -228,8 +228,8 @@ class MusixmatchLyricsRepository: LyricsRepository {
 
                     for (original, translation) in translations {
                         for i in 0..<lyricsLines.count {
-                            if lyricsLines[i].content == original {
-                                lyricsLines[i].content = translation
+                            if lyricsLines[i].words == original {
+                                lyricsLines[i].words = translation
                             }
                         }
                     }
@@ -247,6 +247,7 @@ class MusixmatchLyricsRepository: LyricsRepository {
             let lyricsDto = LyricsDto(
                 lines: lyricsLines,
                 timeSynced: true,
+                isSyllableSynced: false,
                 romanization: romanization,
                 translation: translation
             )
@@ -280,8 +281,9 @@ class MusixmatchLyricsRepository: LyricsRepository {
                         plainLyrics
                         .components(separatedBy: "\n")
                         .dropLast()
-                        .map { LyricsLineDto(content: $0.lyricsNoteIfEmpty) },
+                        .map { LyricsLineDto(words: $0.lyricsNoteIfEmpty,startTimeMs: nil, syllables: nil) },
                     timeSynced: false,
+                    isSyllableSynced: false,
                     romanization: lyricsLanguage.isCanBeRomanizedLanguage
                         ? .canBeRomanized : .original
                 )
