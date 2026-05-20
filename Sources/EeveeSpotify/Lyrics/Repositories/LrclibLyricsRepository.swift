@@ -231,86 +231,85 @@ class LrclibLyricsRepository: LyricsRepository {
         return alignedTranslations
     }
 
-    func getLyrics(_ query: LyricsSearchQuery, options: LyricsOptions) throws -> LyricsDto {
-        let song: LrclibSong
+func getLyrics(_ query: LyricsSearchQuery, options: LyricsOptions) throws -> LyricsDto {
+    let song: LrclibSong
 
+    do {
+        song = try getSong(trackName: query.title, artistName: query.primaryArtist)
+    } catch {
+        let strippedTitle = query.title.strippedTrackTitle
         do {
-            song = try getSong(trackName: query.title, artistName: query.primaryArtist)
+            song = try getSong(trackName: strippedTitle, artistName: query.primaryArtist)
         } catch {
-            let strippedTitle = query.title.strippedTrackTitle
-            do {
-                song = try getSong(trackName: strippedTitle, artistName: query.primaryArtist)
-            } catch {
-                throw LyricsError.noSuchSong
-            }
+            throw LyricsError.noSuchSong
         }
+    }
 
-        if song.instrumental {
-            return LyricsDto(
-                lines: [], 
-                timeSynced: false, 
-                isSyllableSynced: false,
-                romanization: .original,
-                translation: nil
-            )
-        }
-
-        var lyricsLines: [LyricsLineDto] = []
-        var timeSynced = false
-        var isSyllableSynced = false
-        var translation: LyricsTranslationDto? = nil
-        
-        // 优先使用逐字歌词 (yrcLyrics)
-        if let yrcLyrics = song.yrcLyrics, !yrcLyrics.isEmpty {
-            lyricsLines = parseYrcLyrics(yrcLyrics)
-            timeSynced = true
-            isSyllableSynced = true
-        }
-        // 其次使用时间轴歌词 (syncedLyrics)
-        else if let syncedLyrics = song.syncedLyrics, !syncedLyrics.isEmpty {
-            lyricsLines = parseLrcLyrics(syncedLyrics)
-            timeSynced = true
-        }
-        // 最后使用纯文本歌词 (plainLyrics)
-        else if let plainLyrics = song.plainLyrics, !plainLyrics.isEmpty {
-            lyricsLines = parsePlainLyrics(plainLyrics)
-            timeSynced = false
-        }
-        
-        // 处理翻译歌词
-        if let translatedLyrics = song.translatedLyrics, !translatedLyrics.isEmpty {
-            let translationLines = parseLrcLyrics(translatedLyrics)
-            let alignedTranslations = alignTranslations(
-                originalLines: lyricsLines,
-                translationLines: translationLines
-            )
-            
-            translation = LyricsTranslationDto(
-                languageCode: "zh",
-                lines: alignedTranslations
-            )
-        }
-        
-        // 处理罗马化歌词
-        var romanization = LyricsRomanizationStatus.original
-        
-        // 优化：不必遍历全部歌词，只检查前几行即可判断是否包含中文
-        if !lyricsLines.isEmpty {
-            let checkCount = min(5, lyricsLines.count)
-            for i in 0..<checkCount {
-                if lyricsLines[i].words.range(of: "\\p{Han}", options: .regularExpression) != nil {
-                    romanization = .canBeRomanized
-                    break
-                }
-            }
-        }
-        
+    if song.instrumental {
         return LyricsDto(
-            lines: lyricsLines,
-            timeSynced: timeSynced,
-            isSyllableSynced: isSyllableSynced,
-            romanization: romanization,
-            translation: translation
+            lines: [], 
+            timeSynced: false, 
+            isSyllableSynced: false,
+            romanization: .original,
+            translation: nil
         )
     }
+
+    var lyricsLines: [LyricsLineDto] = []
+    var timeSynced = false
+    var isSyllableSynced = false
+    var translation: LyricsTranslationDto? = nil
+
+    // 优先使用时间轴歌词 (syncedLyrics)
+    if let syncedLyrics = song.syncedLyrics, !syncedLyrics.isEmpty {
+        lyricsLines = parseLrcLyrics(syncedLyrics)
+        timeSynced = true
+        isSyllableSynced = false
+    }
+    // 其次使用逐字歌词 (yrcLyrics)
+    else if let yrcLyrics = song.yrcLyrics, !yrcLyrics.isEmpty {
+        lyricsLines = parseYrcLyrics(yrcLyrics)
+        timeSynced = true
+        isSyllableSynced = true
+    }
+    // 最后使用纯文本歌词 (plainLyrics)
+    else if let plainLyrics = song.plainLyrics, !plainLyrics.isEmpty {
+        lyricsLines = parsePlainLyrics(plainLyrics)
+        timeSynced = false
+    }
+
+    // 处理翻译歌词
+    if let translatedLyrics = song.translatedLyrics, !translatedLyrics.isEmpty {
+        let translationLines = parseLrcLyrics(translatedLyrics)
+        let alignedTranslations = alignTranslations(
+            originalLines: lyricsLines,
+            translationLines: translationLines
+        )
+        
+        translation = LyricsTranslationDto(
+            languageCode: "zh",
+            lines: alignedTranslations
+        )
+    }
+    
+    // 处理罗马化歌词
+    var romanization = LyricsRomanizationStatus.original
+    if !lyricsLines.isEmpty {
+        let checkCount = min(5, lyricsLines.count)
+        for i in 0..<checkCount {
+            if lyricsLines[i].words.range(of: "\\p{Han}", options: .regularExpression) != nil {
+                romanization = .canBeRomanized
+                break
+            }
+        }
+    }
+    
+    return LyricsDto(
+        lines: lyricsLines,
+        timeSynced: timeSynced,
+        isSyllableSynced: isSyllableSynced,
+        romanization: romanization,
+        translation: translation
+    )
+}
 }
