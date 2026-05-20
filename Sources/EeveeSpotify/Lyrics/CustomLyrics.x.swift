@@ -315,6 +315,6 @@ func getLyricsDataForCurrentTrack(_ originalPath: String, originalLyrics: ColorL
         colorLyricsResponse.colors = colorData
     }
     
-    let serializedData = try colorLyricsResponse.serializedBytes()
+    let serializedData = try colorLyricsResponse.serializedData()
     return serializedData
 }
