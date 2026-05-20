@@ -3,52 +3,82 @@ import Foundation
 struct LyricsDto {
     var lines: [LyricsLineDto]
     var timeSynced: Bool
+    var isSyllableSynced: Bool
     var romanization: LyricsRomanizationStatus
     var translation: LyricsTranslationDto?
     
-    func toSpotifyLyricsData(source: String) -> LyricsData {
-        var lyricsData = LyricsData.with {
-            $0.timeSynchronized = timeSynced
-            $0.restriction = .unrestricted
-            $0.providedBy = "\(source) (EeveeSpotify)"
+    func toSpotifyLyricsData(source: String) -> LyricsResponse {
+        var lyricsResponse = LyricsResponse()
+        
+        // 设置同步类型
+        if isSyllableSynced {
+            lyricsResponse.syncType = .syllableSynced
+        } else if timeSynced {
+            lyricsResponse.syncType = .lineSynced
+        } else {
+            lyricsResponse.syncType = .unsynced
         }
+        
+        lyricsResponse.provider = source
+        lyricsResponse.providerDisplayName = "CharlesL"
+        lyricsResponse.language = "en"
         
         let shouldRomanize = UserDefaults.lyricsOptions.romanization
         
         if lines.isEmpty {
-            lyricsData.lines = [
+            // 处理无歌词情况（纯音乐）
+            lyricsResponse.lines = [
                 LyricsLine.with {
-                    $0.content = "song_is_instrumental".localized
+                    $0.startTimeMs = 0
+                    $0.words = "song_is_instrumental".localized
                 },
                 LyricsLine.with {
-                    $0.content = "let_the_music_play".localized
+                    $0.startTimeMs = 3000
+                    $0.words = "let_the_music_play".localized
                 },
                 LyricsLine.with {
-                    $0.content = ""
+                    $0.startTimeMs = 6000
+                    $0.words = ""
                 }
             ]
-        }
-        else {
+        } else {
             let sortedLines = lines.sorted { 
-                ($0.offsetMs ?? 0) < ($1.offsetMs ?? 0)
+                ($0.startTimeMs ?? 0) < ($1.startTimeMs ?? 0)
             }
-            lyricsData.lines = sortedLines.map { line in
-                LyricsLine.with {
-                    $0.content = (shouldRomanize && romanization == .canBeRomanized)
-                        ? line.content.applyingTransform(.toLatin, reverse: false)!
-                        : line.content
-                    $0.offsetMs = Int32(line.offsetMs ?? 0)
+            
+            lyricsResponse.lines = sortedLines.map { line in
+                var lyricsLine = LyricsLine()
+                
+                // 设置歌词文本（应用罗马化）
+                let words = (shouldRomanize && romanization == .canBeRomanized)
+                    ? line.words.applyingTransform(.toLatin, reverse: false) ?? line.words
+                    : line.words
+                
+                lyricsLine.words = words
+                lyricsLine.startTimeMs = line.startTimeMs ?? 0
+                
+                // 设置音节（逐字歌词）
+                if let syllables = line.syllables {
+                    lyricsLine.syllables = syllables.map { syllableDto in
+                        var syllable = Syllable()
+                        syllable.startTimeMs = syllableDto.startTimeMs
+                        syllable.numChars = syllableDto.numChars
+                        return syllable
+                    }
                 }
+                
+                return lyricsLine
             }
         }
         
+        // 设置翻译
         if let translation = translation {
-            lyricsData.translation = LyricsTranslation.with {
-                $0.languageCode = translation.languageCode
-                $0.lines = translation.lines
-            }
+            var alternative = AlternativeLanguages()
+            alternative.language = translation.languageCode
+            alternative.lines = translation.lines
+            lyricsResponse.alternatives = [alternative]
         }
         
-        return lyricsData
+        return lyricsResponse
     }
 }
