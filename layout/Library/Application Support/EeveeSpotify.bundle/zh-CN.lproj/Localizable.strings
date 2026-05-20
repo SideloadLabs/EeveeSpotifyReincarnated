@@ -107,8 +107,8 @@ unknown_error = "未知错误";
 
 // Instrumental Titles
 
-song_is_instrumental = "此歌曲为纯音乐。";
-let_the_music_play = "让音乐播放…";
+song_is_instrumental = "此歌曲为纯音乐";
+let_the_music_play = "尽情聆听吧";
 
 // liked songs title, should match official spotify loc
 liked_songs = "喜欢的歌曲";
