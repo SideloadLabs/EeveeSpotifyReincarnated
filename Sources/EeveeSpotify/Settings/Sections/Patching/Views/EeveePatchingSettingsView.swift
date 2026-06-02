@@ -4,6 +4,7 @@ import UIKit
 struct EeveePatchingSettingsView: View {
     @State var patchType = UserDefaults.patchType
     @State var overwriteConfiguration = UserDefaults.overwriteConfiguration
+    @State var trueShuffleEnabled = UserDefaults.trueShuffleEnabled
 
     var body: some View {
         List {
@@ -33,7 +34,11 @@ struct EeveePatchingSettingsView: View {
                 UserDefaults.overwriteConfiguration = overwriteConfiguration
                 OfflineHelper.resetData()
             }
-            
+
+            .onChange(of: trueShuffleEnabled) { isEnabled in
+                UserDefaults.trueShuffleEnabled = isEnabled
+            }
+
             if patchType == .requests {
                 Section(
                     footer: Text("overwrite_configuration_description".localized)
@@ -43,8 +48,17 @@ struct EeveePatchingSettingsView: View {
                         isOn: $overwriteConfiguration
                     )
                 }
+
+                Section(
+                    footer: Text(
+                        "Blocks Spotify's free-tier Smart Shuffle from mixing recommended tracks into your queue. Shuffle stays inside the playlist. "
+                        + "restart_is_required_description".localized
+                    )
+                ) {
+                    Toggle("True Shuffle", isOn: $trueShuffleEnabled)
+                }
             }
-            
+
             NonIPadSpacerView()
         }
         .listStyle(GroupedListStyle())

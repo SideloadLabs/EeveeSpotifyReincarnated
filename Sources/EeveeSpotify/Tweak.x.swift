@@ -200,7 +200,7 @@ func eeveeEnvFlag(_ name: String) -> Bool {
 
 struct EeveeSpotify: Tweak {
     static let version = "6.6.4"
-    static let buildNumber = "1"
+    static let buildNumber = "2"
     static let repoSlug = GeneratedConfig.repoSlug
     
     static var hookTarget: VersionHookTarget {
@@ -232,6 +232,8 @@ struct EeveeSpotify: Tweak {
         // patching / network interception. Keeps premium UI/state even if every
         // other Eevee path is disabled.
         activateEeveePremiumForce()
+
+        activateEeveeCrossfadeForce()
 
         // TESTING: extended ad blocker (NPV/lyrics ad, home brand-ads, in-stream).
         activateEeveeAdBlockerExtended()
@@ -373,6 +375,7 @@ struct EeveeSpotify: Tweak {
                 writeDebugLog("[INIT] Settings_PlatformImpl.SettingsListViewController missing")
             }
             NSLog("[EeveeSpotify] Initialization complete for 9.1.x")
+            TrueShuffleHook.install()
             activateEeveeProbes()
             activateSponsorBlock()
             return

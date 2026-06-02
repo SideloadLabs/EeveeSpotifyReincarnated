@@ -14,6 +14,9 @@ private let traceAds:   Bool = false
 // TESTING: dumps SPTPlayer* surface + widens notif filter to include
 // "player/track/position" so SponsorBlock can find episode-uri/seek path.
 private let traceSB:    Bool = false
+// TESTING: dumps SmartShuffle / FreeShuffle service classes so we can
+// pick real selectors for a TrueShuffle hook on this Spotify version.
+private let traceShuffle: Bool = false
 
 private let importantNotifSubstrings: [String] = [
     "premium", "product", "account", "session", "login", "logout",
@@ -118,6 +121,28 @@ private let adClassesToDump: [String] = [
 
 private let runClassDump = false
 
+private let shuffleClassesToDump: [String] = [
+    "FreeShuffle_RecommendationsImpl.FreeShuffleRecommendationsServiceImplementation",
+    "FreeShuffle_RecommendationsImpl.FreeSmartShuffleServiceImplementation",
+    "FreeShuffle_RecommendationsImpl.FreeSmartShuffleConfigurationImplementation",
+    "FreeShuffle_RecommendationsImpl.PlayingTrackImplementation",
+    "FreeShuffle_RecommendationsImpl.PlayingTrackProviderImplementation",
+    "FreeShuffle_RecommendationsImpl.PlayingTrackResolverImplementation",
+    "FreeShuffle_RecommendationsImpl.PlayingTrackContextProviderImplementation",
+    "FreeShuffle_RecommendationsImpl.ApplicationStateObserverImplementation",
+    "FreeShuffle_RecommendationsImpl.TestManagerImplementation",
+    "SmartShuffle_CoreImpl.SmartShuffleCoreServiceImpl",
+    "SmartShuffle_CoreImpl.SmartShuffleHandlerImplementation",
+    "SmartShuffle_CoreImpl.CentralizedShuffleStateDataLoaderImplementation",
+    "SmartShuffle_CoreImpl.SmartShufflePredicatesImplementation",
+    "SmartShuffle_CoreImpl.SmartShuffleSignalsHandlerImplementation",
+    "SmartShuffle_CoreImpl.SmartShufflePlayerContextControllerImplementation",
+    "SmartShuffle_CoreImpl.SmartShuffleStateReactiveValue",
+    "SmartShuffle_CoreImpl.SmartShuffleHandlerObserverWrapper",
+    "Queue_ViewImpl.QueueTrackShuffledList",
+    "ListUXPlatform_PlaylistTrackCloudImpl.LikedTrackCloudShuffle",
+]
+
 private let sbClassesToDump: [String] = [
     "SPTVideoCoordinatorPlayerRouter",
     "SPTVideoCoordinatorDataSavingVideoDisabler",
@@ -168,7 +193,7 @@ private func dumpClass(_ name: String) {
 }
 
 private func dumpClassesOnce() {
-    guard runClassDump || traceAds || traceSB, !classDumpDone else { return }
+    guard runClassDump || traceAds || traceSB || traceShuffle, !classDumpDone else { return }
     classDumpDone = true
     if runClassDump {
         for n in classesToDump { dumpClass(n) }
@@ -184,6 +209,77 @@ private func dumpClassesOnce() {
         NSLog("[PROBE][SB] === sponsorblock class dump begin ===")
         for n in sbClassesToDump { dumpClass(n) }
         NSLog("[PROBE][SB] === sponsorblock class dump end ===")
+    }
+    // TrueShuffle: dump FreeShuffle / SmartShuffle service surface.
+    // NSClassFromString("Module.Class") is unreliable for Swift; iterate the
+    // runtime and dump methods inline when the name matches a target suffix.
+    if traceShuffle {
+        let targetSuffixes: [String] = [
+            ".FreeShuffleRecommendationsServiceImplementation",
+            ".FreeSmartShuffleServiceImplementation",
+            ".FreeSmartShuffleConfigurationImplementation",
+            ".PlayingTrackProviderImplementation",
+            ".PlayingTrackResolverImplementation",
+            ".PlayingTrackContextProviderImplementation",
+            ".SmartShuffleCoreServiceImpl",
+            ".SmartShuffleHandlerImplementation",
+            ".CentralizedShuffleStateDataLoaderImplementation",
+            ".SmartShufflePredicatesImplementation",
+            ".SmartShuffleSignalsHandlerImplementation",
+            ".SmartShufflePlayerContextControllerImplementation",
+            ".SmartShuffleStateReactiveValue",
+            ".SmartShuffleAllowedSettingImpl",
+            ".SmartShuffleAllowedSettingAlwaysEnabled",
+            ".ShuffleSettingsServiceImpl",
+            ".MixingShuffleHandlerImpl",
+            ".ShuffledListEffectHandler",
+            ".ReshuffleEffectHandler",
+            ".QueueTrackShuffledList",
+            ".LikedTrackCloudShuffle",
+            ".SmartShufflePlayerAdapter",
+            ".SmartShuffleInteropImpl",
+            ".ShuffleControllerImpl",
+            ".HeaderShuffleActionManager",
+            ".ContextualShuffleService",
+            ".ContextualShuffleLocalEntityModelImpl",
+            ".ShuffleManagerImpl",
+            ".ShuffleElementServiceImpl",
+        ]
+        NSLog("[PROBE][SHUF] === shuffle class dump begin ===")
+        let total = objc_getClassList(nil, 0)
+        let buf = UnsafeMutablePointer<AnyClass>.allocate(capacity: Int(total))
+        defer { buf.deallocate() }
+        let cn = objc_getClassList(AutoreleasingUnsafeMutablePointer<AnyClass>(buf), total)
+        for i in 0..<Int(cn) {
+            let raw = UnsafeRawPointer(buf).load(fromByteOffset: i * MemoryLayout<UnsafeRawPointer>.size,
+                                                  as: UnsafeRawPointer.self)
+            let cls: AnyClass = unsafeBitCast(raw, to: AnyClass.self)
+            let nm = String(cString: class_getName(cls))
+            let hit = targetSuffixes.first { nm.hasSuffix($0) }
+            guard hit != nil else { continue }
+            NSLog("[PROBE][SHUF][CLS] %s", class_getName(cls))
+            var mc: UInt32 = 0
+            if let methods = class_copyMethodList(cls, &mc) {
+                for j in 0..<Int(mc) {
+                    let m = methods[j]
+                    let sel = method_getName(m)
+                    let enc = method_getTypeEncoding(m).map { String(cString: $0) } ?? "?"
+                    NSLog("[PROBE][SHUF]   - %@  (enc=%@)", NSStringFromSelector(sel), enc)
+                }
+                free(methods)
+            }
+            var ic: UInt32 = 0
+            if let ivars = class_copyIvarList(cls, &ic) {
+                for j in 0..<Int(ic) {
+                    let iv = ivars[j]
+                    let inm = ivar_getName(iv).map { String(cString: $0) } ?? "?"
+                    let itp = ivar_getTypeEncoding(iv).map { String(cString: $0) } ?? "?"
+                    NSLog("[PROBE][SHUF]   * %@ :: %@", inm, itp)
+                }
+                free(ivars)
+            }
+        }
+        NSLog("[PROBE][SHUF] === shuffle class dump end ===")
     }
 
     // objc_copyClassList returns AutoreleasingUnsafeMutablePointer; subscripting

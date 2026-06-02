@@ -12,7 +12,11 @@ extension UserDefaults {
             serverURL: "https://sponsor.ajay.app",
             minSegmentDuration: 1.0,
             categories: SponsorBlockOptions.defaultCategories,
-            colors: SponsorBlockOptions.defaultColors
+            colors: SponsorBlockOptions.defaultColors,
+            verboseLogging: false,
+            showSkipFeedbackButtons: true,
+            toastDuration: 2.2,
+            autoSkipMySubmissions: true
         )
     )
     static var sponsorBlockOptions

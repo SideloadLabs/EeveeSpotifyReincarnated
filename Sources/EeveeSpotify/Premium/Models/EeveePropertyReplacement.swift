@@ -2,6 +2,8 @@ enum EeveePropertyModification {
     case remove
     case setBool(Bool)
     case setEnum(String)
+    // Flip if present, append if missing (needs name + scope).
+    case forceBool(Bool)
 }
 
 struct EeveePropertyReplacement {

@@ -5,19 +5,20 @@ struct SponsorBlockSettingsView: View {
 
     var body: some View {
         List {
-            Section(footer: Text("Skips community-marked segments in podcasts.")) {
+            Section(footer: Text("Skips community-marked segments in podcast episodes.")) {
                 Toggle("Enable SponsorBlock", isOn: $options.enabled)
                 Toggle("Show colored overlay on progress bar", isOn: $options.showOverlay)
                     .disabled(!options.enabled)
                 Toggle("Show toast when skipping", isOn: $options.showToast)
                     .disabled(!options.enabled)
+                Toggle("Skip-toast action buttons (vote / undo / hide)", isOn: $options.showSkipFeedbackButtons)
+                    .disabled(!options.enabled || !options.showToast)
                 Toggle("Respect manual seek (don't re-skip)", isOn: $options.respectManualSeek)
-                    .disabled(!options.enabled)
-                Toggle("Log only (don't seek)", isOn: $options.logOnly)
                     .disabled(!options.enabled)
             }
 
-            Section(header: Text("Categories")) {
+            Section(header: Text("Categories"),
+                    footer: Text("Off · Show · Manual · Auto. Tap the color circle to change.")) {
                 ForEach(SponsorBlockOptions.allCategoryOrder, id: \.self) { key in
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
@@ -41,32 +42,55 @@ struct SponsorBlockSettingsView: View {
                 }
             }
 
-            Section(header: Text("Reporting (WIP)"),
-                    footer: Text("Submit + vote on segments. Coming soon.")) {
-                Text("Vote segment up/down")
-                    .foregroundColor(.gray)
-                Text("Submit new segment")
-                    .foregroundColor(.gray)
-            }
-            .disabled(true)
-
-            Section(header: Text("Advanced")) {
-                HStack {
-                    Text("Server")
-                    Spacer()
-                    TextField("https://sponsor.ajay.app", text: $options.serverURL)
-                        .multilineTextAlignment(.trailing)
-                        .autocapitalization(.none)
-                        .disableAutocorrection(true)
-                        .keyboardType(.URL)
+            Section {
+                NavigationLink(destination: SponsorBlockPendingListView()) {
+                    HStack {
+                        Image(systemName: "tray.and.arrow.up")
+                        Text("Reporting & drafts")
+                        Spacer()
+                        let count = SponsorBlockPendingStore.all().values.reduce(0) { $0 + $1.count }
+                        if count > 0 {
+                            Text("\(count)")
+                                .font(.footnote)
+                                .foregroundColor(.secondary)
+                        }
+                    }
                 }
-                Stepper(
-                    "Min duration: \(String(format: "%.1f", options.minSegmentDuration))s",
-                    value: $options.minSegmentDuration,
-                    in: 0.0...30.0,
-                    step: 0.5
-                )
-                .disabled(!options.enabled)
+                Button {
+                    let snap = SponsorBlockSkipper.shared.currentPlayhead()
+                    guard let episodeID = snap.episodeID else {
+                        PopUpHelper.showPopUp(message: "No podcast is currently playing.", buttonText: "OK")
+                        return
+                    }
+                    let active = SponsorBlockPendingStore.segments(for: episodeID).first(where: { $0.end == nil })
+                    if let active {
+                        var copy = active
+                        copy.end = max(snap.position, copy.start + 0.1)
+                        SponsorBlockPendingStore.upsert(copy)
+                        SponsorBlockReportingUI.presentSubmitForm(pending: copy, duration: snap.duration)
+                    } else {
+                        let p = SponsorBlockPendingSegment(episodeID: episodeID, start: snap.position)
+                        SponsorBlockPendingStore.upsert(p)
+                        SponsorBlockToast.shared.show("Start set at \(String(format: "%.1f", snap.position))s · open again to set end")
+                    }
+                } label: {
+                    HStack {
+                        Image(systemName: "plus.circle")
+                        Text("Mark segment for current episode")
+                    }
+                }
+                NavigationLink(destination: SponsorBlockAdvancedView(options: $options)) {
+                    HStack {
+                        Image(systemName: "gearshape.2")
+                        Text("Advanced")
+                    }
+                }
+                NavigationLink(destination: SponsorBlockHelpView()) {
+                    HStack {
+                        Image(systemName: "questionmark.circle")
+                        Text("How to use")
+                    }
+                }
             }
 
             Section(header: Text("Credits"),
@@ -74,28 +98,6 @@ struct SponsorBlockSettingsView: View {
                 Link("Spot-SponsorBlock-Extension on GitHub",
                      destination: URL(string: "https://github.com/Spot-SponsorBlock/Spot-SponsorBlock-Extension")!)
                 Link("SponsorBlock", destination: URL(string: "https://sponsor.ajay.app")!)
-            }
-
-            Section {
-                Button {
-                    options = SponsorBlockOptions(
-                        enabled: options.enabled,
-                        logOnly: false,
-                        showOverlay: true,
-                        showToast: false,
-                        respectManualSeek: false,
-                        serverURL: "https://sponsor.ajay.app",
-                        minSegmentDuration: 1.0,
-                        categories: SponsorBlockOptions.defaultCategories,
-                        colors: SponsorBlockOptions.defaultColors
-                    )
-                } label: {
-                    HStack {
-                        Image(systemName: "arrow.counterclockwise")
-                        Text("Reset to defaults")
-                    }
-                    .foregroundColor(.red)
-                }
             }
 
             Section {

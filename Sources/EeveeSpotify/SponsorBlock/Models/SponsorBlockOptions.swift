@@ -17,6 +17,10 @@ struct SponsorBlockOptions: Codable, Equatable {
     var minSegmentDuration: Double
     var categories: [String: SponsorBlockAction]
     var colors: [String: String]
+    var verboseLogging: Bool
+    var showSkipFeedbackButtons: Bool
+    var toastDuration: Double
+    var autoSkipMySubmissions: Bool
 
     static let defaultCategories: [String: SponsorBlockAction] = [
         "sponsor":          .autoSkip,
@@ -68,7 +72,11 @@ struct SponsorBlockOptions: Codable, Equatable {
          serverURL: String,
          minSegmentDuration: Double,
          categories: [String: SponsorBlockAction],
-         colors: [String: String]) {
+         colors: [String: String],
+         verboseLogging: Bool = false,
+         showSkipFeedbackButtons: Bool = true,
+         toastDuration: Double = 2.2,
+         autoSkipMySubmissions: Bool = true) {
         self.enabled = enabled
         self.logOnly = logOnly
         self.showOverlay = showOverlay
@@ -78,6 +86,10 @@ struct SponsorBlockOptions: Codable, Equatable {
         self.minSegmentDuration = minSegmentDuration
         self.categories = categories
         self.colors = colors
+        self.verboseLogging = verboseLogging
+        self.showSkipFeedbackButtons = showSkipFeedbackButtons
+        self.toastDuration = toastDuration
+        self.autoSkipMySubmissions = autoSkipMySubmissions
     }
 
     init(from decoder: Decoder) throws {
@@ -90,6 +102,10 @@ struct SponsorBlockOptions: Codable, Equatable {
         serverURL          = (try? c.decode(String.self, forKey: .serverURL)) ?? "https://sponsor.ajay.app"
         minSegmentDuration = (try? c.decode(Double.self, forKey: .minSegmentDuration)) ?? 1.0
         colors             = (try? c.decode([String: String].self, forKey: .colors)) ?? SponsorBlockOptions.defaultColors
+        verboseLogging     = (try? c.decode(Bool.self, forKey: .verboseLogging)) ?? false
+        showSkipFeedbackButtons = (try? c.decode(Bool.self, forKey: .showSkipFeedbackButtons)) ?? true
+        toastDuration  = (try? c.decode(Double.self, forKey: .toastDuration)) ?? 2.2
+        autoSkipMySubmissions = (try? c.decode(Bool.self, forKey: .autoSkipMySubmissions)) ?? true
 
         if let actionMap = try? c.decode([String: SponsorBlockAction].self, forKey: .categories) {
             categories = actionMap

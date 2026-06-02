@@ -2,9 +2,9 @@ On this page, you'll find a detailed FAQ covering various topics related to Eeve
 
 # Versions and Support
 
-EeveeSpotify currently supports Spotify version **9.1.12** (the latest version compatible with iOS 14+). 
+EeveeSpotify currently supports Spotify version **9.1.48** (the latest version compatible with iOS 14+). 
 
-If you are jailbroken, install the latest .deb from the [releases page](https://github.com/Meeep1/EeveeSpotifyRevivedPublic/releases), along with Spotify 9.1.12 from the App Store. After installation, open the EeveeSpotify settings (accessible from your Spotify profile settings) and reset data so it will properly patch Premium features.
+If you are jailbroken, install the latest .deb from the [releases page](https://github.com/jaydenjcpy/EeveeSpotifyReincarnated/releases), along with Spotify 9.1.48 from the App Store. After installation, open the EeveeSpotify settings (accessible from your Spotify profile settings) and reset data so it will properly patch Premium features.
 
 For non-jailbroken devices, use the patched IPA files available in the releases. You can install these using:
 - **TrollStore** (recommended for iOS 14-16.6.1)

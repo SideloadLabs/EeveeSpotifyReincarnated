@@ -48,7 +48,7 @@ extension UserDefaults {
 
     static var trueShuffleEnabled: Bool {
         get {
-            container.object(forKey: trueShuffleEnabledKey) as? Bool ?? true
+            container.object(forKey: trueShuffleEnabledKey) as? Bool ?? false
         }
         set (isEnabled) {
             container.set(isEnabled, forKey: trueShuffleEnabledKey)
