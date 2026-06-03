@@ -2,11 +2,9 @@ import SwiftUI
 import UIKit 
 
 class EeveeSettingsViewController: SPTPageViewController {
-    let frame: CGRect
     let settingsView: AnyView
     
     init(_ frame: CGRect, settingsView: AnyView, navigationTitle: String) {
-        self.frame = frame
         self.settingsView = settingsView
         super.init(nibName: nil, bundle: nil)
         
@@ -21,11 +19,19 @@ class EeveeSettingsViewController: SPTPageViewController {
         super.viewDidLoad()
         
         let hostingController = UIHostingController(rootView: settingsView)
-        hostingController.view.frame = frame
+        hostingController.view.translatesAutoresizingMaskIntoConstraints = false
+        hostingController.view.backgroundColor = .clear
         
         view.addSubview(hostingController.view)
         addChild(hostingController)
         hostingController.didMove(toParent: self)
+        
+        NSLayoutConstraint.activate([
+            hostingController.view.topAnchor.constraint(equalTo: view.topAnchor),
+            hostingController.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            hostingController.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            hostingController.view.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
     }
     
     @objc func openRepositoryUrl(_ sender: UIButton) {

@@ -27,6 +27,8 @@ struct EeveeAppIconPickerView: View {
                         .buttonStyle(PlainButtonStyle())
                 }
             }
+            
+            SpacerView()
         }
         .listStyle(InsetGroupedListStyle())
         .onAppear(perform: load)

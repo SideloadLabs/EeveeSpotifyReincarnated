@@ -58,7 +58,7 @@ struct EeveeUISettingsView: View {
                 )
             }
             
-            NonIPadSpacerView()
+            SpacerView()
         }
         
         .listStyle(GroupedListStyle())

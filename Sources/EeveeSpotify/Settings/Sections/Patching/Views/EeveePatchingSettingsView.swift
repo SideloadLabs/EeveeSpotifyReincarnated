@@ -59,7 +59,7 @@ struct EeveePatchingSettingsView: View {
                 }
             }
 
-            NonIPadSpacerView()
+            SpacerView()
         }
         .listStyle(GroupedListStyle())
         .animation(.default, value: patchType)

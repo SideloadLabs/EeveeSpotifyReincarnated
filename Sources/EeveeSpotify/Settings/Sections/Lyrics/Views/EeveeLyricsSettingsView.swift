@@ -20,7 +20,7 @@ struct EeveeLyricsSettingsView: View {
                 }
             }
             
-            NonIPadSpacerView()
+            SpacerView()
         }
         .onReceive(viewModel.musixmatchTokenInputAlertPublisher) { showAnonymousTokenOption in
             showMusixmatchTokenAlert(UserDefaults.lyricsSource, showAnonymousTokenOption)
