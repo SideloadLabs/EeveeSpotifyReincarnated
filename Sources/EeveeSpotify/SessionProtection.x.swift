@@ -196,33 +196,47 @@ class OauthAccessTokenBridgeHook: ClassHook<NSObject> {
     // This catches cases where C++ sets the ivar without going through the ObjC setter
     func `init`() -> NSObject? {
         let result = orig.`init`()
-        extendExpiryIvar()
-        // Also start a repeating timer to keep extending the ivar
-        startExpiryExtender()
+        // NOTE: operate on `result`, not `target` / `self`. `init` may
+        // return a different instance than the one it was called on (e.g.
+        // class clusters, placeholder swaps) — touching `target` would
+        // extend the lifetime of the *uninitialized* placeholder and leave
+        // the real instance with a stale expiry, which is exactly the kind
+        // of state mismatch that surfaces as a delayed crash inside the
+        // URLSession completion handler.
+        let realTarget: NSObject = (result as NSObject?) ?? target
+        extendExpiryIvar(on: realTarget)
+        startExpiryExtender(on: realTarget)
         return result
     }
 
     // orion:new
-    func extendExpiryIvar() {
-        let bridgeClass: AnyClass = type(of: target)
+    func extendExpiryIvar(on obj: NSObject) {
+        let bridgeClass: AnyClass = type(of: obj)
         if let ivar = class_getInstanceVariable(bridgeClass, "expiresAt") {
             let farFuture = Date(timeIntervalSinceNow: 365 * 24 * 60 * 60)
-            object_setIvar(target, ivar, farFuture)
+            object_setIvar(obj, ivar, farFuture)
         }
     }
 
     // orion:new
-    func startExpiryExtender() {
-        let weak = target
-        // Extend the ivar every 60 seconds
+    //
+    // Re-implemented to use a *real* weak reference. The previous version
+    // did `let weak = target` which captured `target` strongly (Swift does
+    // not infer `weak` from a local name), so every OauthAccessTokenBridge
+    // instance leaked a dispatch-queue thread that retained it forever.
+    // Over many sessions the URLSession runtime would then see stale
+    // Swift objects being released from the leaked threads and crash with
+    // the "use-after-free in didCompleteWithError" signature.
+    func startExpiryExtender(on obj: NSObject) {
+        weak var weakRef: NSObject? = obj
         DispatchQueue.global(qos: .utility).async {
-            while true {
+            while weakRef != nil {
                 Thread.sleep(forTimeInterval: 60)
-                guard let obj = weak as? NSObject else { break }
-                let cls: AnyClass = type(of: obj)
+                guard let live = weakRef else { return }
+                let cls: AnyClass = type(of: live)
                 if let ivar = class_getInstanceVariable(cls, "expiresAt") {
                     let farFuture = Date(timeIntervalSinceNow: 365 * 24 * 60 * 60)
-                    object_setIvar(obj, ivar, farFuture)
+                    object_setIvar(live, ivar, farFuture)
                 }
             }
         }
@@ -407,19 +421,31 @@ class URLSessionTaskResumeHook: ClassHook<NSObject> {
 
             // Block outgoing DeleteToken/signup requests at network level
             // Only block after initial startup (30s) to allow fresh login/signup
+            //
+            // IMPORTANT: we MUST still call `orig.resume()` before cancelling.
+            // Cancelling a task that has never been started leaves the
+            // URLSession state machine in an undefined shape — Apple's
+            // completion wrapper then dereferences internal state that was
+            // never allocated, producing the "use-after-free in
+            // didCompleteWithError" crash signature. Resume, *then* cancel;
+            // cancellation is processed asynchronously and is effectively
+            // immediate for our purposes.
             if host.contains("spotify") || host.contains("spclient") {
                 if elapsed > 30 && path.contains("DeleteToken") {
-                    writeDebugLog("[NET] Cancelled DeleteToken at \(elapsedInt)s")
+                    writeDebugLog("[NET] Cancelling DeleteToken at \(elapsedInt)s")
+                    orig.resume()
                     task.cancel()
                     return
                 }
                 if elapsed > 30 && path.contains("signup/public") {
-                    writeDebugLog("[NET] Cancelled signup/public at \(elapsedInt)s")
+                    writeDebugLog("[NET] Cancelling signup/public at \(elapsedInt)s")
+                    orig.resume()
                     task.cancel()
                     return
                 }
                 if elapsed > 30 && path.contains("pses/screenconfig") {
-                    writeDebugLog("[NET] Cancelled pses/screenconfig at \(elapsedInt)s")
+                    writeDebugLog("[NET] Cancelling pses/screenconfig at \(elapsedInt)s")
+                    orig.resume()
                     task.cancel()
                     return
                 }
@@ -432,12 +458,14 @@ class URLSessionTaskResumeHook: ClassHook<NSObject> {
                 // background URLSession, causing ads to reappear.
                 // We block re-fetches after the initial 30s startup window.
                 if elapsed > 30 && path.contains("v1/customize") {
-                    writeDebugLog("[NET] Cancelled customize re-fetch at \(elapsedInt)s")
+                    writeDebugLog("[NET] Cancelling customize re-fetch at \(elapsedInt)s")
+                    orig.resume()
                     task.cancel()
                     return
                 }
                 if elapsed > 30 && host.contains("apresolve") {
-                    writeDebugLog("[NET] Cancelled apresolve at \(elapsedInt)s")
+                    writeDebugLog("[NET] Cancelling apresolve at \(elapsedInt)s")
+                    orig.resume()
                     task.cancel()
                     return
                 }

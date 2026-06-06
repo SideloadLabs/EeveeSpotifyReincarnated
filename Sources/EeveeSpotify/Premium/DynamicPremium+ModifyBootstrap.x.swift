@@ -106,6 +106,11 @@ class SpotifySessionDelegateBootstrapHook: ClassHook<NSObject>, SpotifySessionDe
             }
         }
         
+        // Fallthrough (non-bootstrap URL, error != nil, decode failed, etc).
+        // Drop any leftover buffer so the helper map does not accumulate
+        // stale entries keyed by a task address that the URLSession runtime
+        // is about to free and re-use for another request.
+        URLSessionHelper.shared.discardData(for: task)
         orig.URLSession(session, task: task, didCompleteWithError: error)
     }
 }
