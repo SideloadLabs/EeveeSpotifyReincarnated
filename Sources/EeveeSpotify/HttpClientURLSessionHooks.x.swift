@@ -37,19 +37,10 @@ class HttpClientURLSessionHook: ClassHook<NSObject>, SpotifySessionDelegate {
 
         if SpotifyResponsePatcher.handledCustomizeTasks.remove(task.taskIdentifier) != nil {
             orig.URLSession(session, task: task, didCompleteWithError: nil)
-            URLSessionHelper.shared.discardData(for: task)
             return
         }
 
-        // Error / non-patch path — the buffer is not consumed below, so drop
-        // it explicitly. The previous version leaked one entry per failed
-        // or non-patched task; over a long session the helper map grew to
-        // the point where its `ObjectIdentifier` keys started colliding
-        // with newly-allocated task addresses — a use-after-free waiting to
-        // happen the moment a URLSession delegate callback ran on a stale
-        // entry.
         guard error == nil, SpotifyResponsePatcher.shouldModify(url) else {
-            URLSessionHelper.shared.discardData(for: task)
             orig.URLSession(session, task: task, didCompleteWithError: error)
             return
         }
@@ -69,11 +60,15 @@ class HttpClientURLSessionHook: ClassHook<NSObject>, SpotifySessionDelegate {
         }
 
         do {
-            // Lyrics — body was pre-fetched in didReceiveResponse (see
-            // `LyricsPrefetch`). Replaces the old in-line semaphore.wait
-            // that used to block this delegate thread for up to 5s.
             if url.isLyrics {
-                let customLyricsData = LyricsPrefetch.pop(task)
+                let originalLyrics = try? ColorLyricsResponse(serializedBytes: buffer)
+                let semaphore = DispatchSemaphore(value: 0)
+                var customLyricsData: Data?
+                DispatchQueue.global(qos: .userInitiated).async {
+                    customLyricsData = try? getLyricsDataForCurrentTrack(url.path, originalLyrics: originalLyrics)
+                    semaphore.signal()
+                }
+                _ = semaphore.wait(timeout: .now() + .milliseconds(5000))
                 orig.URLSession(session, dataTask: task, didReceiveData: customLyricsData ?? buffer)
                 orig.URLSession(session, task: task, didCompleteWithError: nil)
                 return
@@ -109,28 +104,19 @@ class HttpClientURLSessionHook: ClassHook<NSObject>, SpotifySessionDelegate {
             return
         }
 
-        // Lyrics — kick off the async custom-lyrics fetch NOW so the body
-        // is ready by didCompleteWithError. This replaces the old in-line
-        // `semaphore.wait` in didCompleteWithError, which blocked the
-        // URLSession delegate thread for up to 5 seconds and was a
-        // documented contributor to the "use-after-free in
-        // didCompleteWithError" crash signature.
-        //
-        // For 4xx/5xx we also synthesise a 200 response — the original
-        // behaviour (and the only way the downstream parser will accept
-        // the custom body it never asked for).
-        if let url = task.currentRequest?.url, url.isLyrics {
-            if response.statusCode != 200 {
-                let ok = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "2.0", headerFields: [:])!
-                orig.URLSession(session, dataTask: task, didReceiveResponse: ok, completionHandler: handler)
-            } else {
-                orig.URLSession(session, dataTask: task, didReceiveResponse: response, completionHandler: handler)
-            }
-            LyricsPrefetch.start(task: task, path: url.path)
+        guard let url = task.currentRequest?.url, url.isLyrics, response.statusCode != 200 else {
+            orig.URLSession(session, dataTask: task, didReceiveResponse: response, completionHandler: handler)
             return
         }
 
-        orig.URLSession(session, dataTask: task, didReceiveResponse: response, completionHandler: handler)
+        do {
+            let data = try getLyricsDataForCurrentTrack(url.path)
+            let ok = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "2.0", headerFields: [:])!
+            orig.URLSession(session, dataTask: task, didReceiveResponse: ok, completionHandler: handler)
+            orig.URLSession(session, dataTask: task, didReceiveData: data)
+        } catch {
+            orig.URLSession(session, task: task, didCompleteWithError: error)
+        }
     }
 
     func URLSession(
