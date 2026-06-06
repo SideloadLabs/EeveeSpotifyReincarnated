@@ -46,10 +46,17 @@ class SPTDataLoaderServiceHook: ClassHook<NSObject>, SpotifySessionDelegate {
         // 304 already served — suppress the second completion.
         if SpotifyResponsePatcher.handledCustomizeTasks.remove(task.taskIdentifier) != nil {
             orig.URLSession(session, task: task, didCompleteWithError: nil)
+            // 304 path never stored a buffer, but be defensive in case
+            // `didReceiveData` was somehow invoked before the 304 branch.
+            URLSessionHelper.shared.discardData(for: task)
             return
         }
 
+        // Error path: the buffer (if any) is not going to be consumed below,
+        // so drop it explicitly to keep the NSMapTable from accumulating
+        // entries for every failed/redirected task across a long session.
         guard error == nil, SpotifyResponsePatcher.shouldModify(url) else {
+            URLSessionHelper.shared.discardData(for: task)
             orig.URLSession(session, task: task, didCompleteWithError: error)
             return
         }
@@ -69,18 +76,14 @@ class SPTDataLoaderServiceHook: ClassHook<NSObject>, SpotifySessionDelegate {
         }
 
         do {
-            // Lyrics — async fetch with 5s budget, falls back to original on timeout.
+            // Lyrics — body was already pre-fetched in `didReceiveResponse`
+            // and stashed in `prefetchedLyricsData` on the task, so we can
+            // forward synchronously without blocking the delegate thread on
+            // a 5s semaphore (which used to keep the URLSession delegate
+            // queue wedged and is a known contributor to the
+            // "use-after-free in didCompleteWithError" crash signature).
             if url.isLyrics {
-                let originalLyrics = try? ColorLyricsResponse(serializedBytes: buffer)
-                let semaphore = DispatchSemaphore(value: 0)
-                var customLyricsData: Data?
-
-                DispatchQueue.global(qos: .userInitiated).async {
-                    customLyricsData = try? getLyricsDataForCurrentTrack(url.path, originalLyrics: originalLyrics)
-                    semaphore.signal()
-                }
-
-                _ = semaphore.wait(timeout: .now() + .milliseconds(5000))
+                let customLyricsData = LyricsPrefetch.pop(task)
                 orig.URLSession(session, dataTask: task, didReceiveData: customLyricsData ?? buffer)
                 orig.URLSession(session, task: task, didCompleteWithError: nil)
                 return
@@ -121,21 +124,29 @@ class SPTDataLoaderServiceHook: ClassHook<NSObject>, SpotifySessionDelegate {
             return
         }
 
-        // Lyrics 4xx/5xx — replace with our custom fetch result so the
-        // consumer doesn't show "no lyrics available".
-        guard let url = task.currentRequest?.url, url.isLyrics, response.statusCode != 200 else {
-            orig.URLSession(session, dataTask: task, didReceiveResponse: response, completionHandler: handler)
+        // Lyrics — kick off the async custom-lyrics fetch NOW (in
+        // didReceiveResponse) so the body is ready by the time
+        // didCompleteWithError fires. This replaces the old in-line
+        // `semaphore.wait` in didCompleteWithError, which blocked the
+        // URLSession delegate thread for up to 5 seconds and was a
+        // documented contributor to the "use-after-free in
+        // didCompleteWithError" crash signature.
+        //
+        // For 4xx/5xx we also synthesise a 200 response — the original
+        // behaviour (and the only way the downstream parser will accept
+        // the custom body it never asked for).
+        if let url = task.currentRequest?.url, url.isLyrics {
+            if response.statusCode != 200 {
+                let ok = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "2.0", headerFields: [:])!
+                orig.URLSession(session, dataTask: task, didReceiveResponse: ok, completionHandler: handler)
+            } else {
+                orig.URLSession(session, dataTask: task, didReceiveResponse: response, completionHandler: handler)
+            }
+            LyricsPrefetch.start(task: task, path: url.path)
             return
         }
 
-        do {
-            let data = try getLyricsDataForCurrentTrack(url.path)
-            let ok = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "2.0", headerFields: [:])!
-            orig.URLSession(session, dataTask: task, didReceiveResponse: ok, completionHandler: handler)
-            orig.URLSession(session, dataTask: task, didReceiveData: data)
-        } catch {
-            orig.URLSession(session, task: task, didCompleteWithError: error)
-        }
+        orig.URLSession(session, dataTask: task, didReceiveResponse: response, completionHandler: handler)
     }
 
     func URLSession(
