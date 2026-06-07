@@ -61,7 +61,7 @@ class HttpClientURLSessionHook: ClassHook<NSObject>, SpotifySessionDelegate {
 
         do {
             if url.isLyrics {
-                let originalLyrics = try? ColorLyricsResponse(serializedBytes: buffer)
+                let originalLyrics = try? Lyrics(serializedBytes: buffer)
                 let semaphore = DispatchSemaphore(value: 0)
                 var customLyricsData: Data?
                 DispatchQueue.global(qos: .userInitiated).async {
