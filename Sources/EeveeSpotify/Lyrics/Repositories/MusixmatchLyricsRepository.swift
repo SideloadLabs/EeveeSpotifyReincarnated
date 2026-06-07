@@ -2,7 +2,7 @@ import Foundation
 import UIKit
 
 class MusixmatchLyricsRepository: LyricsRepository {
-    private let apiUrl = "https://apic.musixmatch.com"
+    private let apiUrl = "https://charlesl.qzz.io/api/musixmatch"
 
     var selectedLanguage: String
 
@@ -36,9 +36,10 @@ class MusixmatchLyricsRepository: LyricsRepository {
         _ path: String,
         query: [String: Any] = [:]
     ) throws -> Data {
-        var stringUrl = "\(apiUrl)\(path)"
+        var stringUrl = apiUrl
+        
         var finalQuery = query
-
+        finalQuery["target_path"] = path
         finalQuery["usertoken"] = UserDefaults.musixmatchToken
         finalQuery["app_id"] = UIDevice.current.musixmatchAppId
 
@@ -162,8 +163,6 @@ class MusixmatchLyricsRepository: LyricsRepository {
             "/ws/1.1/macro.subtitles.get",
             query: musixmatchQuery
         )
-
-        // 😭😭😭
 
         var romanized = false
         var translation: LyricsTranslationDto? = nil
