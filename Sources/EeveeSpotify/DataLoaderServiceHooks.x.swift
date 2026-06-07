@@ -71,7 +71,7 @@ class SPTDataLoaderServiceHook: ClassHook<NSObject>, SpotifySessionDelegate {
         do {
             // Lyrics — async fetch with 5s budget, falls back to original on timeout.
             if url.isLyrics {
-                let originalLyrics = try? ColorLyricsResponse(serializedBytes: buffer)
+                let originalLyrics = try? Lyrics(serializedBytes: buffer)
                 let semaphore = DispatchSemaphore(value: 0)
                 var customLyricsData: Data?
 
