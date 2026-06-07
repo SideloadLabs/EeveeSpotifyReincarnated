@@ -19,6 +19,11 @@ var hasShownUnauthorizedPopUp = false
 private let geniusLyricsRepository = GeniusLyricsRepository()
 private let petitLyricsRepository = PetitLyricsRepository()
 
+// MARK: - 繁体转简体辅助函数
+private func traditionalToSimplified(_ text: String) -> String {
+    return text.applyingTransform(StringTransform("Traditional-Simplified"), reverse: false) ?? text
+}
+
 // Overload for 9.1.6 where we only have track ID from URL
 private func loadCustomLyricsForTrackId(_ trackId: String) throws -> ColorLyricsResponse {
     
@@ -128,7 +133,14 @@ private func loadCustomLyricsForTrackId(_ trackId: String) throws -> ColorLyrics
         lyricsDto = try repository.getLyrics(searchQuery, options: options)
     }
     catch let error {
-        throw error
+        // 改动1：添加回退逻辑到 Musixmatch（如果当前源不是 Musixmatch 且开启了 geniusFallback）
+        if source == .musixmatch || !UserDefaults.lyricsOptions.geniusFallback {
+            throw error
+        }
+        
+        // 回退到 Musixmatch
+        let musixmatchRepository = MusixmatchLyricsRepository.shared
+        lyricsDto = try musixmatchRepository.getLyrics(searchQuery, options: options)
     }
     
     lyricsState.isEmpty = lyricsDto.lines.isEmpty
@@ -229,12 +241,14 @@ private func loadCustomLyricsForCurrentTrack() throws -> ColorLyricsResponse {
             lyricsState.fallbackError = .unknownError
         }
         
-        if source == .genius || !UserDefaults.lyricsOptions.geniusFallback {
+        // 改动2：将回退目标从 Genius 改为 Musixmatch
+        if source == .musixmatch || !UserDefaults.lyricsOptions.geniusFallback {
             throw error
         }
         
-        source = .genius
-        repository = GeniusLyricsRepository()
+        // 回退到 Musixmatch
+        source = .musixmatch
+        repository = MusixmatchLyricsRepository.shared
         
         lyricsDto = try repository.getLyrics(searchQuery, options: options)
     }
@@ -284,6 +298,15 @@ func getLyricsDataForCurrentTrack(_ originalPath: String, originalLyrics: ColorL
     
     // Use track ID version for 9.1.6 where we don't have track objects
     var colorLyricsResponse = try loadCustomLyricsForTrackId(trackIdentifier)
+    
+    // 改动3：如果歌词来自 Musixmatch，将繁体转简体
+    if colorLyricsResponse.lyrics.provider == "Musixmatch" {
+        var lyrics = colorLyricsResponse.lyrics
+        for i in 0..<lyrics.lines.count {
+            lyrics.lines[i].words = traditionalToSimplified(lyrics.lines[i].words)
+        }
+        colorLyricsResponse.lyrics = lyrics
+    }
     
     let lyricsColorsSettings = UserDefaults.lyricsColors
     
