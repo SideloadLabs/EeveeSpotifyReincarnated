@@ -106,10 +106,14 @@ jobs:
           cd "$(dirname "$OUT_IPA")"
           rm -rf Payload
           unzip -q "$(basename "$OUT_IPA")"
+          if [ -d "Payload/Spotify.app/com.apple.WatchPlaceholder" ]; then
+            rm -rf Payload/Spotify.app/com.apple.WatchPlaceholder
+          fi
           if [ -d "Payload/Spotify.app/Watch" ]; then
             rm -rf Payload/Spotify.app/Watch
-            zip -qry "$(basename "$OUT_IPA")" Payload
           fi
+          rm -f "$(basename "$OUT_IPA")"
+          zip -qry "$(basename "$OUT_IPA")" Payload
           rm -rf Payload
 
       - name: Stage alternate app icons
