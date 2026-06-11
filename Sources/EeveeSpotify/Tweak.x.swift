@@ -238,6 +238,15 @@ struct EeveeSpotify: Tweak {
         // TESTING: extended ad blocker (NPV/lyrics ad, home brand-ads, in-stream).
         activateEeveeAdBlockerExtended()
 
+        // Block premium upsell / "Like listening without limits?" popups.
+        activateUpsellPopupBlocker()
+
+        // Block upsell components injected into Hub/home JSON (e.g. upgrade banners).
+        if NSClassFromString("HUBViewModelBuilderImplementation") != nil {
+            AdBlockerGroup().activate()
+            NSLog("[EeveeSpotify] AdBlockerGroup activated")
+        }
+
         // activateEeveeFlexGesture()
 
         // Global kill-switch for debugging “instant crash / no logs”.
@@ -269,6 +278,9 @@ struct EeveeSpotify: Tweak {
         writeDebugLog("[INIT] Patch type: \(UserDefaults.patchType)")
         writeDebugLog("[INIT] Lyrics source: \(UserDefaults.lyricsSource)")
         writeDebugLog("[INIT] tweakInitTime: \(tweakInitTime)")
+
+        // CarPlay crash fix (Issue #16) — safe-gated
+        activateCarPlayCrashFix()
 
         // Verify critical hook targets exist
         let hookTargets: [(String, String)] = [
