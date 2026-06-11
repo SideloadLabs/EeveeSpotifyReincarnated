@@ -138,6 +138,43 @@ class MusixmatchLyricsRepository: LyricsRepository {
         }
     }
 
+    // MARK: - RichSync 逐字歌词解析
+
+    private func parseRichSyncLyrics(_ richsyncBody: String) -> [LyricsLineDto] {
+        guard let data = richsyncBody.data(using: .utf8) else {
+            return []
+        }
+        
+        do {
+            let richSyncLines = try JSONDecoder().decode([MusixmatchRichSync].self, from: data)
+            
+            return richSyncLines.map { richSync in
+                let lineStartMs = Int64(richSync.ts * 1000)
+                var syllables: [SyllableDto] = []
+                var fullText = ""
+                
+                for word in richSync.l {
+                    let wordStartMs = lineStartMs + Int64(word.o * 1000)
+                    
+                    syllables.append(SyllableDto(
+                        startTimeMs: wordStartMs,
+                        numChars: Int64(word.c.count)
+                    ))
+                    fullText += word.c
+                }
+                
+                return LyricsLineDto(
+                    words: fullText,
+                    startTimeMs: lineStartMs,
+                    syllables: syllables
+                )
+            }
+        } catch {
+            print("Failed to parse RichSync: \(error)")
+            return []
+        }
+    }
+
     //
 
     func getLyrics(_ query: LyricsSearchQuery, options: LyricsOptions) throws -> LyricsDto {
@@ -147,7 +184,60 @@ class MusixmatchLyricsRepository: LyricsRepository {
             return cached.dto
         }
 
-        var musixmatchQuery = [
+        // ========== 优先级 1: 尝试获取 RichSync 逐字歌词 ==========
+        var richsyncQuery: [String: Any] = [
+            "track_spotify_id": query.spotifyTrackId,
+            "q_track": query.title,
+            "q_artist": query.primaryArtist,
+            "format": "json"
+        ]
+        
+        if !selectedLanguage.isEmpty && selectedLanguage != "en" {
+            richsyncQuery["selected_language"] = selectedLanguage
+        }
+        
+        do {
+            let data = try perform(
+                "/ws/1.1/track.richsync.get",
+                query: richsyncQuery
+            )
+            
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let message = json["message"] as? [String: Any],
+               let header = message["header"] as? [String: Any],
+               let statusCode = header["status_code"] as? Int {
+                
+                if statusCode == 200,
+                   let body = message["body"] as? [String: Any],
+                   let richsync = body["richsync"] as? [String: Any],
+                   let richsyncBodyString = richsync["richsync_body"] as? String {
+                    
+                    let syllableLines = parseRichSyncLyrics(richsyncBodyString)
+                    
+                    if !syllableLines.isEmpty {
+                        let language = richsync["richssync_language"] as? String ?? "en"
+                        
+                        let lyricsDto = LyricsDto(
+                            lines: syllableLines,
+                            timeSynced: true,
+                            isSyllableSynced: true,
+                            romanization: .original,
+                            translation: nil
+                        )
+                        
+                        lyricsCache.setObject(CachedLyrics(dto: lyricsDto), forKey: cacheKey as NSString)
+                        return lyricsDto
+                    }
+                } else if statusCode == 404 {
+                    // RichSync 不存在，继续降级
+                }
+            }
+        } catch {
+            print("RichSync request failed: \(error), falling back to subtitles")
+        }
+
+        // ========== 优先级 2: 行同步歌词 (原有逻辑) ==========
+        var musixmatchQuery: [String: Any] = [
             "track_spotify_id": query.spotifyTrackId,
             "subtitle_format": "mxm",
             "q_track": query.title,
@@ -255,6 +345,7 @@ class MusixmatchLyricsRepository: LyricsRepository {
             return lyricsDto
         }
 
+        // ========== 优先级 3: 纯文本歌词 ==========
         if let trackLyricsGet = macroCalls["track.lyrics.get"] as? [String: Any],
             let lyricsMessage = trackLyricsGet["message"] as? [String: Any],
             let lyricsHeader = lyricsMessage["header"] as? [String: Any],
@@ -280,7 +371,7 @@ class MusixmatchLyricsRepository: LyricsRepository {
                         plainLyrics
                         .components(separatedBy: "\n")
                         .dropLast()
-                        .map { LyricsLineDto(words: $0.lyricsNoteIfEmpty,startTimeMs: nil, syllables: nil) },
+                        .map { LyricsLineDto(words: $0.lyricsNoteIfEmpty, startTimeMs: nil, syllables: nil) },
                     timeSynced: false,
                     isSyllableSynced: false,
                     romanization: lyricsLanguage.isCanBeRomanizedLanguage
