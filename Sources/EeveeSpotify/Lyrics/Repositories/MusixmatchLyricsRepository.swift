@@ -184,59 +184,7 @@ class MusixmatchLyricsRepository: LyricsRepository {
             return cached.dto
         }
 
-        // ========== 优先级 1: 尝试获取 RichSync 逐字歌词 ==========
-        var richsyncQuery: [String: Any] = [
-            "track_spotify_id": query.spotifyTrackId,
-            "q_track": query.title,
-            "q_artist": query.primaryArtist,
-            "format": "json"
-        ]
-        
-        if !selectedLanguage.isEmpty && selectedLanguage != "en" {
-            richsyncQuery["selected_language"] = selectedLanguage
-        }
-        
-        do {
-            let data = try perform(
-                "/ws/1.1/track.richsync.get",
-                query: richsyncQuery
-            )
-            
-            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let message = json["message"] as? [String: Any],
-               let header = message["header"] as? [String: Any],
-               let statusCode = header["status_code"] as? Int {
-                
-                if statusCode == 200,
-                   let body = message["body"] as? [String: Any],
-                   let richsync = body["richsync"] as? [String: Any],
-                   let richsyncBodyString = richsync["richsync_body"] as? String {
-                    
-                    let syllableLines = parseRichSyncLyrics(richsyncBodyString)
-                    
-                    if !syllableLines.isEmpty {
-                        let language = richsync["richssync_language"] as? String ?? "en"
-                        
-                        let lyricsDto = LyricsDto(
-                            lines: syllableLines,
-                            timeSynced: true,
-                            isSyllableSynced: true,
-                            romanization: .original,
-                            translation: nil
-                        )
-                        
-                        lyricsCache.setObject(CachedLyrics(dto: lyricsDto), forKey: cacheKey as NSString)
-                        return lyricsDto
-                    }
-                } else if statusCode == 404 {
-                    // RichSync 不存在，继续降级
-                }
-            }
-        } catch {
-            print("RichSync request failed: \(error), falling back to subtitles")
-        }
-
-        // ========== 优先级 2: 行同步歌词 (原有逻辑) ==========
+        // 准备请求参数
         var musixmatchQuery: [String: Any] = [
             "track_spotify_id": query.spotifyTrackId,
             "subtitle_format": "mxm",
@@ -249,6 +197,7 @@ class MusixmatchLyricsRepository: LyricsRepository {
             musixmatchQuery["part"] = "subtitle_translated"
         }
 
+        // 发送请求（代理会自动合并 richsync + subtitles）
         let data = try perform(
             "/ws/1.1/macro.subtitles.get",
             query: musixmatchQuery
@@ -256,36 +205,64 @@ class MusixmatchLyricsRepository: LyricsRepository {
 
         var romanized = false
         var translation: LyricsTranslationDto? = nil
+        var subtitleLines: [LyricsLineDto] = []
+        var richsyncLines: [LyricsLineDto] = []
+        var hasRichSync = false
+        var subtitleLanguage: String?
 
         let macroCalls = try getMacroCalls(data)
 
+        // ========== 检查是否有 RichSync 逐字歌词 ==========
+        if let trackRichsyncGet = macroCalls["track.richsync.get"] as? [String: Any],
+           let richsyncMessage = trackRichsyncGet["message"] as? [String: Any],
+           let header = richsyncMessage["header"] as? [String: Any],
+           let statusCode = header["status_code"] as? Int,
+           statusCode == 200,
+           let body = richsyncMessage["body"] as? [String: Any],
+           let richsync = body["richsync"] as? [String: Any],
+           let richsyncBodyString = richsync["richsync_body"] as? String {
+            
+            richsyncLines = parseRichSyncLyrics(richsyncBodyString)
+            if !richsyncLines.isEmpty {
+                hasRichSync = true
+                subtitleLanguage = richsync["richssync_language"] as? String
+            }
+        }
+
+        // ========== 处理字幕（包含翻译） ==========
         if let trackSubtitlesGet = macroCalls["track.subtitles.get"] as? [String: Any],
             let subtitlesMessage = trackSubtitlesGet["message"] as? [String: Any],
             let subtitle = try? getFirstSubtitle(subtitlesMessage),
-            let subtitleLanguage = subtitle["subtitle_language"] as? String,
+            let subLanguage = subtitle["subtitle_language"] as? String,
             let subtitleBody = subtitle["subtitle_body"] as? String,
             let subtitles = try? JSONDecoder().decode(
                 [MusixmatchSubtitle].self, from: subtitleBody.data(using: .utf8)!
             )
         {
+            if subtitleLanguage == nil {
+                subtitleLanguage = subLanguage
+            }
+            
+            let romanizationLanguage = "r\(subLanguage.prefix(1))"
 
-            let romanizationLanguage = "r\(subtitleLanguage.prefix(1))"
-
-            var lyricsLines = subtitles.dropLast().map { subtitle in
+            subtitleLines = subtitles.dropLast().map { subtitle in
                 LyricsLineDto(
                     words: subtitle.text.lyricsNoteIfEmpty,
-                    startTimeMs: Int64(subtitle.time.total * 1000)
+                    startTimeMs: Int64(subtitle.time.total * 1000),
+                    syllables: nil
                 )
             }
 
-            lyricsLines.append(
+            subtitleLines.append(
                 LyricsLineDto(
                     words: "",
-                    startTimeMs: Int64(subtitles.last!.time.total * 1000)
+                    startTimeMs: Int64(subtitles.last!.time.total * 1000),
+                    syllables: nil
                 )
             )
 
-            if selectedLanguage != subtitleLanguage,
+            // 处理翻译
+            if selectedLanguage != subLanguage,
                 let subtitleTranslated = subtitle["subtitle_translated"] as? [String: Any],
                 let subtitleTranslatedBody = subtitleTranslated["subtitle_body"] as? String,
                 let subtitlesTranslated = try? JSONDecoder().decode(
@@ -294,10 +271,9 @@ class MusixmatchLyricsRepository: LyricsRepository {
             {
                 if selectedLanguage == romanizationLanguage {
                     romanized = true
-
                     for (index, subtitleTranslated) in subtitlesTranslated.enumerated() {
-                        if !subtitleTranslated.text.isEmpty {
-                            lyricsLines[index].words = subtitleTranslated.text
+                        if index < subtitleLines.count && !subtitleTranslated.text.isEmpty {
+                            subtitleLines[index].words = subtitleTranslated.text
                         }
                     }
                 } else {
@@ -308,81 +284,120 @@ class MusixmatchLyricsRepository: LyricsRepository {
                 }
             }
 
+            // 罗马音处理
             if options.romanization && selectedLanguage != romanizationLanguage {
                 if let translations = try? getTranslations(
                     query.spotifyTrackId,
                     selectedLanguage: romanizationLanguage
                 ) {
                     romanized = true
-
-                    for (original, translation) in translations {
-                        for i in 0..<lyricsLines.count {
-                            if lyricsLines[i].words == original {
-                                lyricsLines[i].words = translation
+                    for (original, translationText) in translations {
+                        for i in 0..<subtitleLines.count {
+                            if subtitleLines[i].words == original {
+                                subtitleLines[i].words = translationText
                             }
                         }
                     }
                 }
             }
-
-            var romanization = LyricsRomanizationStatus.original
-
-            if romanized {
-                romanization = .romanized
-            } else if subtitleLanguage.isCanBeRomanizedLanguage {
-                romanization = .canBeRomanized
-            }
-
-            let lyricsDto = LyricsDto(
-                lines: lyricsLines,
-                timeSynced: true,
-                isSyllableSynced: false,
-                romanization: romanization,
-                translation: translation
-            )
-
-            lyricsCache.setObject(CachedLyrics(dto: lyricsDto), forKey: cacheKey as NSString)
-            return lyricsDto
         }
 
-        // ========== 优先级 3: 纯文本歌词 ==========
-        if let trackLyricsGet = macroCalls["track.lyrics.get"] as? [String: Any],
-            let lyricsMessage = trackLyricsGet["message"] as? [String: Any],
-            let lyricsHeader = lyricsMessage["header"] as? [String: Any],
-            let lyricsStatusCode = lyricsHeader["status_code"] as? Int
-        {
-
-            if lyricsStatusCode == 404 {
-                throw LyricsError.noSuchSong
+        // ========== 合并结果 ==========
+        let finalLines: [LyricsLineDto]
+        let isSyllableSynced: Bool
+        let timeSynced: Bool
+        
+        if hasRichSync && !richsyncLines.isEmpty {
+            // 使用逐字歌词，合并翻译
+            finalLines = richsyncLines
+            isSyllableSynced = true
+            timeSynced = true
+            
+            // 如果字幕有翻译，按时间对齐
+            if translation != nil && !subtitleLines.isEmpty {
+                var alignedTranslations: [String] = Array(repeating: "", count: richsyncLines.count)
+                
+                for (index, richLine) in richsyncLines.enumerated() {
+                    if let richStartTime = richLine.startTimeMs {
+                        var closestIndex = -1
+                        var minDiff = Int64.max
+                        
+                        for (subIndex, subLine) in subtitleLines.enumerated() {
+                            if let subStartTime = subLine.startTimeMs {
+                                let diff = abs(richStartTime - subStartTime)
+                                if diff < minDiff {
+                                    minDiff = diff
+                                    closestIndex = subIndex
+                                }
+                            }
+                        }
+                        
+                        if closestIndex >= 0 && closestIndex < (translation?.lines.count ?? 0) {
+                            alignedTranslations[index] = translation?.lines[closestIndex] ?? ""
+                        }
+                    }
+                }
+                
+                translation = LyricsTranslationDto(
+                    languageCode: translation?.languageCode ?? selectedLanguage,
+                    lines: alignedTranslations
+                )
             }
-
-            if let lyricsBody = lyricsMessage["body"] as? [String: Any],
-                let lyrics = lyricsBody["lyrics"] as? [String: Any],
-                let lyricsLanguage = lyrics["lyrics_language"] as? String,
-                let plainLyrics = lyrics["lyrics_body"] as? String
+        } else if !subtitleLines.isEmpty {
+            // 使用普通行同步歌词
+            finalLines = subtitleLines
+            isSyllableSynced = false
+            timeSynced = true
+        } else {
+            // 降级到纯文本歌词
+            if let trackLyricsGet = macroCalls["track.lyrics.get"] as? [String: Any],
+                let lyricsMessage = trackLyricsGet["message"] as? [String: Any],
+                let lyricsHeader = lyricsMessage["header"] as? [String: Any],
+                let lyricsStatusCode = lyricsHeader["status_code"] as? Int
             {
-
-                if let restricted = lyrics["restricted"] as? Bool, restricted {
-                    throw LyricsError.musixmatchRestricted
+                if lyricsStatusCode == 404 {
+                    throw LyricsError.noSuchSong
                 }
 
-                let lyricsDto = LyricsDto(
-                    lines:
-                        plainLyrics
+                if let lyricsBody = lyricsMessage["body"] as? [String: Any],
+                    let lyrics = lyricsBody["lyrics"] as? [String: Any],
+                    let plainLyrics = lyrics["lyrics_body"] as? String
+                {
+                    if let restricted = lyrics["restricted"] as? Bool, restricted {
+                        throw LyricsError.musixmatchRestricted
+                    }
+
+                    finalLines = plainLyrics
                         .components(separatedBy: "\n")
                         .dropLast()
-                        .map { LyricsLineDto(words: $0.lyricsNoteIfEmpty, startTimeMs: nil, syllables: nil) },
-                    timeSynced: false,
-                    isSyllableSynced: false,
-                    romanization: lyricsLanguage.isCanBeRomanizedLanguage
-                        ? .canBeRomanized : .original
-                )
-
-                lyricsCache.setObject(CachedLyrics(dto: lyricsDto), forKey: cacheKey as NSString)
-                return lyricsDto
+                        .map { LyricsLineDto(words: $0.lyricsNoteIfEmpty, startTimeMs: nil, syllables: nil) }
+                    isSyllableSynced = false
+                    timeSynced = false
+                } else {
+                    throw LyricsError.decodingError
+                }
+            } else {
+                throw LyricsError.decodingError
             }
         }
 
-        throw LyricsError.decodingError
+        // 处理罗马化状态
+        var romanizationStatus = LyricsRomanizationStatus.original
+        if romanized {
+            romanizationStatus = .romanized
+        } else if !hasRichSync, let lang = subtitleLanguage, lang.isCanBeRomanizedLanguage {
+            romanizationStatus = .canBeRomanized
+        }
+
+        let lyricsDto = LyricsDto(
+            lines: finalLines,
+            timeSynced: timeSynced,
+            isSyllableSynced: isSyllableSynced,
+            romanization: romanizationStatus,
+            translation: translation
+        )
+
+        lyricsCache.setObject(CachedLyrics(dto: lyricsDto), forKey: cacheKey as NSString)
+        return lyricsDto
     }
 }
