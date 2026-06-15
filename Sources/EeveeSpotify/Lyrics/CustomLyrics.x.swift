@@ -17,8 +17,26 @@ var hasShownUnauthorizedPopUp = false
 private let geniusLyricsRepository = GeniusLyricsRepository()
 private let petitLyricsRepository = PetitLyricsRepository()
 
+// MARK: - 繁体转简体辅助函数
+private func traditionalToSimplified(_ text: String) -> String {
+    return text.applyingTransform(StringTransform("Traditional-Simplified"), reverse: false) ?? text
+}
+
+/// Returns a serialized empty lyrics payload.
+/// Used as a fallback when every lyrics source (including fallback) fails,
+/// so we show "no lyrics" instead of leaking Spotify's own response.
+func emptyLyricsData(originalLyrics: ColorLyricsResponse? = nil) -> Data? {
+    let emptyDto = LyricsDto(lines: [], timeSynced: false, romanization: .original, translation: nil)
+    var colorLyricsResponse = ColorLyricsResponse()
+    colorLyricsResponse.lyrics = emptyDto.toSpotifyLyricsData(source: "")
+    if let originalLyrics = originalLyrics {
+        colorLyricsResponse.colors = originalLyrics.colors
+    }
+    return try? colorLyricsResponse.serializedBytes()
+}
+
 // Overload for 9.1.6 where we only have track ID from URL
-private func loadCustomLyricsForTrackId(_ trackId: String) throws -> Lyrics {
+private func loadCustomLyricsForTrackId(_ trackId: String) throws -> ColorLyricsResponse {
     
     var source = UserDefaults.lyricsSource
 
@@ -155,15 +173,15 @@ private func loadCustomLyricsForTrackId(_ trackId: String) throws -> Lyrics {
             lyricsState.fallbackError = .unknownError
         }
 
-        // Attempt Genius fallback if enabled and the primary source isn't already Genius.
-        // Genius requires title + artist to search — only attempt if we have them.
-        let canFallbackToGenius = source != .genius
+        // 改动1：将回退目标从 Genius 改为 Musixmatch
+        let canFallbackToMusixmatch = source != .musixmatch
             && UserDefaults.lyricsOptions.geniusFallback
             && !(currentTitle ?? "").isEmpty
             && !(currentArtist ?? "").isEmpty
-        if canFallbackToGenius {
-            source = .genius
-            lyricsDto = try geniusLyricsRepository.getLyrics(searchQuery, options: options)
+        
+        if canFallbackToMusixmatch {
+            source = .musixmatch
+            lyricsDto = try MusixmatchLyricsRepository.shared.getLyrics(searchQuery, options: options)
         } else {
             throw error
         }
@@ -176,14 +194,13 @@ private func loadCustomLyricsForTrackId(_ trackId: String) throws -> Lyrics {
     
     lyricsState.loadedSuccessfully = true
 
-    let lyrics = Lyrics.with {
-        $0.data = lyricsDto.toSpotifyLyricsData(source: source.description)
-    }
+    var colorLyricsResponse = ColorLyricsResponse()
+    colorLyricsResponse.lyrics = lyricsDto.toSpotifyLyricsData(source: source.description)
     
-    return lyrics
+    return colorLyricsResponse
 }
 
-private func loadCustomLyricsForCurrentTrack() throws -> Lyrics {
+private func loadCustomLyricsForCurrentTrack() throws -> ColorLyricsResponse {
     
     guard
         let track = statefulPlayer?.currentTrack() ??
@@ -204,7 +221,6 @@ private func loadCustomLyricsForCurrentTrack() throws -> Lyrics {
     let options = UserDefaults.lyricsOptions
     var source = UserDefaults.lyricsSource
     
-    // switched to swift 5.8 syntax to compile with Theos on Linux.
     var repository: LyricsRepository
 
     switch source {
@@ -263,12 +279,13 @@ private func loadCustomLyricsForCurrentTrack() throws -> Lyrics {
             lyricsState.fallbackError = .unknownError
         }
         
-        if source == .genius || !UserDefaults.lyricsOptions.geniusFallback {
+        // 改动2：将回退目标从 Genius 改为 Musixmatch
+        if source == .musixmatch || !UserDefaults.lyricsOptions.geniusFallback {
             throw error
         }
         
-        source = .genius
-        repository = GeniusLyricsRepository()
+        source = .musixmatch
+        repository = MusixmatchLyricsRepository.shared
         
         lyricsDto = try repository.getLyrics(searchQuery, options: options)
     }
@@ -280,28 +297,13 @@ private func loadCustomLyricsForCurrentTrack() throws -> Lyrics {
     
     lyricsState.loadedSuccessfully = true
 
-    let lyrics = Lyrics.with {
-        $0.data = lyricsDto.toSpotifyLyricsData(source: source.description)
-    }
+    var colorLyricsResponse = ColorLyricsResponse()
+    colorLyricsResponse.lyrics = lyricsDto.toSpotifyLyricsData(source: source.description)
     
-    return lyrics
+    return colorLyricsResponse
 }
 
-/// Returns a serialized empty `Lyrics` protobuf payload.
-/// Used as a fallback when every lyrics source (including Genius fallback) fails,
-/// so we show "no lyrics" instead of leaking Spotify's own Musixmatch response.
-func emptyLyricsData(originalLyrics: Lyrics? = nil) -> Data? {
-    let emptyDto = LyricsDto(lines: [], timeSynced: false, romanization: .original, translation: nil)
-    var lyrics = Lyrics.with {
-        $0.data = emptyDto.toSpotifyLyricsData(source: "")
-    }
-    if let originalLyrics = originalLyrics {
-        lyrics.colors = originalLyrics.colors
-    }
-    return try? lyrics.serializedData()
-}
-
-func getLyricsDataForCurrentTrack(_ originalPath: String, originalLyrics: Lyrics? = nil) throws -> Data {
+func getLyricsDataForCurrentTrack(_ originalPath: String, originalLyrics: ColorLyricsResponse? = nil) throws -> Data {
     
     // track id from URL path; player objects are nil on 9.1.6
     // path: /color-lyrics/v2/track/{trackId}
@@ -323,12 +325,21 @@ func getLyricsDataForCurrentTrack(_ originalPath: String, originalLyrics: Lyrics
         capturedTrackId = nil
     }
 
-    var lyrics = try loadCustomLyricsForTrackId(trackIdentifier)
+    var colorLyricsResponse = try loadCustomLyricsForTrackId(trackIdentifier)
+    
+    // 改动3：如果歌词来自 Musixmatch，将繁体转简体
+    if colorLyricsResponse.lyrics.provider == "Musixmatch" {
+        var lyrics = colorLyricsResponse.lyrics
+        for i in 0..<lyrics.lines.count {
+            lyrics.lines[i].words = traditionalToSimplified(lyrics.lines[i].words)
+        }
+        colorLyricsResponse.lyrics = lyrics
+    }
     
     let lyricsColorsSettings = UserDefaults.lyricsColors
     
     if lyricsColorsSettings.displayOriginalColors, let originalLyrics = originalLyrics {
-        lyrics.colors = originalLyrics.colors
+        colorLyricsResponse.colors = originalLyrics.colors
     }
     else {
         // no track object on 9.1.6: static color, else background color, else gray
@@ -345,13 +356,14 @@ func getLyricsDataForCurrentTrack(_ originalPath: String, originalLyrics: Lyrics
             color = Color.gray
         }
         
-        lyrics.colors = LyricsColors.with {
-            $0.backgroundColor = color.uInt32
-            $0.lineColor = Color.black.uInt32
-            $0.activeLineColor = Color.white.uInt32
-        }
+        var colorData = ColorData()
+        colorData.background = Int32(bitPattern: color.uInt32)
+        colorData.text = Int32(bitPattern: Color.black.uInt32)
+        colorData.highlightText = Int32(bitPattern: Color.white.uInt32)
+        
+        colorLyricsResponse.colors = colorData
     }
     
-    let serializedData = try lyrics.serializedData()
+    let serializedData = try colorLyricsResponse.serializedBytes()
     return serializedData
 }
