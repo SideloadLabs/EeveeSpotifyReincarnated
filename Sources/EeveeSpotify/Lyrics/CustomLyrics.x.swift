@@ -2,14 +2,12 @@ import Orion
 import SwiftUI
 import MediaPlayer
 
-//
-
 struct BaseLyricsGroup: HookGroup { }
 
 struct LegacyLyricsGroup: HookGroup { }
 struct ModernLyricsGroup: HookGroup { }
-struct V91LyricsGroup: HookGroup { }  // For Spotify 9.1.x - excludes incompatible hooks
-struct LyricsErrorHandlingGroup: HookGroup { }  // ErrorViewController hooks - not compatible with 9.1.x
+struct V91LyricsGroup: HookGroup { }            // 9.1.x-safe subset
+struct LyricsErrorHandlingGroup: HookGroup { }  // not activated on 9.1.x
 
 var lyricsState = LyricsLoadingState()
 
@@ -19,89 +17,80 @@ var hasShownUnauthorizedPopUp = false
 private let geniusLyricsRepository = GeniusLyricsRepository()
 private let petitLyricsRepository = PetitLyricsRepository()
 
-// MARK: - 繁体转简体辅助函数
-private func traditionalToSimplified(_ text: String) -> String {
-    return text.applyingTransform(StringTransform("Traditional-Simplified"), reverse: false) ?? text
-}
-
 // Overload for 9.1.6 where we only have track ID from URL
-private func loadCustomLyricsForTrackId(_ trackId: String) throws -> ColorLyricsResponse {
+private func loadCustomLyricsForTrackId(_ trackId: String) throws -> Lyrics {
     
-    let source = UserDefaults.lyricsSource
-    
-    // Always clear captured metadata to ensure we fetch fresh info
+    var source = UserDefaults.lyricsSource
+
     var currentTitle: String? = nil
     var currentArtist: String? = nil
     var hasMetadata = false
-    
-    // If metadata is needed (Genius/LRCLIB/Petit), fetch using token
+
     let needsMetadata = source == .genius || source == .lrclib || source == .petit
-    
-    // Check if we already have the metadata cached for this exact trackId
+
+    // 1. Use cached metadata if it's for the same track
     if capturedTrackId == trackId, let title = capturedTrackTitle, let artist = capturedArtistName {
         currentTitle = title
         currentArtist = artist
         hasMetadata = true
     }
-    
-    // Fetch if missing
+
+    // 2. Try statefulPlayer (most reliable on modern Spotify)
     if !hasMetadata {
-        
-        // Try getting metadata from the current player state (most reliable)
-        if let player = statefulPlayer, 
+        if let player = statefulPlayer,
            let track = player.currentTrack() {
             let currentId = track.URI().spt_trackIdentifier()
-            
+
             if currentId == trackId {
                 currentTitle = track.trackTitle()
                 currentArtist = track.artistName()
                 hasMetadata = true
-                
-                // Cache it
                 capturedTrackId = trackId
                 capturedTrackTitle = currentTitle
                 capturedArtistName = currentArtist
-            } else {
-            }
-        } else {
-        }
-
-        if !hasMetadata {
-            // Try MPNowPlayingInfoCenter (always available, version-independent)
-            if let info = MPNowPlayingInfoCenter.default().nowPlayingInfo,
-               let title = info[MPMediaItemPropertyTitle] as? String,
-               let artist = info[MPMediaItemPropertyArtist] as? String,
-               !title.isEmpty, !artist.isEmpty {
-                currentTitle = title
-                currentArtist = artist
-                hasMetadata = true
-                capturedTrackId = trackId
-                capturedTrackTitle = title
-                capturedArtistName = artist
-            }
-        }
-
-        if !hasMetadata {
-            if let token = spotifyAccessToken {
-                if let info = fetchTrackDetails(trackId: trackId, token: token) {
-                    currentTitle = info.title
-                    currentArtist = info.artist
-                    hasMetadata = true
-                    
-                    // Cache it
-                    capturedTrackId = trackId
-                    capturedTrackTitle = currentTitle
-                    capturedArtistName = currentArtist
-                }
             }
         }
     }
-    
+
+    // 3. MPNowPlayingInfoCenter — must be read on the main thread
+    if !hasMetadata {
+        var npTitle: String? = nil
+        var npArtist: String? = nil
+        if Thread.isMainThread {
+            npTitle = MPNowPlayingInfoCenter.default().nowPlayingInfo?[MPMediaItemPropertyTitle] as? String
+            npArtist = MPNowPlayingInfoCenter.default().nowPlayingInfo?[MPMediaItemPropertyArtist] as? String
+        } else {
+            DispatchQueue.main.sync {
+                npTitle = MPNowPlayingInfoCenter.default().nowPlayingInfo?[MPMediaItemPropertyTitle] as? String
+                npArtist = MPNowPlayingInfoCenter.default().nowPlayingInfo?[MPMediaItemPropertyArtist] as? String
+            }
+        }
+        if let title = npTitle, let artist = npArtist, !title.isEmpty, !artist.isEmpty {
+            currentTitle = title
+            currentArtist = artist
+            hasMetadata = true
+            capturedTrackId = trackId
+            capturedTrackTitle = title
+            capturedArtistName = artist
+        }
+    }
+
+    // 4. Spotify Web API fallback using captured Bearer token
+    if !hasMetadata, let token = spotifyAccessToken {
+        if let info = fetchTrackDetails(trackId: trackId, token: token) {
+            currentTitle = info.title
+            currentArtist = info.artist
+            hasMetadata = true
+            capturedTrackId = trackId
+            capturedTrackTitle = currentTitle
+            capturedArtistName = currentArtist
+        }
+    }
+
     if needsMetadata && !hasMetadata {
         throw LyricsError.noSuchSong
     }
-    
-    // Create search query with available data
+
     let searchQuery = LyricsSearchQuery(
         title: currentTitle ?? "",
         primaryArtist: currentArtist ?? "",
@@ -133,14 +122,51 @@ private func loadCustomLyricsForTrackId(_ trackId: String) throws -> ColorLyrics
         lyricsDto = try repository.getLyrics(searchQuery, options: options)
     }
     catch let error {
-        // 改动1：添加回退逻辑到 Musixmatch（如果当前源不是 Musixmatch 且开启了 geniusFallback）
-        if source == .musixmatch || !UserDefaults.lyricsOptions.geniusFallback {
+        if let lyricsError = error as? LyricsError {
+            lyricsState.fallbackError = lyricsError
+
+            switch lyricsError {
+            case .invalidMusixmatchToken:
+                if !hasShownUnauthorizedPopUp {
+                    DispatchQueue.main.async {
+                        PopUpHelper.showPopUp(
+                            delayed: false,
+                            message: "musixmatch_unauthorized_popup".localized,
+                            buttonText: "OK".uiKitLocalized
+                        )
+                    }
+                    hasShownUnauthorizedPopUp = true
+                }
+            case .musixmatchRestricted:
+                if !hasShownRestrictedPopUp {
+                    DispatchQueue.main.async {
+                        PopUpHelper.showPopUp(
+                            delayed: false,
+                            message: "musixmatch_restricted_popup".localized,
+                            buttonText: "OK".uiKitLocalized
+                        )
+                    }
+                    hasShownRestrictedPopUp = true
+                }
+            default:
+                break
+            }
+        } else {
+            lyricsState.fallbackError = .unknownError
+        }
+
+        // Attempt Genius fallback if enabled and the primary source isn't already Genius.
+        // Genius requires title + artist to search — only attempt if we have them.
+        let canFallbackToGenius = source != .genius
+            && UserDefaults.lyricsOptions.geniusFallback
+            && !(currentTitle ?? "").isEmpty
+            && !(currentArtist ?? "").isEmpty
+        if canFallbackToGenius {
+            source = .genius
+            lyricsDto = try geniusLyricsRepository.getLyrics(searchQuery, options: options)
+        } else {
             throw error
         }
-        
-        // 回退到 Musixmatch
-        let musixmatchRepository = MusixmatchLyricsRepository.shared
-        lyricsDto = try musixmatchRepository.getLyrics(searchQuery, options: options)
     }
     
     lyricsState.isEmpty = lyricsDto.lines.isEmpty
@@ -150,15 +176,14 @@ private func loadCustomLyricsForTrackId(_ trackId: String) throws -> ColorLyrics
     
     lyricsState.loadedSuccessfully = true
 
-    var colorLyricsResponse = ColorLyricsResponse()
-    colorLyricsResponse.lyrics = lyricsDto.toSpotifyLyricsData(source: source.description)
+    let lyrics = Lyrics.with {
+        $0.data = lyricsDto.toSpotifyLyricsData(source: source.description)
+    }
     
-    return colorLyricsResponse
+    return lyrics
 }
 
-//
-
-private func loadCustomLyricsForCurrentTrack() throws -> ColorLyricsResponse {
+private func loadCustomLyricsForCurrentTrack() throws -> Lyrics {
     
     guard
         let track = statefulPlayer?.currentTrack() ??
@@ -168,11 +193,8 @@ private func loadCustomLyricsForCurrentTrack() throws -> ColorLyricsResponse {
         }
     
     let trackTitle = track.trackTitle()
-    let artistName = EeveeSpotify.hookTarget == .lastAvailableiOS14
-        ? track.artistName()
-        : track.artistName()
-    
-    
+    let artistName = track.artistName()
+
     let searchQuery = LyricsSearchQuery(
         title: trackTitle,
         primaryArtist: artistName,
@@ -241,14 +263,12 @@ private func loadCustomLyricsForCurrentTrack() throws -> ColorLyricsResponse {
             lyricsState.fallbackError = .unknownError
         }
         
-        // 改动2：将回退目标从 Genius 改为 Musixmatch
-        if source == .musixmatch || !UserDefaults.lyricsOptions.geniusFallback {
+        if source == .genius || !UserDefaults.lyricsOptions.geniusFallback {
             throw error
         }
         
-        // 回退到 Musixmatch
-        source = .musixmatch
-        repository = MusixmatchLyricsRepository.shared
+        source = .genius
+        repository = GeniusLyricsRepository()
         
         lyricsDto = try repository.getLyrics(searchQuery, options: options)
     }
@@ -260,16 +280,31 @@ private func loadCustomLyricsForCurrentTrack() throws -> ColorLyricsResponse {
     
     lyricsState.loadedSuccessfully = true
 
-    var colorLyricsResponse = ColorLyricsResponse()
-    colorLyricsResponse.lyrics = lyricsDto.toSpotifyLyricsData(source: source.description)
+    let lyrics = Lyrics.with {
+        $0.data = lyricsDto.toSpotifyLyricsData(source: source.description)
+    }
     
-    return colorLyricsResponse
+    return lyrics
 }
 
-func getLyricsDataForCurrentTrack(_ originalPath: String, originalLyrics: ColorLyricsResponse? = nil) throws -> Data {
+/// Returns a serialized empty `Lyrics` protobuf payload.
+/// Used as a fallback when every lyrics source (including Genius fallback) fails,
+/// so we show "no lyrics" instead of leaking Spotify's own Musixmatch response.
+func emptyLyricsData(originalLyrics: Lyrics? = nil) -> Data? {
+    let emptyDto = LyricsDto(lines: [], timeSynced: false, romanization: .original, translation: nil)
+    var lyrics = Lyrics.with {
+        $0.data = emptyDto.toSpotifyLyricsData(source: "")
+    }
+    if let originalLyrics = originalLyrics {
+        lyrics.colors = originalLyrics.colors
+    }
+    return try? lyrics.serializedData()
+}
+
+func getLyricsDataForCurrentTrack(_ originalPath: String, originalLyrics: Lyrics? = nil) throws -> Data {
     
-    // Extract track ID from URL path since player objects are nil in 9.1.6
-    // Format: /color-lyrics/v2/track/{trackId} or /lyrics/.../{trackId}
+    // track id from URL path; player objects are nil on 9.1.6
+    // path: /color-lyrics/v2/track/{trackId}
     let trackIdentifier: String
     if let range = originalPath.range(of: #"/track/([a-zA-Z0-9]+)"#, options: .regularExpression) {
         let match = originalPath[range]
@@ -277,45 +312,26 @@ func getLyricsDataForCurrentTrack(_ originalPath: String, originalLyrics: ColorL
     } else {
         throw LyricsError.noCurrentTrack
     }
-    
-    // Verify track ID was extracted
+
     if trackIdentifier.isEmpty {
         throw LyricsError.noCurrentTrack
     }
-    
-    // Try to capture metadata from view hierarchy at lyrics request time
-    // Always try to capture fresh metadata when track changes
-    // Clear old metadata if track ID changed
+
     if capturedTrackId != trackIdentifier {
         capturedTrackTitle = nil
         capturedArtistName = nil
         capturedTrackId = nil
     }
-    
-    
-    // We strictly use API fetching now (handled in loadCustomLyricsForTrackId)
-    // No more UI scraping or system info hacking
-    
-    // Use track ID version for 9.1.6 where we don't have track objects
-    var colorLyricsResponse = try loadCustomLyricsForTrackId(trackIdentifier)
-    
-    // 改动3：如果歌词来自 Musixmatch，将繁体转简体
-    if colorLyricsResponse.lyrics.provider == "Musixmatch" {
-        var lyrics = colorLyricsResponse.lyrics
-        for i in 0..<lyrics.lines.count {
-            lyrics.lines[i].words = traditionalToSimplified(lyrics.lines[i].words)
-        }
-        colorLyricsResponse.lyrics = lyrics
-    }
+
+    var lyrics = try loadCustomLyricsForTrackId(trackIdentifier)
     
     let lyricsColorsSettings = UserDefaults.lyricsColors
     
     if lyricsColorsSettings.displayOriginalColors, let originalLyrics = originalLyrics {
-        colorLyricsResponse.colors = originalLyrics.colors
+        lyrics.colors = originalLyrics.colors
     }
     else {
-        // For 9.1.6, we don't have track object to extract color from
-        // Use static color if enabled, otherwise use background color or gray
+        // no track object on 9.1.6: static color, else background color, else gray
         var color: Color
         
         if lyricsColorsSettings.useStaticColor {
@@ -329,15 +345,13 @@ func getLyricsDataForCurrentTrack(_ originalPath: String, originalLyrics: ColorL
             color = Color.gray
         }
         
-        var colorData = ColorData()
-        // 直接使用 Int32(bitPattern:) 转换 UInt32 到 Int32
-        colorData.background = Int32(bitPattern: color.uInt32)
-        colorData.text = Int32(bitPattern: Color.black.uInt32)
-        colorData.highlightText = Int32(bitPattern: Color.white.uInt32)
-        
-        colorLyricsResponse.colors = colorData
+        lyrics.colors = LyricsColors.with {
+            $0.backgroundColor = color.uInt32
+            $0.lineColor = Color.black.uInt32
+            $0.activeLineColor = Color.white.uInt32
+        }
     }
     
-    let serializedData = try colorLyricsResponse.serializedData()
+    let serializedData = try lyrics.serializedData()
     return serializedData
 }
