@@ -40,15 +40,15 @@ class PetitLyricsRepository: LyricsRepository {
         if let error = error {
             throw error
         }
-        
-        guard let response = try? XMLDecoder().decode(PetitResponse.self, from: data!) else {
+
+        guard let data,
+              let response = try? XMLDecoder().decode(PetitResponse.self, from: data) else {
             throw LyricsError.decodingError
         }
 
         return response
     }
     
-    //
     
     private func searchSong(_ title: String, artist: String) throws -> PetitSong {
         let response = try perform(
@@ -62,7 +62,6 @@ class PetitLyricsRepository: LyricsRepository {
         return song
     }
     
-    //
     
     private func getSong(_ lyricsId: Int, availableLyricsType: PetitLyricsType) throws -> PetitSong {
         var lyricsType: PetitLyricsType
@@ -85,7 +84,6 @@ class PetitLyricsRepository: LyricsRepository {
         return song
     }
     
-    //
     
     func getLyrics(_ query: LyricsSearchQuery, options: LyricsOptions) throws -> LyricsDto {
         let searchResult = try searchSong(query.title, artist: query.primaryArtist)
@@ -109,25 +107,25 @@ class PetitLyricsRepository: LyricsRepository {
             return LyricsDto(
                 lines: lyrics.lines.map {
                     LyricsLineDto(
-                        words: $0.linestring,
-                        startTimeMs: Int64($0.words.first!.starttime)
+                        content: $0.linestring,
+                        offsetMs: $0.words.first?.starttime ?? 0
                     )
                 },
                 timeSynced: true,
-                isSyllableSynced: false,
                 romanization: lyrics.lines.map { $0.linestring }.canBeRomanized
                     ? .canBeRomanized
                     : .original
             )
             
         case .plain:
-            let stringLyrics = String(data: lyricsData, encoding: .utf8)!
+            guard let stringLyrics = String(data: lyricsData, encoding: .utf8) else {
+                throw LyricsError.decodingError
+            }
             let lines = stringLyrics.components(separatedBy: "\n")
             
             return LyricsDto(
-                lines: lines.map { LyricsLineDto(words: $0) },
+                lines: lines.map { LyricsLineDto(content: $0) },
                 timeSynced: false,
-                isSyllableSynced: false,
                 romanization: lines.canBeRomanized ? .canBeRomanized : .original
             )
             
