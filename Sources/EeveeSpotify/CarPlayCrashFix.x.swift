@@ -2,54 +2,42 @@ import Orion
 import Foundation
 import ObjectiveC.runtime
 
-// Fix for Issue #16: CarPlay launching can crash inside CarPlay.framework.
-//
-// Observed crash signatures so far:
-// - -[CPInterfaceController clientAssistantCellUnavailableWithError:] (older log)
-// - -[CPListTemplate setAssistantCellConfiguration:] (newer log)
-//
-// In sideloaded/resigned Spotify builds, CarPlay can raise an NSException from
-// these private callbacks, which terminates the app.
-//
-// We hook the callbacks and swallow them (no-op) so Spotify stays alive.
-// This trades a crash for a non-fatal CarPlay-unavailable / degraded state.
-
-struct CarPlayCrashFixGroup: HookGroup {}
+// Issue #16: CarPlay private callbacks can raise an NSException on resigned builds
+// and kill the app. We swallow them — trades a crash for degraded CarPlay.
+// Split per-class so a build with only one selector doesn't hook the absent one.
+struct CPInterfaceControllerCrashFixGroup: HookGroup {}
+struct CPListTemplateCrashFixGroup: HookGroup {}
 
 private var carPlayFixActivated = false
 private var carPlayFixAttempt = 0
 private let carPlayFixMaxAttempts = 30  // ~15s with 0.5s interval
 
 class CPInterfaceControllerCarPlayCrashFixHook: ClassHook<NSObject> {
-    typealias Group = CarPlayCrashFixGroup
+    typealias Group = CPInterfaceControllerCrashFixGroup
     static let targetName = "CPInterfaceController"
 
-    // Private API selector (observed in crash log)
     @objc(clientAssistantCellUnavailableWithError:)
     func clientAssistantCellUnavailableWithError(_ error: Any?) {
-        // Intentionally do NOT call orig — on affected OS versions this path
-        // can raise an exception and crash the entire process.
-        writeDebugLog("[CarPlayFix] Swallowed clientAssistantCellUnavailableWithError: \(String(describing: error))")
+        // no orig — this path can raise and crash the process
+        writeDebugLog("[CarPlayFix] Swallowed clientAssistantCellUnavailableWithError:")
     }
 }
 
 class CPListTemplateAssistantCellConfigCrashFixHook: ClassHook<NSObject> {
-    typealias Group = CarPlayCrashFixGroup
+    typealias Group = CPListTemplateCrashFixGroup
     static let targetName = "CPListTemplate"
 
-    // Private API selector (observed in crash log)
     @objc(setAssistantCellConfiguration:)
     func setAssistantCellConfiguration(_ config: Any?) {
-        // Do NOT call orig — this path can raise an NSException.
-        writeDebugLog("[CarPlayFix] Swallowed CPListTemplate setAssistantCellConfiguration: \(String(describing: config))")
+        // no orig — this path can raise an NSException
+        writeDebugLog("[CarPlayFix] Swallowed setAssistantCellConfiguration:")
     }
 }
 
 func activateCarPlayCrashFix() {
     if carPlayFixActivated { return }
 
-    // CarPlay.framework may not be loaded yet during tweak init.
-    // Retry a few times on the main queue until the classes appear.
+    // CarPlay.framework may not be loaded yet at init — retry until classes appear.
     guard let icCls = NSClassFromString("CPInterfaceController"),
           let ltCls = NSClassFromString("CPListTemplate") else {
         if carPlayFixAttempt < carPlayFixMaxAttempts {
@@ -74,7 +62,8 @@ func activateCarPlayCrashFix() {
         return
     }
 
-    CarPlayCrashFixGroup().activate()
+    if icOK { CPInterfaceControllerCrashFixGroup().activate() }
+    if ltOK { CPListTemplateCrashFixGroup().activate() }
     carPlayFixActivated = true
-    writeDebugLog("[CarPlayFix] Activated")
+    writeDebugLog("[CarPlayFix] Activated (ic=\(icOK) lt=\(ltOK))")
 }

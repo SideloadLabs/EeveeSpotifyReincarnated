@@ -6,14 +6,14 @@ struct SponsorBlockAdvancedView: View {
 
     var body: some View {
         List {
-            Section(header: Text("Skipping behavior")) {
-                Toggle("Auto-skip my own submissions", isOn: $options.autoSkipMySubmissions)
-                Toggle("Log only (don't actually seek)", isOn: $options.logOnly)
+            Section(header: Text("skipBehaviourTitle".localized)) {
+                Toggle("autoSkipSubmissionsTitle".localized, isOn: $options.autoSkipMySubmissions)
+                Toggle("logOnlyToggle".localized, isOn: $options.logOnly)
             }
 
-            Section(header: Text("Server")) {
+            Section(header: Text("serverHeader".localized)) {
                 HStack {
-                    Text("URL")
+                    Text("urlText".localized)
                     Spacer()
                     TextField("https://sponsor.ajay.app", text: $options.serverURL)
                         .multilineTextAlignment(.trailing)
@@ -23,23 +23,23 @@ struct SponsorBlockAdvancedView: View {
                 }
             }
 
-            Section(header: Text("Tuning")) {
+            Section(header: Text("tuningTitle".localized)) {
                 Stepper(
-                    "Min segment duration: \(String(format: "%.1f", options.minSegmentDuration))s",
+                    String(format: "minSegmentDuration".localized, options.minSegmentDuration),
                     value: $options.minSegmentDuration,
                     in: 0.0...30.0,
                     step: 0.5
                 )
                 Stepper(
-                    "Toast duration: \(String(format: "%.1f", options.toastDuration))s",
+                    String(format: "toastDuration".localized, options.toastDuration),
                     value: $options.toastDuration,
                     in: 1.0...8.0,
                     step: 0.2
                 )
             }
 
-            Section(footer: Text("Dumps podcast track metadata (URI, isPodcast, isVideo, etc.) to the debug log on each new track. Enable only when SponsorBlock isn't detecting a podcast you expect.")) {
-                Toggle("Diagnostic track log", isOn: $options.verboseLogging)
+            Section(footer: Text("trackLogSubtitle".localized)) {
+                Toggle("trackLogToggle".localized, isOn: $options.verboseLogging)
             }
 
             Section {
@@ -48,7 +48,7 @@ struct SponsorBlockAdvancedView: View {
                 } label: {
                     HStack {
                         Image(systemName: "arrow.counterclockwise")
-                        Text("Reset…")
+                        Text("resetButtonTrackLog".localized)
                     }
                     .foregroundColor(.red)
                 }
@@ -62,7 +62,7 @@ struct SponsorBlockAdvancedView: View {
             }
         }
         .listStyle(InsetGroupedListStyle())
-        .navigationTitle("Advanced")
+        .navigationTitle("advancedTitle".localized)
         .actionSheet(isPresented: $showingResetSheet) { resetSheet() }
     }
 
@@ -73,10 +73,10 @@ struct SponsorBlockAdvancedView: View {
         let mineCount   = SponsorBlockMySubmissionsStore.totalCount
 
         return ActionSheet(
-            title: Text("Reset what?"),
-            message: Text("Each is independent."),
+            title: Text("resetTitle".localized),
+            message: Text("resetSubtitle".localized),
             buttons: [
-                .destructive(Text("Settings (toggles + categories + colors)")) {
+                .destructive(Text("settingsResetSB".localized)) {
                     options = SponsorBlockOptions(
                         enabled: options.enabled,
                         logOnly: false,
@@ -89,24 +89,24 @@ struct SponsorBlockAdvancedView: View {
                         colors: SponsorBlockOptions.defaultColors
                     )
                 },
-                .destructive(Text("Drafts (\(draftCount))")) {
+                .destructive(Text(String(format: "draftsCountSB".localized, draftCount))) {
                     for (id, _) in SponsorBlockPendingStore.all() {
                         SponsorBlockPendingStore.clear(episodeID: id)
                     }
                 },
-                .destructive(Text("Hidden segments (\(hiddenCount))")) {
+                .destructive(Text(String(format: "hiddenSegmentsSB".localized, hiddenCount))) {
                     SponsorBlockHiddenStore.clear()
                 },
-                .destructive(Text("Voted records (\(votedCount))")) {
+                .destructive(Text(String(format: "votedRecordsSB".localized, votedCount))) {
                     SponsorBlockVotedStore.clear()
                 },
-                .destructive(Text("My local submissions (\(mineCount))")) {
+                .destructive(Text(String(format: "localSubmissionsSB".localized, mineCount))) {
                     SponsorBlockMySubmissionsStore.clear()
                 },
-                .destructive(Text("Regenerate user ID")) {
+                .destructive(Text("regenerateIDSB".localized)) {
                     UserDefaults.sponsorBlockUserID = SponsorBlockReporter.makeUserID()
                 },
-                .destructive(Text("Everything (all of the above)")) {
+                .destructive(Text("allResetSB".localized)) {
                     options = SponsorBlockOptions(
                         enabled: false,
                         logOnly: false,

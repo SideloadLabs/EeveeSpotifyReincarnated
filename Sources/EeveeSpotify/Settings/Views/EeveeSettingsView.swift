@@ -106,12 +106,12 @@ struct EeveeSettingsView: View {
             Button {
                 pushSettingsController(
                     with: SponsorBlockSettingsView(),
-                    title: "SponsorBlock (BETA)"
+                    title: "sponsorblock".localized
                 )
             } label: {
                 NavigationSectionView(
                     color: .red,
-                    title: "SponsorBlock (BETA)",
+                    title: "sponsorblock".localized,
                     imageSystemName: "forward.end.fill"
                 )
             }
@@ -119,12 +119,12 @@ struct EeveeSettingsView: View {
             Button {
                 pushSettingsController(
                     with: EeveeAppIconPickerView(),
-                    title: "App Icon"
+                    title: "appIcon".localized
                 )
             } label: {
                 NavigationSectionView(
                     color: .pink,
-                    title: "App Icon",
+                    title: "appIcon".localized,
                     imageSystemName: "app.badge.fill"
                 )
             }
@@ -200,12 +200,12 @@ struct EeveeSettingsView: View {
                 }
             }
 
-            Section(footer: Text("Force re-login. Wipes Spotify keychain entries, sandbox dirs, and app-group containers. Other sideloaded apps untouched. App exits when done.")) {
+            Section(footer: Text("resetFooter".localized)) {
                 Button {
                     confirmDestructive(
-                        title: "Full Reset",
-                        message: "Wipes Spotify keychain, sandbox dirs, and app-group containers. Forces re-login. App exits when done.",
-                        confirmTitle: "Full Reset"
+                        title: "resetButtonTitle".localized,
+                        message: "resetSubtitle".localized,
+                        confirmTitle: "resetButtonTitle".localized
                     ) {
                         isClearingData = true
                         DispatchQueue.global(qos: .userInitiated).async {
@@ -218,7 +218,7 @@ struct EeveeSettingsView: View {
                 } label: {
                     HStack {
                         Image(systemName: "exclamationmark.triangle.fill")
-                        Text("Full Reset")
+                        Text("resetButtonTitle".localized)
                     }
                     .foregroundColor(.red)
                 }

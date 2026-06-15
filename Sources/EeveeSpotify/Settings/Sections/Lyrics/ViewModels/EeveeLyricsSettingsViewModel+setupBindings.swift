@@ -74,6 +74,11 @@ extension EeveeLyricsSettingsViewModel {
                 }
                 
                 UserDefaults.lyricsSource = newSource
+
+                // Clear the Musixmatch in-memory cache so the next track
+                // fetch goes to the new source rather than serving a stale
+                // cached result.
+                MusixmatchLyricsRepository.shared.clearCache()
             }
             .store(in: &cancellables)
     }

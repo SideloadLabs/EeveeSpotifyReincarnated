@@ -51,11 +51,11 @@ struct EeveePatchingSettingsView: View {
 
                 Section(
                     footer: Text(
-                        "Blocks Spotify's free-tier Smart Shuffle from mixing recommended tracks into your queue. Shuffle stays inside the playlist. "
+                        "true_shuffle_dec".localized
                         + "restart_is_required_description".localized
                     )
                 ) {
-                    Toggle("True Shuffle", isOn: $trueShuffleEnabled)
+                    Toggle("true_shuffle".localized, isOn: $trueShuffleEnabled)
                 }
             }
 

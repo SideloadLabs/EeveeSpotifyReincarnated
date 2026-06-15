@@ -2,15 +2,10 @@ import Orion
 import Foundation
 
 // MARK: - Session Logout Protection
-// Hooks all logout-related methods to prevent Spotify from logging out
-// when it detects the account isn't actually premium.
-// Also intercepts Ably WebSocket messages to block server-side revocation events.
-// Additionally blocks network endpoints that trigger session invalidation.
-// Extends OAuth token expiry to prevent internal reauth triggers.
+// Blocks the logout paths Spotify triggers when it decides the account isn't premium:
+// logout selectors, Ably revocation messages, session-invalidation endpoints, and
+// OAuth expiry. Each group is runtime-gated so renamed selectors don't crash on 9.1.x.
 
-// Split into smaller groups so missing selectors/classes don't crash on activation.
-// Spotify occasionally renames/removes private session-related selectors between minor versions.
-// By gating each group behind runtime checks, we keep compatibility across 9.1.x.
 struct SessionLogoutAuthHookGroup: HookGroup { }
 struct SessionLogoutConnectivityHookGroup: HookGroup { }
 struct SessionLogoutAblyHookGroup: HookGroup { }
@@ -173,15 +168,13 @@ class LegacyLoginControllerHook: ClassHook<NSObject> {
 }
 
 // MARK: - OauthAccessTokenBridge — Extend token expiry
-// This private class inside Connectivity_SessionImpl controls the OAuth token's
-// expiry time. By hooking expiresAt to return a far-future date, we prevent
-// the internal timer from marking the token as expired.
+// Private Connectivity_SessionImpl class holding the OAuth expiry. Forcing a
+// far-future expiresAt keeps the internal timer from marking the token expired.
 
 class OauthAccessTokenBridgeHook: ClassHook<NSObject> {
     typealias Group = SessionLogoutConnectivityHookGroup
     static let targetName = "_TtC24Connectivity_SessionImplP33_831B98CC28223E431E21CD27ADD20AF222OauthAccessTokenBridge"
 
-    // Hook the GETTER
     func expiresAt() -> Any {
         let farFuture = Date(timeIntervalSinceNow: 365 * 24 * 60 * 60)
         return farFuture
@@ -192,20 +185,19 @@ class OauthAccessTokenBridgeHook: ClassHook<NSObject> {
         orig.setExpiresAt(farFuture)
     }
 
-    // Hook init to directly modify the ivar using ObjC runtime
-    // This catches cases where C++ sets the ivar without going through the ObjC setter
+    // set the ivar directly: C++ writes it without going through the ObjC setter
     func `init`() -> NSObject? {
         let result = orig.`init`()
         extendExpiryIvar()
-        // Also start a repeating timer to keep extending the ivar
         startExpiryExtender()
         return result
     }
 
     // orion:new
+    // Backing ivar is _expiresAt (readonly property, so C++ writes it directly).
     func extendExpiryIvar() {
         let bridgeClass: AnyClass = type(of: target)
-        if let ivar = class_getInstanceVariable(bridgeClass, "expiresAt") {
+        if let ivar = class_getInstanceVariable(bridgeClass, "_expiresAt") {
             let farFuture = Date(timeIntervalSinceNow: 365 * 24 * 60 * 60)
             object_setIvar(target, ivar, farFuture)
         }
@@ -213,14 +205,14 @@ class OauthAccessTokenBridgeHook: ClassHook<NSObject> {
 
     // orion:new
     func startExpiryExtender() {
-        let weak = target
-        // Extend the ivar every 60 seconds
+        // genuine weak ref so the loop exits when the bridge deallocates (no leaked thread)
+        weak var weakTarget = target
         DispatchQueue.global(qos: .utility).async {
             while true {
                 Thread.sleep(forTimeInterval: 60)
-                guard let obj = weak as? NSObject else { break }
+                guard let obj = weakTarget else { break }
                 let cls: AnyClass = type(of: obj)
-                if let ivar = class_getInstanceVariable(cls, "expiresAt") {
+                if let ivar = class_getInstanceVariable(cls, "_expiresAt") {
                     let farFuture = Date(timeIntervalSinceNow: 365 * 24 * 60 * 60)
                     object_setIvar(obj, ivar, farFuture)
                 }
@@ -263,11 +255,8 @@ class ARTWebSocketTransportHook: ClassHook<NSObject> {
                     writeDebugLog("[ABLY] Blocked action \(action) (\(actionName)) at \(elapsed)s")
                     return
                 }
-                // Filter action-15 (message) payloads.
-                // Spotify sends 'ap://product-state-update' Ably messages that trigger
-                // a fresh re-fetch of the customize endpoint. If the re-fetched response
-                // is not intercepted in time, the app re-enables ad feature flags.
-                // We block these specific messages to prevent ad re-delivery after hours of use.
+                // action-15 'ap://product-state-update' messages trigger a customize
+                // re-fetch that can re-enable ad flags; drop them.
                 if action == 15 {
                     let preview = String(msgString.prefix(300))
                     writeDebugLog("[ABLY] Message (action 15) at \(elapsed)s: \(preview)")
@@ -305,9 +294,7 @@ class ARTSRWebSocketHook: ClassHook<NSObject> {
                     writeDebugLog("[ABLY-SR] Blocked frame action \(action) (\(actionName)) at \(elapsed)s")
                     return
                 }
-                // Filter action-15 (message) payloads.
-                // Same as ARTWebSocketTransportHook — block product-state-update messages
-                // that trigger ad re-delivery after a few hours of use.
+                // same as ARTWebSocketTransportHook: drop product-state-update messages
                 if action == 15 {
                     let preview = String(text.prefix(300))
                     writeDebugLog("[ABLY-SR] Message (action 15) at \(elapsed)s: \(preview)")
@@ -330,11 +317,6 @@ class URLSessionTaskResumeHook: ClassHook<NSObject> {
     typealias Group = SessionLogoutNetworkHookGroup
     static let targetName = "NSURLSessionTask"
 
-    // Flip to true to dump the URLSession-delegate class for every
-    // premium-relevant URL — needed only when investigating a route that
-    // bypasses both currently-hooked delegates.
-    static let enableNetDelegateProbe = false
-
     func resume() {
         if let task = target as? URLSessionTask,
            let url = task.currentRequest?.url ?? task.originalRequest?.url,
@@ -344,42 +326,8 @@ class URLSessionTaskResumeHook: ClassHook<NSObject> {
             let elapsedInt = Int(elapsed)
             let path = url.path
 
-            // DISABLED: previously cancelled subsequent bootstraps to defend against
-            // session re-init wiping premium state. Broke fresh-login flow on 9.1.34
-            // (first bootstrap is anonymous signup-screen, second is post-login user state).
-            // Let all bootstraps through; modifyRemoteConfiguration is idempotent.
-            // Diagnostic probe (off by default). Logs the URLSession-delegate
-            // class for any premium-relevant URL — used to discover which
-            // delegate Spotify uses for a given route. We currently hook
-            // SPTDataLoaderService and HttpClientURLSession; if a future
-            // build/region adds a third delegate, flip this on to find its
-            // class name.
-            if URLSessionTaskResumeHook.enableNetDelegateProbe {
-                let isPremiumRelevantURL =
-                    path.contains("bootstrap/v1/bootstrap") ||
-                    path.contains("pam-view-service") ||
-                    path.contains("GetYourPremiumBadge") ||
-                    path.contains("GetPlanOverview") ||
-                    path.contains("GetPremiumPlanRow") ||
-                    path.contains("v1/customize")
-
-                if isPremiumRelevantURL {
-                    let sessionDelegate: String = {
-                        if let s = task.value(forKey: "session") as? URLSession, let d = s.delegate {
-                            return NSStringFromClass(type(of: d as AnyObject))
-                        }
-                        return "<no-session-delegate>"
-                    }()
-                    let tag = path.contains("bootstrap/v1/bootstrap") ? "Bootstrap" :
-                              (path.contains("GetYourPremiumBadge")  ? "PAM.Badge"  :
-                              (path.contains("GetPlanOverview")      ? "PAM.PlanOverview" :
-                              (path.contains("GetPremiumPlanRow")    ? "PAM.PlanRow" :
-                              (path.contains("pam-view-service")     ? "PAM.Other" : "Customize"))))
-                    writeDebugLog("[NET][\(tag)] host=\(host) path=\(path) at \(elapsedInt)s sessDelegate=\(sessionDelegate)")
-                }
-            }
-
-            // Log auth-related requests for diagnostics
+            // bootstraps pass through: modifyRemoteConfiguration is idempotent, and
+            // cancelling the second one broke fresh login on 9.1.34.
             let isAuthRelated = host.contains("login5") ||
                 host.contains("apresolve") ||
                 (host.contains("googleapis.com") && path.contains("/token")) ||
@@ -423,14 +371,9 @@ class URLSessionTaskResumeHook: ClassHook<NSObject> {
                     task.cancel()
                     return
                 }
-                // (Bootstrap is logged by the premium-relevant probe above —
-                // dropped duplicate "(late)" log to keep output clean.)
-                // Block periodic re-fetches of the customize endpoint.
-                // Spotify's RemoteConfigurationSDK AuthFetcher re-fetches the customize
-                // endpoint after minimumFetchIntervalSeconds (typically a few hours).
-                // This re-fetch can bypass the DataLoaderService hook if it uses a
-                // background URLSession, causing ads to reappear.
-                // We block re-fetches after the initial 30s startup window.
+                // customize re-fetches (AuthFetcher, every few hours) can use a
+                // background URLSession that bypasses the DataLoaderService hook and
+                // re-enable ads; cancel them past the 30s startup window.
                 if elapsed > 30 && path.contains("v1/customize") {
                     writeDebugLog("[NET] Cancelled customize re-fetch at \(elapsedInt)s")
                     task.cancel()

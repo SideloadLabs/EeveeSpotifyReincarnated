@@ -28,6 +28,7 @@ class HUBViewModelBuilderImplementationHook: ClassHook<NSObject> {
                 where: { $0["id"] as? String == "artist-entity-view-artist-tab-container" }
             ) {
                 if var childrenArray = components[index]["children"] as? [[String: Any]],
+                   !childrenArray.isEmpty,
                    var innerChildrenArray = childrenArray[0]["children"] as? [Any] {
                     
                     innerChildrenArray.insert(likedTracksRow, at: 0)

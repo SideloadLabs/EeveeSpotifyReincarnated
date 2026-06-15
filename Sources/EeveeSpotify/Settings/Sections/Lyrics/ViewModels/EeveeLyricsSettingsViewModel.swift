@@ -87,7 +87,13 @@ class EeveeLyricsSettingsViewModel: ObservableObject {
             }, receiveValue: { [weak self] token in
                 UserDefaults.musixmatchToken = token
                 self?.musixmatchToken = token
-                UserDefaults.lyricsSource = .musixmatch
+                // Only switch source to Musixmatch if the user hasn't already
+                // picked a different source. Overwriting it here caused the
+                // source to silently reset to Musixmatch on every app restart.
+                if UserDefaults.lyricsSource == .notReplaced {
+                    UserDefaults.lyricsSource = .musixmatch
+                    self?.lyricsSource = .musixmatch
+                }
             })
     }
 }

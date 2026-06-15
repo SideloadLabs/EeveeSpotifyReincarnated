@@ -230,7 +230,6 @@ class SettingsListViewControllerHook: ClassHook<UIViewController> {
 private let eeveeInlineRowTag = 1338
 private let eeveeInlineRowHeight: CGFloat = 68
 private let eeveeInlineRowTitle = "EeveeSpotify"
-private let eeveeInlineRowSubtitle = "Patching, lyrics, customization, and experiments"
 
 func injectEeveeInlineRow(into vc: UIViewController) {
     // Each Spotify page sits in a MusicAppPageHostingViewController wrapper; the list VC is its child.
@@ -261,7 +260,7 @@ func injectEeveeInlineRow(into vc: UIViewController) {
     row.addSubview(title)
 
     let subtitle = UILabel(frame: CGRect(x: 20, y: 34, width: textWidth, height: 18))
-    subtitle.text = eeveeInlineRowSubtitle
+    subtitle.text = "eevee_inline_subtitle_text".localized
     subtitle.textColor = UIColor(white: 1.0, alpha: 0.6)
     subtitle.font = UIFont.systemFont(ofSize: 13)
     subtitle.autoresizingMask = [.flexibleWidth]

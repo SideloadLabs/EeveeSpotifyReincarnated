@@ -146,8 +146,8 @@ jobs:
           rm -rf Payload
           unzip -q "$(basename "$OUT_IPA")"
 
-          mkdir -p "Payload/Spotify.app/Plugins"
-          cp -R "$OPENSPOTIFY_APPEX" "Payload/Spotify.app/Plugins/OpenSpotifySafariExtension.appex"
+          mkdir -p "Payload/Spotify.app/PlugIns"
+          cp -R "$OPENSPOTIFY_APPEX" "Payload/Spotify.app/PlugIns/OpenSpotifySafariExtension.appex"
 
           rm -f "$(basename "$OUT_IPA")"
           zip -qry "$(basename "$OUT_IPA")" Payload

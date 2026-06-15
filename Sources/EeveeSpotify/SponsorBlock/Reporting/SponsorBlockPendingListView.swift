@@ -11,8 +11,8 @@ struct SponsorBlockPendingListView: View {
 
     var body: some View {
         List {
-            Section(header: Text("Your SponsorBlock ID"),
-                    footer: Text("Used to attribute your submissions and votes. Treat as a private password — don't share it.")) {
+            Section(header: Text("sponsorblockIDTitle".localized),
+                    footer: Text("sponsorblockIDFooter".localized)) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(userID)
                         .font(.system(.footnote, design: .monospaced))
@@ -21,14 +21,14 @@ struct SponsorBlockPendingListView: View {
                     HStack {
                         Button {
                             UIPasteboard.general.string = userID
-                            SponsorBlockToast.shared.show("User ID copied")
+                            SponsorBlockToast.shared.show(NSLocalizedString("user_id_copied", comment: ""))
                         } label: {
-                            Label("Copy", systemImage: "doc.on.doc")
+                            Label("copyButton".localized, systemImage: "doc.on.doc")
                         }
                         .buttonStyle(BorderlessButtonStyle())
                         Spacer()
                         Button(action: { showingRegenConfirm = true }) {
-                            Label("Regenerate", systemImage: "arrow.triangle.2.circlepath")
+                            Label("regenerateButton".localized, systemImage: "arrow.triangle.2.circlepath")
                                 .foregroundColor(.red)
                         }
                         .buttonStyle(BorderlessButtonStyle())
@@ -39,14 +39,15 @@ struct SponsorBlockPendingListView: View {
             }
 
             if groups.isEmpty {
-                Section(header: Text("Drafts")) {
-                    Text("No drafts. Long-press the podcast progress bar to start marking a segment.")
+                Section(header: Text("draftsTitleSB".localized)) {
+                    Text("draftsEmpty".localized)
                         .font(.footnote)
                         .foregroundColor(.secondary)
                 }
             } else {
                 ForEach(groups, id: \.episodeID) { group in
-                    Section(header: Text("Episode \(group.episodeID)")) {
+                    let headerText = String(format: "episode_header".localized, "\(group.episodeID)")
+                    Section(header: Text(headerText)) {
                         ForEach(group.drafts) { d in
                             draftRow(d)
                         }
@@ -54,10 +55,10 @@ struct SponsorBlockPendingListView: View {
                 }
             }
 
-            Section(header: Text("Hidden locally (\(hiddenUUIDs.count))"),
-                    footer: Text("Segments here are never auto-skipped on this device. They still exist on the SponsorBlock server.")) {
+            Section(header: Text(String(format: "hidden_locally_header".localized, hiddenUUIDs.count)),
+                    footer: Text("hiddenFooter".localized)) {
                 if hiddenUUIDs.isEmpty {
-                    Text("No hidden segments.")
+                    Text("hiddenSegmentsEmpty".localized)
                         .font(.footnote)
                         .foregroundColor(.secondary)
                 } else {
@@ -71,7 +72,7 @@ struct SponsorBlockPendingListView: View {
                                 SponsorBlockHiddenStore.remove(uuid)
                                 reload()
                             }) {
-                                Text("Unhide").font(.footnote)
+                                Text("unhideButton".localized).font(.footnote)
                             }
                             .buttonStyle(BorderlessButtonStyle())
                         }
@@ -91,13 +92,13 @@ struct SponsorBlockPendingListView: View {
             }
         }
         .listStyle(InsetGroupedListStyle())
-        .navigationTitle("SponsorBlock Reports")
+        .navigationTitle("sponsorblock_reports_title".localized)
         .onAppear(perform: reload)
         .alert(isPresented: $showingRegenConfirm) {
             Alert(
-                title: Text("Regenerate user ID?"),
-                message: Text("Your existing submissions and votes will no longer be linked to you."),
-                primaryButton: .destructive(Text("Regenerate")) {
+                title: Text("popUpRegenerateTitle".localized),
+                message: Text("popUpRegenerateSubtitle".localized),
+                primaryButton: .destructive(Text("regenerateButton".localized)) {
                     let fresh = SponsorBlockReporter.makeUserID()
                     UserDefaults.sponsorBlockUserID = fresh
                     userID = fresh
@@ -107,10 +108,10 @@ struct SponsorBlockPendingListView: View {
         }
         .actionSheet(isPresented: $showingHiddenClearConfirm) {
             ActionSheet(
-                title: Text("Clear all hidden segments?"),
-                message: Text("They will skip again according to your category rules."),
+                title: Text("popUpClearAllTitle".localized),
+                message: Text("popUpClearAllSubtitle".localized),
                 buttons: [
-                    .destructive(Text("Clear all")) {
+                    .destructive(Text("popUpClearAllButton".localized)) {
                         SponsorBlockHiddenStore.clear()
                         reload()
                     },
@@ -137,7 +138,7 @@ struct SponsorBlockPendingListView: View {
                 Text(SponsorBlockFormatters.categoryName(d.category))
                     .font(.body)
                 Spacer()
-                Text(d.isReadyToSubmit ? "Ready" : "Incomplete")
+                Text(d.isReadyToSubmit ? "readyButton".localized : "incompleteButton".localized)
                     .font(.caption2)
                     .foregroundColor(d.isReadyToSubmit ? .green : .orange)
             }
@@ -146,7 +147,7 @@ struct SponsorBlockPendingListView: View {
                 .foregroundColor(.secondary)
             HStack {
                 Button(action: { presentingSubmit = d }) {
-                    Label("Edit / Submit", systemImage: "square.and.pencil")
+                    Label("editSubmit".localized, systemImage: "square.and.pencil")
                         .font(.footnote)
                 }
                 .buttonStyle(BorderlessButtonStyle())
@@ -155,7 +156,7 @@ struct SponsorBlockPendingListView: View {
                     SponsorBlockPendingStore.remove(id: d.id, episodeID: d.episodeID)
                     reload()
                 }) {
-                    Label("Discard", systemImage: "trash")
+                    Label("discardButton".localized, systemImage: "trash")
                         .font(.footnote)
                         .foregroundColor(.red)
                 }

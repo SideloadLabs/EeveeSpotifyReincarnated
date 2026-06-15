@@ -4,6 +4,8 @@ patching = "Impostazioni di Patch";
 lyrics = "Testi";
 customization = "Personalizzazione";
 experiments = "Sperimentali";
+sponsorblock = "SponsorBlock (BETA)";
+appIcon = "Icona App";
 
 common_issues_tip_title = "Riscontri problemi?";
 
@@ -150,3 +152,133 @@ debug_log_cleared_ok = "OK";
 no_debug_log_found = "Nessun Log di Debug trovato. I Log iniziano ad essere scritti all'apertura dell'app.";
 no_debug_log_found_ok = "OK";
 debug_section_footer = "Esporta o elimina i Log di Debug.";
+
+// Full reset
+"resetButtonTitle" = "Ripristino completo";
+"resetSubtitle" = "Svuota il portachiavi di Spotify, le directory sandbox e i container app-group. Forza un nuovo accesso. L'app si chiuderà al termine.";
+"resetFooter" = "Forza un nuovo accesso. Svuota le voci del portachiavi di Spotify, le directory sandbox e i container app-group. Le altre app in sideload non subiranno modifiche. L'app si chiuderà al termine.";
+
+// Settings Bar
+eevee_inline_subtitle_text = "Patch, testi, personalizzazioni ed esperimenti";
+
+// App Icon Chooser
+"appIconTitle" = "Scegli l'icona";
+"appIconSubtitle" = "iOS mostrerà un avviso di conferma la prima volta. La schermata Home potrebbe impiegare qualche secondo per aggiornarsi.";
+"iconSelected" = "Selezionata";
+"iconTapToApply" = "Tocca per applicare";
+
+// SponsorBlock
+"categoryOneFooter" = "Salta i segmenti segnalati dalla community negli episodi dei podcast.";
+"enableSponsorblock" = "Abilita SponsorBlock";
+"showColoredOverlay" = "Mostra overlay colorato sulla barra di avanzamento";
+"showToast" = "Mostra avviso quando si salta";
+"skipToast" = "Pulsanti di azione nell'avviso di salto (vota / annulla / nascondi)";
+"respectManualSeek" = "Rispetta la ricerca manuale (non saltare di nuovo)";
+"categoriesHeader" = "Categorie";
+"categoriesFooter" = "Off · Mostra · Manuale · Auto. Tocca il cerchio colorato per modificare.";
+
+"sponsor_category" = "Sponsor";
+"selfpromo_category" = "Autopromozione / Non pagata";
+"interaction_category" = "Invito all'interazione";
+"intro_category" = "Intermezzo / Intro";
+"outro_category" = "Titoli di coda / Chiusura";
+"preview_category" = "Anticipazione / Riassunto";
+"hook_category" = "Teaser / Saluti";
+"filler_category" = "Divagazioni / Riempitivi";
+"exclusive_access_category" = "Accesso esclusivo";
+
+"action_disabled" = "Off";
+"action_show" = "Mostra";
+"action_manual" = "Manuale";
+"action_auto" = "Auto";
+
+"draftsTitle" = "Segnalazioni e bozze";
+"errorNoPodcats" = "Nessun podcast in riproduzione al momento.";
+"markSegment" = "Segna segmento per l'episodio corrente";
+"advancedTitle" = "Avanzate";
+"howToUseTitle" = "Come si usa";
+"creditsTitle" = "Riconoscimenti";
+"creditsSubtitle" = "Dati dei segmenti forniti dalla community di SponsorBlock (sponsor.ajay.app). Integrazione basata su Spot-SponsorBlock-Extension di Spot-SponsorBlock.";
+"linkButtonTitle" = "Spot-SponsorBlock-Extension su GitHub";
+
+// SponsorBlock reports
+"sponsorblock_reports_title" = "Segnalazioni SponsorBlock";
+"sponsorblockIDTitle" = "Il tuo ID SponsorBlock";
+"sponsorblockIDFooter" = "Viene usato per attribuirti gli invii e i voti. Trattalo come una password: non condividerlo con nessuno.";
+"user_id_copied" = "ID utente copiato";
+"copyButton" = "Copia";
+"regenerateButton" = "Rigenera";
+"draftsTitleSB" = "Bozze";
+"draftsEmpty" = "Nessuna bozza. Tieni premuto sulla barra di avanzamento del podcast per iniziare a segnare un segmento.";
+"draftsEpisodeLoc" = "Episodio %@";
+"hidden_locally_header" = "Nascosti localmente (%@)";
+"hiddenFooter" = "I segmenti presenti qui non vengono mai saltati automaticamente su questo dispositivo. Continueranno però a esistere sui server di SponsorBlock.";
+"hiddenSegmentsEmpty" = "Nessun segmento nascosto.";
+"unhideButton" = "Mostra di nuovo";
+
+"popUpRegenerateTitle" = "Rigenerare l'ID utente?";
+"popUpRegenerateSubtitle" = "I tuoi invii e voti attuali non saranno più collegati a te.";
+"popUpClearAllButton" = "Cancella tutto";
+"popUpClearAllTitle" = "Cancellare tutti i segmenti nascosti?";
+"popUpClearAllSubtitle" = "Verranno saltati di nuovo seguendo le regole delle tue categorie.";
+
+"readyButton" = "Pronto";
+"incompleteButton" = "Incompleto";
+"editSubmit" = "Modifica / Invia";
+"discardButton" = "Scarta";
+
+// SponsorBlock Advanced
+"skipBehaviourTitle" = "Comportamento di salto";
+"autoSkipSubmissionsTitle" = "Salta automaticamente i miei invii";
+"logOnlyToggle" = "Solo log (nessun salto effettivo)";
+"serverHeader" = "Server";
+"urlText" = "URL";
+
+"tuningTitle" = "Regolazioni";
+"minSegmentDuration" = "Durata minima segmento: %.1fs";
+"toastDuration" = "Durata avviso: %.1fs";
+
+"trackLogSubtitle" = "Stampa i metadati della traccia del podcast (URI, isPodcast, isVideo, ecc.) nel log di debug a ogni nuova traccia. Abilita questa opzione solo se SponsorBlock non rileva un podcast che ti aspetti.";
+"trackLogToggle" = "Log diagnostico della traccia";
+"resetButtonTrackLog" = "Ripristina…";
+
+// SponsorBlock Reset Options Advanced
+"resetTitle" = "Cosa vuoi ripristinare?";
+"resetSubtitle" = "Ogni opzione è indipendente dalle altre.";
+"allResetSB" = "Tutto (tutte le voci precedenti)";
+"regenerateIDSB" = "Rigenera ID utente";
+"localSubmissionsSB" = "I miei invii locali (%@)";
+"votedRecordsSB" = "Voti registrati (%@)";
+"draftsCountSB" = "Bozze (%@)";
+"settingsResetSB" = "Impostazioni (interruttori + categorie + colori)";
+
+// SponsorBlock How To Use
+"playerGesturesTitle" = "Gesti sul player";
+"gesturesTitle1" = "Pressione prolungata sulla barra di avanzamento";
+"gesturesDeps1" = "Segna l'inizio di un segmento. Tieni premuto di nuovo alla fine per impostare la FINE e aprire il modulo d'invio.";
+"gesturesTitle2" = "Tocca un segmento sulla barra";
+"gesturesDeps2" = "Vota, cambia categoria o nascondi un segmento solo su questo dispositivo.";
+
+"submittingTitle" = "Invio";
+"submittingSectionTitle1" = "Modulo d'invio";
+"submittingSectionDeps1" = "Slider e pulsanti di precisione per regolare inizio e fine. Scegli una categoria e invia la segnalazione a sponsor.ajay.app.";
+"submittingSectionTitle2" = "I tuoi invii locali";
+"submittingSectionDeps2" = "Vengono saltati istantaneamente su questo dispositivo. Il voto si sbloccherà una volta pubblicati dal server. Sono contrassegnati dal badge 'MINE'.";
+
+"skipToastTitle" = "Avviso di salto";
+"skipToastSectionTitle1" = "Annulla";
+"skipToastSectionDeps1" = "Torna all'inizio del segmento, che verrà riprodotto interamente una volta. Manda avanti e poi indietro per ripristinare il salto automatico.";
+"skipToastSectionTitle2" = "Voto positivo / Voto negativo";
+"skipToastSectionDeps2" = "👍 registra il tuo voto sul server. 👎 apre un menu per votare negativamente, nasconderlo localmente o cambiare categoria.";
+"skipToastSectionTitle3" = "Menu completo del segmento";
+"skipToastSectionDeps3" = "Le stesse opzioni che avresti toccando il segmento sulla barra di avanzamento.";
+
+"managingSegmentsTitle" = "Gestione dei segmenti";
+"managingSegmentsSectionTitle1" = "Gestisci segmenti…";
+"managingSegmentsSectionDeps1" = "Tieni premuto sulla barra → 'Gestisci segmenti' mostra tutti quelli dell'episodio attuale. Vota, nascondi, cambia categoria o tocca una riga per saltare a quel punto col player.";
+"managingSegmentsSectionTitle2" = "Segnalazioni e bozze";
+"managingSegmentsSectionDeps2" = "Impostazioni → 'Segnalazioni e bozze' contiene le bozze a cui stai lavorando (non ancora inviate) e i segmenti nascosti. Le bozze rimangono salvate tra un riavvio e l'altro.";
+
+categoriesTitle = "Categorie";
+categoriesSectionTitle1 = "Azioni per categoria";
+categoriesSectionDeps1 = "Off = ignora. Mostra = evidenzia solo sulla barra. Manuale = chiedi prima di saltare. Auto = salta in automatico.";

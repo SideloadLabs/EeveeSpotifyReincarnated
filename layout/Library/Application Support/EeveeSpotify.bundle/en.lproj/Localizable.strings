@@ -4,6 +4,8 @@ patching = "Patching";
 lyrics = "Lyrics";
 customization = "Customization";
 experiments = "Experiments";
+sponsorblock = "SponsorBlock (BETA)";
+appIcon = "App Icon";
 
 common_issues_tip_title = "Having Trouble?";
 
@@ -29,6 +31,9 @@ If you have an active Premium subscription, you can turn on Do Not Patch Premium
 
 overwrite_configuration = "Overwrite Configuration";
 overwrite_configuration_description = "Replace remote configuration with the dumped Premium one. This configuration defines most UI/UX parameters and may be helpful, although it could cause issues.";
+
+true_shuffle = "True Shuffle";
+true_shuffle_dec = "Blocks Spotify's free-tier Smart Shuffle from mixing recommended tracks into your queue. Shuffle stays inside the playlist. ";
 
 // Lyrics
 
@@ -150,3 +155,134 @@ debug_log_cleared_ok = "OK";
 no_debug_log_found = "No debug log found. The log starts recording when the app launches.";
 no_debug_log_found_ok = "OK";
 debug_section_footer = "Export or clear the debug log.";
+
+// Full reset
+resetButtonTitle = "Full Reset";
+resetSubtitle = "Wipes Spotify keychain, sandbox dirs, and app-group containers. Forces re-login. App exits when done.";
+resetFooter = "Force re-login. Wipes Spotify keychain entries, sandbox dirs, and app-group containers. Other sideloaded apps untouched. App exits when done.";
+
+// Settings Bar
+eevee_inline_subtitle_text = "Patching, lyrics, customization, and experiments";
+
+// App Icon Chooser
+appIconTitle = "Choose Icon";
+appIconSubtitle = "iOS shows a confirmation the first time. The home screen may take a few seconds to refresh.";
+iconSelected = "Selected";
+iconTapToApply = "Tap to apply";
+
+// SponsorBlock
+categoryOneFooter = "Skips community-marked segments in podcast episodes.";
+enableSponsorblock = "Enable SponsorBlock";
+showColoredOverlay = "Show colored overlay on progress bar";
+showToast = "Show toast when skipping";
+skipToast = "Skip-toast action buttons (vote / undo / hide)";
+respectManualSeek = "Respect manual seek (don't re-skip)";
+categoriesHeader = "Categories";
+categoriesFooter = "Off · Show · Manual · Auto. Tap the color circle to change.";
+
+sponsor_category = "Sponsor";
+selfpromo_category = "Unpaid/Self Promotion";
+interaction_category = "Interaction Reminder";
+intro_category = "Intermission/Intro";
+outro_category = "Outro/Credits";
+preview_category = "Preview/Recap";
+hook_category = "Hook/Greetings";
+filler_category = "Tangent/Filler";
+exclusive_access_category = "Exclusive Access";
+
+action_disabled = "Off";
+action_show = "Show";
+action_manual = "Manual";
+action_auto = "Auto";
+
+draftsTitle = "Reporting & drafts";
+errorNoPodcats = "No podcast is currently playing.";
+markSegment = "Mark segment for current episode";
+advancedTitle = "Advanced";
+howToUseTitle = "How to use";
+creditsTitle = "Credits";
+creditsSubtitle = "Segment data from the SponsorBlock community (sponsor.ajay.app). Integration ported from Spot-SponsorBlock-Extension by Spot-SponsorBlock.";
+linkButtonTitle = "Spot-SponsorBlock-Extension on GitHub";
+
+// SponsorBlock reports
+sponsorblock_reports_title = "SponsorBlock Reports";
+sponsorblockIDTitle = "Your SponsorBlock ID";
+sponsorblockIDFooter = "Used to attribute your submissions and votes. Treat as a private password — don't share it.";
+user_id_copied = "User ID copied";
+copyButton = "Copy";
+regenerateButton = "Regenerate";
+draftsTitleSB = "Drafts";
+draftsEmpty = "No drafts. Long-press the podcast progress bar to start marking a segment.";
+draftsEpisodeLoc = "Episode %@";
+hidden_locally_header = "Hidden locally (%@)";
+hiddenFooter = "Segments here are never auto-skipped on this device. They still exist on the SponsorBlock server.";
+hiddenSegmentsEmpty = "No hidden segments.";
+unhideButton = "Unhide";
+
+popUpRegenerateTitle = "Regenerate user ID?";
+popUpRegenerateSubtitle = "Your existing submissions and votes will no longer be linked to you.";
+popUpClearAllButton = "Clear all";
+popUpClearAllTitle = "Clear all hidden segments?";
+popUpClearAllSubtitle = "They will skip again according to your category rules.";
+
+readyButton = "Ready";
+incompleteButton = "Incomplete";
+editSubmit = "Edit / Submit";
+discardButton = "Discard";
+
+// SponsorBlock Advanced
+skipBehaviourTitle = "Skipping behavior";
+autoSkipSubmissionsTitle = "Auto-skip my own submissions";
+logOnlyToggle = "Log only (don't actually seek)";
+serverHeader = "Server";
+urlText = "URL";
+
+tuningTitle = "Tuning";
+minSegmentDuration = "Min segment duration: %.1fs";
+toastDuration = "Toast duration: %.1fs";
+
+trackLogSubtitle = "Dumps podcast track metadata (URI, isPodcast, isVideo, etc.) to the debug log on each new track. Enable only when SponsorBlock isn't detecting a podcast you expect.";
+trackLogToggle = "Diagnostic track log";
+resetButtonTrackLog = "Reset…";
+
+// SponsorBlock Reset Options Advanced
+resetTitle = "Reset what?";
+resetSubtitle = "Each is independent.";
+allResetSB = "Everything (all of the above)";
+regenerateIDSB = "Regenerate user ID";
+localSubmissionsSB = "My local submissions (%@)";
+votedRecordsSB = "Voted records (%@)";
+hiddenSegmentsSB = "Hidden segments (%@)";
+draftsCountSB = "Draft (%@)";
+settingsResetSB = "Settings (toggles + categories + colors)";
+
+// SponsorBlock How To Use
+playerGesturesTitle = "Gestures on the player";
+gesturesTitle1 = "Long-press the progress bar";
+gesturesDeps1 = "Mark a segment start. Long-press again at the end of the segment to set END and open the submission form.";
+gesturesTitle2 = "Tap a segment on the bar";
+gesturesDeps2 = "Vote, change category, or hide a segment on this device only.";
+
+submittingTitle = "Submitting";
+submittingSectionTitle1 = "Submission form";
+submittingSectionDeps1 = "Sliders + nudge buttons fine-tune start/end. Pick a category. Submit posts to sponsor.ajay.app.";
+submittingSectionTitle2 = "Your local submissions";
+submittingSectionDeps2 = "Auto-skipped on this device immediately. Voting unlocks once the server publishes them. The 'MINE' badge marks them.";
+
+skipToastTitle = "Skip toast";
+skipToastSectionTitle1 = "Undo";
+skipToastSectionDeps1 = "Seeks back to segment start. The segment plays through this once. Forward + back resets it so it re-skips.";
+skipToastSectionTitle2 = "Upvote / Downvote";
+skipToastSectionDeps2 = "👍 records your vote on the server. 👎 opens a menu to downvote, hide locally, or change category.";
+skipToastSectionTitle3 = "Full segment menu";
+skipToastSectionDeps3 = "Same options as tapping the segment on the progress bar.";
+
+managingSegmentsTitle = "Managing segments";
+managingSegmentsSectionTitle1 = "Manage segments…";
+managingSegmentsSectionDeps1 = "Long-press the bar → 'Manage segments' lists every segment for the current episode. Vote, hide, change category, or tap a row to jump the player.";
+managingSegmentsSectionTitle2 = "Reporting & drafts";
+managingSegmentsSectionDeps2 = "Settings → 'Reporting & drafts' holds your in-progress drafts (unfinished marks) and your hidden segments. Drafts persist across launches.";
+
+categoriesTitle = "Categories";
+categoriesSectionTitle1 = "Per-category actions";
+categoriesSectionDeps1 = "Off = ignore. Show = draw on the bar only. Manual = prompt before skipping. Auto = skip silently.";

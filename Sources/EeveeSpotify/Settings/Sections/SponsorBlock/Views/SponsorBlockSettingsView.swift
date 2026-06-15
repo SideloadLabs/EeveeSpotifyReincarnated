@@ -5,20 +5,20 @@ struct SponsorBlockSettingsView: View {
 
     var body: some View {
         List {
-            Section(footer: Text("Skips community-marked segments in podcast episodes.")) {
-                Toggle("Enable SponsorBlock", isOn: $options.enabled)
-                Toggle("Show colored overlay on progress bar", isOn: $options.showOverlay)
+            Section(footer: Text("categoryOneFooter".localized)) {
+                Toggle("enableSponsorblock".localized, isOn: $options.enabled)
+                Toggle("showColoredOverlay".localized, isOn: $options.showOverlay)
                     .disabled(!options.enabled)
-                Toggle("Show toast when skipping", isOn: $options.showToast)
+                Toggle("showToast".localized, isOn: $options.showToast)
                     .disabled(!options.enabled)
-                Toggle("Skip-toast action buttons (vote / undo / hide)", isOn: $options.showSkipFeedbackButtons)
+                Toggle("skipToast".localized, isOn: $options.showSkipFeedbackButtons)
                     .disabled(!options.enabled || !options.showToast)
-                Toggle("Respect manual seek (don't re-skip)", isOn: $options.respectManualSeek)
+                Toggle("respectManualSeek".localized, isOn: $options.respectManualSeek)
                     .disabled(!options.enabled)
             }
 
-            Section(header: Text("Categories"),
-                    footer: Text("Off · Show · Manual · Auto. Tap the color circle to change.")) {
+            Section(header: Text("categoriesHeader".localized),
+                    footer: Text("categoriesFooter".localized)) {
                 ForEach(SponsorBlockOptions.allCategoryOrder, id: \.self) { key in
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
@@ -46,7 +46,7 @@ struct SponsorBlockSettingsView: View {
                 NavigationLink(destination: SponsorBlockPendingListView()) {
                     HStack {
                         Image(systemName: "tray.and.arrow.up")
-                        Text("Reporting & drafts")
+                        Text("draftsTitle".localized)
                         Spacer()
                         let count = SponsorBlockPendingStore.all().values.reduce(0) { $0 + $1.count }
                         if count > 0 {
@@ -59,7 +59,7 @@ struct SponsorBlockSettingsView: View {
                 Button {
                     let snap = SponsorBlockSkipper.shared.currentPlayhead()
                     guard let episodeID = snap.episodeID else {
-                        PopUpHelper.showPopUp(message: "No podcast is currently playing.", buttonText: "OK")
+                        PopUpHelper.showPopUp(message: "errorNoPodcats".localized, buttonText: "OK")
                         return
                     }
                     let active = SponsorBlockPendingStore.segments(for: episodeID).first(where: { $0.end == nil })
@@ -76,26 +76,26 @@ struct SponsorBlockSettingsView: View {
                 } label: {
                     HStack {
                         Image(systemName: "plus.circle")
-                        Text("Mark segment for current episode")
+                        Text("markSegment".localized)
                     }
                 }
                 NavigationLink(destination: SponsorBlockAdvancedView(options: $options)) {
                     HStack {
                         Image(systemName: "gearshape.2")
-                        Text("Advanced")
+                        Text("advancedTitle".localized)
                     }
                 }
                 NavigationLink(destination: SponsorBlockHelpView()) {
                     HStack {
                         Image(systemName: "questionmark.circle")
-                        Text("How to use")
+                        Text("howToUseTitle".localized)
                     }
                 }
             }
 
-            Section(header: Text("Credits"),
-                    footer: Text("Segment data from the SponsorBlock community (sponsor.ajay.app). Integration ported from Spot-SponsorBlock-Extension by Spot-SponsorBlock.")) {
-                Link("Spot-SponsorBlock-Extension on GitHub",
+            Section(header: Text("creditsTitle".localized),
+                    footer: Text("creditsSubtitle".localized)) {
+                Link("linkButtonTitle".localized,
                      destination: URL(string: "https://github.com/Spot-SponsorBlock/Spot-SponsorBlock-Extension")!)
                 Link("SponsorBlock", destination: URL(string: "https://sponsor.ajay.app")!)
             }
@@ -131,25 +131,25 @@ struct SponsorBlockSettingsView: View {
 
     private func actionLabel(_ a: SponsorBlockAction) -> String {
         switch a {
-        case .disabled:   return "Off"
-        case .showOnly:   return "Show"
-        case .manualSkip: return "Manual"
-        case .autoSkip:   return "Auto"
+            case .disabled: return "action_disabled".localized
+            case .showOnly: return "action_show".localized
+            case .manualSkip: return "action_manual".localized
+            case .autoSkip: return "action_auto".localized
         }
     }
 
     private func prettyName(_ key: String) -> String {
         switch key {
-        case "sponsor":          return "Sponsor"
-        case "selfpromo":        return "Unpaid/Self Promotion"
-        case "interaction":      return "Interaction Reminder"
-        case "intro":            return "Intermission/Intro"
-        case "outro":            return "Outro/Credits"
-        case "preview":          return "Preview/Recap"
-        case "hook":             return "Hook/Greetings"
-        case "filler":           return "Tangent/Filler"
-        case "exclusive_access": return "Exclusive Access"
-        default:                 return key
+            case "sponsor": return "sponsor_category".localized
+            case "selfpromo": return "selfpromo_category".localized
+            case "interaction": return "interaction_category".localized
+            case "intro": return "intro_category".localized
+            case "outro": return "outro_category".localized
+            case "preview": return "preview_category".localized
+            case "hook": return "hook_category".localized
+            case "filler": return "filler_category".localized
+            case "exclusive_access": return "exclusive_access_category".localized
+            default: return key
         }
     }
 }

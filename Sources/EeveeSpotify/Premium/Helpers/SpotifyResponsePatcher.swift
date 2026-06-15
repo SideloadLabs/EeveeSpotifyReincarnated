@@ -5,9 +5,27 @@ import Foundation
 enum SpotifyResponsePatcher {
 
     // Patched customize body, replayed for 304s and post-startup re-fetches
-    // so ad flags can't re-enable mid-session.
-    static var cachedCustomizeData: Data?
-    static var handledCustomizeTasks = Set<Int>()
+    // so ad flags can't re-enable mid-session. Touched from two hook classes on
+    // URLSession's concurrent delegate queues — all access is lock-guarded.
+    private static let lock = NSLock()
+    private static var _cachedCustomizeData: Data?
+    private static var _handledCustomizeTasks = Set<Int>()
+
+    static var cachedCustomizeData: Data? {
+        get { lock.lock(); defer { lock.unlock() }; return _cachedCustomizeData }
+        set { lock.lock(); defer { lock.unlock() }; _cachedCustomizeData = newValue }
+    }
+
+    static func markCustomizeTaskHandled(_ id: Int) {
+        lock.lock(); defer { lock.unlock() }
+        _handledCustomizeTasks.insert(id)
+    }
+
+    // Returns true exactly once per id (the task that synthesized the replay).
+    static func consumeCustomizeTask(_ id: Int) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        return _handledCustomizeTasks.remove(id) != nil
+    }
 
     static func shouldBlock(_ url: URL) -> Bool {
         let elapsed = Date().timeIntervalSince(tweakInitTime)

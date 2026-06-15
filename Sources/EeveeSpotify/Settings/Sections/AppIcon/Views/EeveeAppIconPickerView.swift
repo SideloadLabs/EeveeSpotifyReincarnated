@@ -19,8 +19,8 @@ struct EeveeAppIconPickerView: View {
     var body: some View {
         List {
             Section(
-                header: Text("Choose Icon"),
-                footer: Text("iOS shows a confirmation the first time. The home screen may take a few seconds to refresh.")
+                header: Text("appIconTitle".localized),
+                footer: Text("appIconSubtitle".localized)
             ) {
                 ForEach(icons) { icon in
                     Button { apply(icon) } label: { row(icon) }
@@ -55,7 +55,7 @@ struct EeveeAppIconPickerView: View {
                 Text(icon.title)
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.primary)
-                Text(icon.id == selectedKey ? "Selected" : "Tap to apply")
+                Text(icon.id == selectedKey ? "iconSelected".localized : "iconTapToApply".localized)
                     .font(.system(size: 13))
                     .foregroundColor(icon.id == selectedKey
                                      ? EeveeSettingsView.spotifyAccentColor

@@ -34,3 +34,4 @@ build_log.txt
 .vscode/
 .website/
 .github/copilot-instructions.md
+scripts/spotify_symbol_diff.py

@@ -2,9 +2,8 @@
 
 # EeveeSpotifyReincarnated
 
-**Updated and maintained by [jaydenjcpy](https://github.com/jaydenjcpy) & [faroukbmiled](https://github.com/faroukbmiled)  - Current Version 9.1.48**
-
-**Last updated 5/16/26**
+**Maintainers:** [jaydenjcpy](https://github.com/jaydenjcpy) & [faroukbmiled](https://github.com/faroukbmiled) & [Mod4](https://github.com/M0d-4) <br />
+**Last Update:** `6/12/26` **Spotify Version:** `9.1.50`
 
 This tweak makes Spotify think you have a Premium subscription, granting free listening, just like Spotilife, and provides some additional features like custom lyrics.
 
@@ -99,7 +98,7 @@ Thanks for all of the community's support, also, thanks to all the devs who work
 
 [Ryuk](https://github.com/faroukbmiled) - True Shuffle, App Icon, Support for Spotify v9.1.46 and above 
 
-[Mod-4](https://github.com/M0d-4) - Custom Lyrics, iPadUI fix 
+[Mod4](https://github.com/M0d-4) - Custom Lyrics, iPadUI fix 
 
 [estrogencat](https://github.com/estrogencat) - Icon Fixes 
 

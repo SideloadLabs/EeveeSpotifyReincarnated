@@ -3,6 +3,9 @@
 patching = "الترقيع";
 lyrics = "كلمات";
 customization = "التخصيص";
+experiments = "تجريبي";
+sponsorblock = "SponsorBlock (تجريبي)";
+appIcon = "الأيقونة";
 
 common_issues_tip_title = "هل تواجه مشكلة؟";
 
@@ -29,6 +32,9 @@ patching_description = "يقوم EeveeSpotify باعتراض طلبات تحمي
 overwrite_configuration = "الكتابة فوق التكوين";
 overwrite_configuration_description = "استبدل التكوين البعيد بالتهيئة المميزة الملقاة. يحدد هذا التكوين معظم معلمات واجهة المستخدم/تجربة المستخدم وقد يكون مفيدًا، على الرغم من أنه قد يسبب مشاكل.";
 
+true_shuffle = "عشوائي حقيقي";
+true_shuffle_dec = "منع الـ Smart Shuffle بتاع Spotify إنه يضيف أغاني من عنده في قائمة التشغيل العشوائي.";
+
 // Lyrics
 
 do_not_replace_lyrics = "لا تستبدل الكلمات";
@@ -54,6 +60,9 @@ genius_fallback_description = "تحميل كلمات الأغاني من Genius 
 
 show_fallback_reasons = "إظهار الأسباب الاحتياطية";
 
+hide_lyrics_on_error = "出錯時隱藏";
+hide_lyrics_on_error_description = "出現錯誤時（不包含回退）隱藏歌詞框。";
+
 romanized_lyrics = "كلمات مكتوبة بالحروف اللاتينية";
 romanized_lyrics_description = "عرض كلمات الأغاني بالحروف اللاتينية لليابانية والكورية والصينية.";
 
@@ -75,6 +84,14 @@ static_color = "لون ثابت";
 color_normalization_factor = "عامل تطبيع الألوان";
 dark_popups = "بوبوبس داكن";
 
+// MARK: Experiments
+
+show_instagram_destination = "إظهار المشاركة لـ Instagram";
+show_instagram_destination_description = "إظهار خيار المشاركة لـ Instagram دايماً. %@";
+
+livecontainer_sharing = "إظهار المشاركة لـ LiveContainer";
+livecontainer_sharing_description = "لو خيار المشاركة مش متاح، هيشارك لـ LiveContainer وينسخ الرابط.";
+
 /* MARK: Premium PopUps */
 
 have_premium_popup = "يبدو أن لديك اشتراك Premium نشط، لذا لن يقوم التعديل بتصحيح البيانات أو تقييد استخدام الميزات المميزة على الخادم. يمكنك إدارة ذلك في إعدادات EeveeSpotify.";
@@ -82,6 +99,10 @@ have_premium_popup = "يبدو أن لديك اشتراك Premium نشط، لذ�
 high_audio_quality_popup = "جودة الصوت العالية جدًا من جانب الخادم وغير متوفرة مع هذا التعديل.";
 playlist_downloading_popup = "تنزيل قائمة التشغيل الأصلية من جانب الخادم وغير متاح مع هذا التعديل. ومع ذلك يمكنك تنزيل حلقات البودكاست وقوائم التشغيل المحلية.";
 download_local_playlist = "تنزيل قائمة التشغيل المحلية";
+
+//
+
+could_not_share_popup = "مش قادر يشارك للهدف أو لـ LiveContainer، الرابط اتنسخ خلاص.";
 
 /* MARK: Lyrics */
 
@@ -113,3 +134,155 @@ contributors = "المساهمون";
 
 request_anonymous_token = "طلب رمز مجهول الهوية";
 request_anonymous_token_description = "انقر على ”طلب رمز مجهول الهوية“ لطلب رمز مميز من Musixmatch بدون تصريح.";
+
+lrclib_api = "السيرفر";
+
+// Snapshot of your benefits, should match official spotify loc
+
+ad_free_music_listening = "مغنى من غير إعلانات";
+play_songs_in_any_order = "شغل الأغاني بأي ترتيب يعجبك";
+organize_listening_queue = "ترتيب طابور الاستماع";
+
+payment_notice = "تطبيق EeveeSpotify مِتعدل عشان يشغل مميزات Premium وببلاش تماماً.";
+
+// 除錯
+
+debug_title = "تصحيح الأخطاء (Debug)";
+export_debug_log = "تصدير سجل تصحيح الأخطاء";
+clear_debug_log = "مسح سجل تصحيح الأخطاء";
+debug_log_cleared = "تم مسح سجل تصحيح الأخطاء";
+debug_log_cleared_ok = "تمام";
+no_debug_log_found = "مفيش حاجة تتمسح، سجل تصحيح الأخطاء بيشتغل لوحده أول ما تفتح Spotify.";
+no_debug_log_found_ok = "تمام";
+debug_section_footer = "تصدير أو مسح سجل تصحيح الأخطاء.";
+
+// Full reset
+resetButtonTitle = "إعادة ضبط كاملة";
+resetSubtitle = "مسح الـ Keychain والـ Sandbox وفولدرات التطبيق (App-group container) لـ Spotify، وهيخرجك ويقفل التطبيق إجباري عشان يطبق التغييرات.";
+resetFooter = "مسح الـ Keychain والـ Sandbox وفولدرات التطبيق (App-group container) لـ Spotify، وهيخرجك ويقفل التطبيق إجباري عشان يطبق التغييرات. مش هيأثر على أي تطبيقات تانية.";
+
+// Settings Bar
+eevee_inline_subtitle_text = "تعديلات، كلمات أغاني، تخصيص ومميزات تجريبية";
+
+// App Icon Chooser
+appIconTitle = "اختار الأيقونة";
+appIconSubtitle = "نظام iOS/iPadOS هيطلعلك رسالة أول ما تغير الأيقونة، والشاشة الرئيسية ممكن تاخد وقت شوية عقبال ما تتحدث.";
+iconSelected = "مُختار";
+iconTapToApply = "دوس هنا عشان تطبق";
+
+// SponsorBlock
+categoryOneFooter = "تخطي المقاطع المتعلم عليها من المجتمع في البودكاست.";
+enableSponsorblock = "تشغيل SponsorBlock";
+showColoredOverlay = "إظهار علامات ملونة على شريط التقدم";
+showToast = "إظهار إشعار عند التخطي";
+skipToast = "أفعال إشعار التخطي (تصويت/إلغاء/إخفاء)";
+respectManualSeek = "الأولوية للتقديم والتأخير اليدوي";
+categoriesHeader = "الأقسام";
+categoriesFooter = "قفل · إظهار · يدوي · تلقائي، دوس على مغير الألوان عشان تغير اللون.";
+
+sponsor_category = "إعلانات ورعاية";
+selfpromo_category = "إعلان ذاتي/مش مدفوع";
+interaction_category = "تذكير بالتفاعل (لايك وشير)";
+intro_category = "المقدمة";
+outro_category = "الخاتمة/التتر";
+preview_category = "معاينة/ملخص اللي فات";
+hook_category = "جذب انتباه/تحية";
+filler_category = "كلام ملوش لزمة/حشو";
+exclusive_access_category = "محتوى حصري";
+
+action_disabled = "قفل";
+action_show = "إظهار";
+action_manual = "يدوي";
+action_auto = "تلقائي";
+
+draftsTitle = "البلاغات والمسودات";
+errorNoPodcats = "مفيش بودكاست شغال دلوقتي";
+markSegment = "علم على مقطع في الحلقة الحالية";
+advancedTitle = "إعدادات متقدمة";
+howToUseTitle = "طريقة الاستخدام";
+creditsTitle = "شكر وتقدير";
+creditsSubtitle = "بيانات المقاطع جاية من مجتمع SponsorBlock (sponsor.ajay.app). منقولة من Spot-SponsorBlock-Extension التابعة لـ Spot-SponsorBlock.";
+linkButtonTitle = "عرض Spot-SponsorBlock-Extension على GitHub";
+
+// SponsorBlock reports
+sponsorblock_reports_title = "بلاغات SponsorBlock";
+sponsorblockIDTitle = "هويتك في SponsorBlock";
+sponsorblockIDFooter = "بتستخدم للتعرف على تصويتاتك ومشاركاتك، وبتكون على شكل رمز سري، أوعى تشاركها مع حد.";
+user_id_copied = "تم نسخ معرف المستخدم";
+copyButton = "نسخ";
+regenerateButton = "توليد من جديد";
+draftsTitleSB = "المسودات";
+draftsEmpty = "مفيش مسودات، دوس لفترة طويلة على شريط التقدم عشان تبدأ تعليم.";
+draftsEpisodeLoc = "الحلقة %@";
+hidden_locally_header = "مخفي محلياً (%@)";
+hiddenFooter = "المقاطع دي مش هتتخطى أبداً على الجهاز ده، بس هتفضل موجودة على سيرفرات SponsorBlock.";
+hiddenSegmentsEmpty = "مفيش مقاطع مخفية.";
+unhideButton = "إظهار";
+
+popUpRegenerateTitle = "عايز تولد هويتك من جديد؟";
+popUpRegenerateSubtitle = "التصويتات والمشاركات الحالية مش هترتبط بيك تاني.";
+popUpClearAllButton = "مسح الكل";
+popUpClearAllTitle = "مسح كل المقاطع المخفية؟";
+popUpClearAllSubtitle = "هيتخطاهم تاني بناءً على قواعد الأقسام بتاعتك.";
+
+readyButton = "جاهز";
+incompleteButton = "مش كامل";
+editSubmit = "تعديل/إرسال";
+discardButton = "تجاهل";
+
+// SponsorBlock Advanced
+skipBehaviourTitle = "طريقة التخطي";
+autoSkipSubmissionsTitle = "تخطي مشاركاتي تلقائياً";
+logOnlyToggle = "تسجيل في السجل بس (مش هيغير مكان التشغيل)";
+serverHeader = "السيرفر";
+urlText = "الرابط (URL)";
+
+tuningTitle = "الضبط الدقيق";
+minSegmentDuration = "أقل مدة للمقطع: %.1f ثانية";
+toastDuration = "مدة ظهور الإشعار: %.1f ثانية";
+
+trackLogSubtitle = "حفظ بيانات البودكاست (زي الـ URI، وهل هو بودكاست ولا فيديو، إلخ) في سجل تصحيح الأخطاء أول ما حلقة جديدة تشتغل. شغل الخيار ده بس لو SponsorBlock مش عارف يتعرف على البودكاست اللي شغال.";
+trackLogToggle = "سجل التشخيص والمتابعة";
+resetButtonTrackLog = "إعادة ضبط";
+
+// SponsorBlock Reset Options Advanced
+resetTitle = "عايز تعيد ضبط إيه؟";
+resetSubtitle = "كل حاجة لوحدها";
+allResetSB = "الكل";
+regenerateIDSB = "توليد الهوية من جديد";
+localSubmissionsSB = "مشاركاتي المحلية (%@)";
+votedRecordsSB = "سجل التصويتات (%@)";
+hiddenSegmentsSB = "المقاطع المخفية (%@)";
+draftsCountSB = "المسودات (%@)";
+settingsResetSB = "الإعدادات (المفاتيح، الألوان، الأقسام)";
+
+// SponsorBlock How To Use
+playerGesturesTitle = "حركات مشغل الأغاني";
+gesturesTitle1 = "دوسة طويلة على شريط التقدم";
+gesturesDeps1 = "بتعلم على بداية المقطع، ودوسة طويلة تانية عند النهاية عشان تقفل المقطع وتفتح قائمة الإرسال.";
+gesturesTitle2 = "دوس على المقطع";
+gesturesDeps2 = "عشان تصوت، أو تغير القسم، أو تخفيه محلياً.";
+
+submittingTitle = "الإرسال";
+submittingSectionTitle1 = "قائمة الإرسال";
+submittingSectionDeps1 = "استخدم المؤشر لتعديل بداية أو نهاية المقطع بالظبط، واختار القسم وابعت لـ sponsor.ajay.app.";
+submittingSectionTitle2 = "مشاركاتك المحلية";
+submittingSectionDeps2 = "هتتخطى محلياً فوراً على جهازك، وتقدر تصوت عليها أول ما تترفع على السيرفر علناً. هتتعلم بعلامة 'بتاعتي'.";
+
+skipToastTitle = "إشعار التخطي";
+skipToastSectionTitle1 = "إلغاء";
+skipToastSectionDeps1 = "بيرجعك لقبل المقطع، ومش هيتخطاه المرة دي، بس لو قدمت وأخرت يدوي هيتخطاه تاني.";
+skipToastSectionTitle2 = "تأييد / معارضة";
+skipToastSectionDeps2 = "👍 هيسجل تصويتك على السيرفر، و 👎 هيفتح قائمة عشان تختار معارضة، أو إخفاء محلي، أو تغيير القسم.";
+skipToastSectionTitle3 = "قائمة المقطع الكاملة";
+skipToastSectionDeps3 = "نفس الخيارات اللي بتظهر لما تدوس على المقطع.";
+
+managingSegmentsTitle = "إدارة المقاطع";
+managingSegmentsSectionTitle1 = "إدارة المقاطع";
+managingSegmentsSectionDeps1 = "دوسة طويلة على شريط التقدم ← 'إدارة المقاطع' هيجيبلك كل مقاطع الحلقة الحالية عشان تصوت، تخفي، تغير القسم، أو تدوس على سطر عشان تروح للمشغل.";
+managingSegmentsSectionTitle2 = "البلاغات والمسودات";
+managingSegmentsSectionDeps2 = "الإعدادات ← 'البلاغات والمسودات' هتحفظ مسوداتك والمقاطع المخفية، والمسودات هتفضل محفوظة دايماً.";
+
+categoriesTitle = "الأقسام";
+categoriesSectionTitle1 = "أفعال الأقسام";
+categoriesSectionDeps1 = "قفل = تجاهل، إظهار = هيظهر المقطع على شريط التقدم بس، يدوي = هيسألك قبل التخطي، تلقائي = هيتخطى على طول.";

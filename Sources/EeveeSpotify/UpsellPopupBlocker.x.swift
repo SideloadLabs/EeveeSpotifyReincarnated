@@ -1,15 +1,11 @@
-// UpsellPopupBlocker.x.swift
-// Blocks Spotify's premium upsell / "Like listening without limits?" popups
-// by intercepting SPTEncorePopUpPresenter.presentPopUp(_:) and dropping any
-// dialog whose title or description text matches known upsell patterns.
+// Drops premium upsell popups by intercepting presentPopUp(_:) and matching the
+// dialog title/body against known upsell phrases.
 
 import Orion
 import UIKit
 
 struct UpsellPopupBlockerGroup: HookGroup {}
 
-// Keywords found in upsell / upgrade popup titles and descriptions.
-// Checked case-insensitively against both the dialog title and body text.
 private let upsellKeywords: [String] = [
     "premium",
     "upgrade",
@@ -26,7 +22,6 @@ private let upsellKeywords: [String] = [
     "try free",
     "get premium",
     "start premium",
-    "learn more",
     "upsell",
     "paywall",
     "free tier",
@@ -39,9 +34,16 @@ private func isUpsellText(_ text: String?) -> Bool {
     return upsellKeywords.contains { lower.contains($0) }
 }
 
-// Safely read a String KVC key from an NSObject, returning nil on exception.
+// responds(to:) gate is mandatory: value(forKey:) raises an uncatchable
+// NSUnknownKeyException, which try?/do-catch can't trap.
 private func kvcString(_ obj: NSObject, _ key: String) -> String? {
-    obj.value(forKeyPath: key) as? String
+    guard obj.responds(to: Selector(key)) else { return nil }
+    return obj.value(forKey: key) as? String
+}
+
+private func kvcObject(_ obj: NSObject, _ key: String) -> NSObject? {
+    guard obj.responds(to: Selector(key)) else { return nil }
+    return obj.value(forKey: key) as? NSObject
 }
 
 class SPTEncorePopUpPresenterHook: ClassHook<NSObject> {
@@ -49,11 +51,9 @@ class SPTEncorePopUpPresenterHook: ClassHook<NSObject> {
     static let targetName = "SPTEncorePopUpPresenter"
 
     func presentPopUp(_ popUp: NSObject) {
-        // Read dialog text via KVC.
-        // SPTEncorePopUpDialog exposes a `model` (SPTEncorePopUpDialogModel) with
-        // `title` and `descriptionText`. Fall back to the same keys directly on the
-        // dialog object in case the structure differs between Spotify builds.
-        let modelObj = popUp.value(forKeyPath: "model") as? NSObject
+        // dialog exposes a `model` with title/descriptionText; fall back to the
+        // dialog itself in case the structure differs between builds
+        let modelObj = kvcObject(popUp, "model")
 
         let title = modelObj.flatMap { kvcString($0, "title") ?? kvcString($0, "dialogTitle") }
                  ?? kvcString(popUp, "title") ?? kvcString(popUp, "dialogTitle")
@@ -67,10 +67,9 @@ class SPTEncorePopUpPresenterHook: ClassHook<NSObject> {
         if isUpsellText(title) || isUpsellText(desc) {
             NSLog("[EeveeSpotify][UpsellBlock] Blocked popup — title=%@ desc=%@",
                   title ?? "(nil)", desc ?? "(nil)")
-            return  // swallow the call; popup never appears
+            return
         }
 
-        
         orig.presentPopUp(popUp)
     }
 }

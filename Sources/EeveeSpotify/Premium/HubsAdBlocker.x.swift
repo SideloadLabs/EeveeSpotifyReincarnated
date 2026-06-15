@@ -21,41 +21,36 @@ import Foundation
 //   native-ad-home-shelf
 //   com.spotify.service.marquee
 
+// Strips ad components from HUB JSON (home/browse/search) before the builder
+// renders them. Known ad ids: mobile-display-ad-card, mobile-ads-display-ad-element,
+// mobile-ads-fullbleed-display-card, native-ad-home-shelf, com.spotify.service.marquee.
+
 struct AdBlockerGroup: HookGroup { }
 
 class HubsAdBlocker: ClassHook<NSObject> {
     typealias Group = AdBlockerGroup
     static let targetName: String = "HUBViewModelBuilderImplementation"
 
-    // Ad-related keywords matched against component namespace, name, id, type, and metadata keys
+    // Bare "ad"/"ads" intentionally absent: as substrings they hit real shelf ids
+    // (made-for-you, release-radar). Matched only against structural fields, never titles.
     private static let adKeywords: [String] = [
-        "ad", "ads", "sponsored", "upsell", "campaign", "promoted",
-        "premium-upsell", "merch", "ticket", "billboard", "banner",
-        "interstitial", "overlay", "marquee", "leavebehind",
-        "leave-behind", "displayad", "display-ad", "fullbleed", "full-bleed",
-        "leaderboard", "advertisement", "sponsor", "promo", "native-ad",
+        "sponsored", "upsell", "campaign", "promoted", "premium-upsell", "merch",
+        "ticket", "billboard", "banner", "interstitial", "overlay", "marquee",
+        "leavebehind", "leave-behind", "displayad", "display-ad", "fullbleed",
+        "full-bleed", "leaderboard", "advertisement", "sponsor", "promo", "native-ad",
         "mobile-ads", "on-surface", "onsurface", "search-ad", "home-ad",
-        "sponsored-content", "sponsored-ad", "display-ad", "ad-card",
-        "native-ad-home-shelf", "sponsored-shelf", "sponsored-row",
-        "ad-shelf", "ad-row", "sponsored-item", "ad-item",
-        "merchandising", "upgrade-component", "offer", "marketing",
-        "sponsored-shelf", "sponsored-row", "native-ad-home-shelf",
+        "sponsored-content", "sponsored-ad", "ad-card", "native-ad-home-shelf",
+        "sponsored-shelf", "sponsored-row", "ad-shelf", "ad-row", "sponsored-item",
+        "ad-item", "merchandising", "upgrade-component", "offer", "marketing",
         "mobile-display-ad-card", "mobile-ads-display-ad-element"
     ]
 
-    // Returns true if the given string contains any ad keyword
     private static func containsAdKeyword(_ str: String) -> Bool {
         let lower = str.lowercased()
-        for kw in adKeywords {
-            if lower.contains(kw) { return true }
-        }
-        return false
+        return adKeywords.contains { lower.contains($0) }
     }
 
-    // Returns true if the component dictionary represents an ad
     private func isAdComponent(_ component: [String: Any]) -> Bool {
-        // 1. Check "component" field
-        //    In HUB JSON this is a dict: {"namespace": "mobile", "name": "display-ad-card"}
         if let componentDict = component["component"] as? [String: Any] {
             let ns = componentDict["namespace"] as? String ?? ""
             let name = componentDict["name"] as? String ?? ""
@@ -63,84 +58,41 @@ class HubsAdBlocker: ClassHook<NSObject> {
             if HubsAdBlocker.containsAdKeyword(name) { return true }
             if HubsAdBlocker.containsAdKeyword("\(ns):\(name)") { return true }
         }
-        // Also handle plain string format (e.g. "mobile:display-ad-card")
+        // plain string form, e.g. "mobile:display-ad-card"
         if let componentStr = component["component"] as? String {
             if HubsAdBlocker.containsAdKeyword(componentStr) { return true }
         }
 
-        // 2. Check "id" field
-        if let id = component["id"] as? String {
-            if HubsAdBlocker.containsAdKeyword(id) { return true }
-        }
+        if let id = component["id"] as? String, HubsAdBlocker.containsAdKeyword(id) { return true }
+        if let type_ = component["type"] as? String, HubsAdBlocker.containsAdKeyword(type_) { return true }
 
-        // 3. Check "type" field
-        if let type_ = component["type"] as? String {
-            if HubsAdBlocker.containsAdKeyword(type_) { return true }
-        }
-
-        // 4. Check "metadata" dict — look for ad flags and ad-related keys
         if let metadata = component["metadata"] as? [String: Any] {
             if metadata["ad"] as? Bool == true { return true }
             if metadata["is_ad"] as? Bool == true { return true }
             if metadata["is_sponsored"] as? Bool == true { return true }
-            for key in metadata.keys {
-                if HubsAdBlocker.containsAdKeyword(key) { return true }
-            }
+            for key in metadata.keys where HubsAdBlocker.containsAdKeyword(key) { return true }
         }
 
-        // 5. Check "logging" dict keys and type
         if let logging = component["logging"] as? [String: Any] {
-            if let logType = logging["type"] as? String {
-                if HubsAdBlocker.containsAdKeyword(logType) { return true }
-            }
-            for key in logging.keys {
-                if HubsAdBlocker.containsAdKeyword(key) { return true }
-            }
+            if let logType = logging["type"] as? String, HubsAdBlocker.containsAdKeyword(logType) { return true }
+            for key in logging.keys where HubsAdBlocker.containsAdKeyword(key) { return true }
         }
 
-        // 6. Check "custom" dict keys
         if let custom = component["custom"] as? [String: Any] {
-            for key in custom.keys {
-                if HubsAdBlocker.containsAdKeyword(key) { return true }
-            }
+            for key in custom.keys where HubsAdBlocker.containsAdKeyword(key) { return true }
         }
 
-        // 7. Check "text" and "title" fields for "Advertisement" label
-        if let text = component["text"] as? [String: Any] {
-            for value in text.values {
-                if let str = value as? String, HubsAdBlocker.containsAdKeyword(str) { return true }
-                if let dict = value as? [String: Any] {
-                    for v in dict.values {
-                        if let s = v as? String, HubsAdBlocker.containsAdKeyword(s) { return true }
-                    }
-                }
-            }
-        }
-        
-        if let title = component["title"] as? String {
-            if HubsAdBlocker.containsAdKeyword(title) { return true }
-        }
-
-        // 8. Check "subtitle" and "header" fields
-        if let subtitle = component["subtitle"] as? String {
-            if HubsAdBlocker.containsAdKeyword(subtitle) { return true }
-        }
-
-        if let header = component["header"] as? String {
-            if HubsAdBlocker.containsAdKeyword(header) { return true }
-        }
-
+        // Display strings (title/subtitle/text) are NOT matched — real content
+        // ("Billboard Hot 100", "Ticket to Ride") trips the keywords.
         return false
     }
 
-    // Recursively filter ad components from an array
     private func filterComponents(_ components: [[String: Any]]) -> [[String: Any]] {
         var result = [[String: Any]]()
         for var component in components {
             if isAdComponent(component) {
                 continue
             }
-            // Recursively filter nested arrays
             if let children = component["children"] as? [[String: Any]] {
                 component["children"] = filterComponents(children)
             }

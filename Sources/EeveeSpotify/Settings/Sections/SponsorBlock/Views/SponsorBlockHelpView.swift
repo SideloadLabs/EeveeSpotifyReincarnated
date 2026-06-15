@@ -3,49 +3,49 @@ import SwiftUI
 struct SponsorBlockHelpView: View {
     var body: some View {
         List {
-            Section(header: Text("Gestures on the player")) {
+            Section(header: Text("playerGesturesTitle".localized)) {
                 row(symbol: "hand.tap",
-                    title: "Long-press the progress bar",
-                    detail: "Mark a segment start. Long-press again at the end of the segment to set END and open the submission form.")
+                    title: "gesturesTitle1".localized,
+                    detail: "gesturesDeps1".localized)
                 row(symbol: "hand.point.up.left.fill",
-                    title: "Tap a segment on the bar",
-                    detail: "Vote, change category, or hide a segment on this device only.")
+                    title: "gesturesTitle2".localized,
+                    detail: "gesturesDeps2".localized)
             }
 
-            Section(header: Text("Submitting")) {
+            Section(header: Text("submittingTitle".localized)) {
                 row(symbol: "square.and.pencil",
-                    title: "Submission form",
-                    detail: "Sliders + nudge buttons fine-tune start/end. Pick a category. Submit posts to sponsor.ajay.app.")
+                    title: "submittingSectionTitle1".localized,
+                    detail: "submittingSectionDeps1".localized)
                 row(symbol: "lock.shield",
-                    title: "Your local submissions",
-                    detail: "Auto-skipped on this device immediately. Voting unlocks once the server publishes them. The 'MINE' badge marks them.")
+                    title: "submittingSectionTitle2".localized,
+                    detail: "submittingSectionDeps2".localized)
             }
 
-            Section(header: Text("Skip toast")) {
+            Section(header: Text("skipToastTitle".localized)) {
                 row(symbol: "arrow.uturn.backward",
-                    title: "Undo",
-                    detail: "Seeks back to segment start. The segment plays through this once. Forward + back resets it so it re-skips.")
+                    title: "skipToastSectionTitle1".localized,
+                    detail: "skipToastSectionDeps1".localized)
                 row(symbol: "hand.thumbsup.fill",
-                    title: "Upvote / Downvote",
-                    detail: "👍 records your vote on the server. 👎 opens a menu to downvote, hide locally, or change category.")
+                    title: "skipToastSectionTitle2".localized,
+                    detail: "skipToastSectionDeps2".localized)
                 row(symbol: "ellipsis",
-                    title: "Full segment menu",
-                    detail: "Same options as tapping the segment on the progress bar.")
+                    title: "skipToastSectionTitle3".localized,
+                    detail: "skipToastSectionDeps3".localized)
             }
 
-            Section(header: Text("Managing segments")) {
+            Section(header: Text("managingSegmentsTitle".localized)) {
                 row(symbol: "list.bullet.rectangle.portrait",
-                    title: "Manage segments…",
-                    detail: "Long-press the bar → 'Manage segments' lists every segment for the current episode. Vote, hide, change category, or tap a row to jump the player.")
+                    title: "managingSegmentsSectionTitle1".localized,
+                    detail: "managingSegmentsSectionDeps1".localized)
                 row(symbol: "tray.full",
-                    title: "Reporting & drafts",
-                    detail: "Settings → 'Reporting & drafts' holds your in-progress drafts (unfinished marks) and your hidden segments. Drafts persist across launches.")
+                    title: "managingSegmentsSectionTitle2".localized,
+                    detail: "managingSegmentsSectionDeps2".localized)
             }
 
-            Section(header: Text("Categories")) {
+            Section(header: Text("categoriesTitle".localized)) {
                 row(symbol: "list.bullet.rectangle",
-                    title: "Per-category actions",
-                    detail: "Off = ignore. Show = draw on the bar only. Manual = prompt before skipping. Auto = skip silently.")
+                    title: "categoriesSectionTitle1".localized,
+                    detail: "categoriesSectionDeps1".localized)
             }
 
             Section {
@@ -56,7 +56,7 @@ struct SponsorBlockHelpView: View {
             }
         }
         .listStyle(InsetGroupedListStyle())
-        .navigationTitle("How to use")
+        .navigationTitle("howToUseTitle".localized)
     }
 
     private func row(symbol: String, title: String, detail: String) -> some View {

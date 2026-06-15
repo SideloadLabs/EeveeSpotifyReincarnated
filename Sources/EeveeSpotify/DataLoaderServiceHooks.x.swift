@@ -1,16 +1,11 @@
 import Foundation
 import Orion
 
-// Captured Bearer token from any premium-relevant request — surfaced to
-// other modules (lyrics fetch, etc) that need to talk to Spotify's API.
+// Bearer token captured from premium-relevant requests; reused by lyrics fetch etc.
 public var spotifyAccessToken: String?
 
-// Hooks SPTDataLoaderService — Spotify's primary URLSession delegate for
-// wg-spclient.spotify.com traffic (first-fresh-login bootstrap, customize,
-// PAM endpoints).
-//
-// Patching logic lives in `SpotifyResponsePatcher` so the regional-route
-// hook (`HttpClientURLSessionHook`) can share it.
+// Spotify's primary URLSession delegate (wg-spclient: bootstrap, customize, PAM).
+// Patching lives in SpotifyResponsePatcher so HttpClientURLSessionHook can share it.
 
 class SPTDataLoaderServiceHook: ClassHook<NSObject>, SpotifySessionDelegate {
     typealias Group = PremiumBootstrapGroup
@@ -44,7 +39,7 @@ class SPTDataLoaderServiceHook: ClassHook<NSObject>, SpotifySessionDelegate {
         }
 
         // 304 already served — suppress the second completion.
-        if SpotifyResponsePatcher.handledCustomizeTasks.remove(task.taskIdentifier) != nil {
+        if SpotifyResponsePatcher.consumeCustomizeTask(task.taskIdentifier) {
             orig.URLSession(session, task: task, didCompleteWithError: nil)
             return
         }
@@ -69,7 +64,7 @@ class SPTDataLoaderServiceHook: ClassHook<NSObject>, SpotifySessionDelegate {
         }
 
         do {
-            // Lyrics — async fetch with 5s budget, falls back to original on timeout.
+            // Lyrics — async fetch with 5s budget, falls back to Spotify's own response on failure.
             if url.isLyrics {
                 let originalLyrics = try? Lyrics(serializedBytes: buffer)
                 let semaphore = DispatchSemaphore(value: 0)
@@ -80,7 +75,7 @@ class SPTDataLoaderServiceHook: ClassHook<NSObject>, SpotifySessionDelegate {
                     semaphore.signal()
                 }
 
-                _ = semaphore.wait(timeout: .now() + .milliseconds(5000))
+                _ = semaphore.wait(timeout: .now() + .milliseconds(18000))
                 orig.URLSession(session, dataTask: task, didReceiveData: customLyricsData ?? buffer)
                 orig.URLSession(session, task: task, didCompleteWithError: nil)
                 return
@@ -92,9 +87,8 @@ class SPTDataLoaderServiceHook: ClassHook<NSObject>, SpotifySessionDelegate {
                 orig.URLSession(session, task: task, didCompleteWithError: nil)
                 return
             }
-            // patch() returned nil — no transform happened, but didReceiveData
-            // already suppressed the original. Replay the buffer or the
-            // consumer hangs forever (casita/browsita with no ad sections).
+            // patch() returned nil but didReceiveData already suppressed the original —
+            // replay the buffer or the consumer hangs (casita/browsita with no ad sections).
             orig.URLSession(session, dataTask: task, didReceiveData: buffer)
             orig.URLSession(session, task: task, didCompleteWithError: nil)
         } catch {
@@ -110,14 +104,15 @@ class SPTDataLoaderServiceHook: ClassHook<NSObject>, SpotifySessionDelegate {
     ) {
         if let url = task.currentRequest?.url, url.isCustomize, response.statusCode == 304,
            let cached = SpotifyResponsePatcher.cachedCustomizeData {
-            // Server says "not modified" — but our cached copy is the
-            // already-patched body, not whatever the server has. Replace
-            // the response status with 200 so the consumer accepts the
-            // cached data we hand it next.
-            let synthetic = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "2.0", headerFields: [:])!
+            // 304, but our cache holds the already-patched body; force 200 so the
+            // consumer accepts the cached data we replay next.
+            guard let synthetic = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "2.0", headerFields: [:]) else {
+                orig.URLSession(session, dataTask: task, didReceiveResponse: response, completionHandler: handler)
+                return
+            }
             orig.URLSession(session, dataTask: task, didReceiveResponse: synthetic, completionHandler: handler)
             orig.URLSession(session, dataTask: task, didReceiveData: cached)
-            SpotifyResponsePatcher.handledCustomizeTasks.insert(task.taskIdentifier)
+            SpotifyResponsePatcher.markCustomizeTaskHandled(task.taskIdentifier)
             return
         }
 
@@ -130,7 +125,10 @@ class SPTDataLoaderServiceHook: ClassHook<NSObject>, SpotifySessionDelegate {
 
         do {
             let data = try getLyricsDataForCurrentTrack(url.path)
-            let ok = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "2.0", headerFields: [:])!
+            guard let ok = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "2.0", headerFields: [:]) else {
+                orig.URLSession(session, dataTask: task, didReceiveResponse: response, completionHandler: handler)
+                return
+            }
             orig.URLSession(session, dataTask: task, didReceiveResponse: ok, completionHandler: handler)
             orig.URLSession(session, dataTask: task, didReceiveData: data)
         } catch {

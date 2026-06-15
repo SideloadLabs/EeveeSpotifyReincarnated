@@ -138,16 +138,16 @@ jobs:
           ipapatch --input "$OUT_IPA" --inplace --noconfirm \
                    --dylib packages/zxPluginsInject.dylib
 
-      - name: Inject OpeninSafariSpotify extension into IPA Plugins
+      - name: Inject OpeninSafariSpotify extension into IPA PlugIns
         if: ${{ inputs.ipa_url != '' }}
         run: |
           cd "$(dirname "$OUT_IPA")"
           rm -rf Payload
           unzip -q "$(basename "$OUT_IPA")"
 
-          mkdir -p "Payload/Spotify.app/Plugins"
-          rm -rf "Payload/Spotify.app/Plugins/OpenSpotifySafariExtension.appex"
-          cp -R "$OPENSPOTIFY_APPEX" "Payload/Spotify.app/Plugins/OpenSpotifySafariExtension.appex"
+          mkdir -p "Payload/Spotify.app/PlugIns"
+          rm -rf "Payload/Spotify.app/PlugIns/OpenSpotifySafariExtension.appex"
+          cp -R "$OPENSPOTIFY_APPEX" "Payload/Spotify.app/PlugIns/OpenSpotifySafariExtension.appex"
 
           # Repack only the Payload folder back into the IPA
           zip -qry "$(basename "$OUT_IPA")" Payload

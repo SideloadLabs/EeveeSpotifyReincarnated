@@ -35,7 +35,7 @@ class HttpClientURLSessionHook: ClassHook<NSObject>, SpotifySessionDelegate {
             return
         }
 
-        if SpotifyResponsePatcher.handledCustomizeTasks.remove(task.taskIdentifier) != nil {
+        if SpotifyResponsePatcher.consumeCustomizeTask(task.taskIdentifier) {
             orig.URLSession(session, task: task, didCompleteWithError: nil)
             return
         }
@@ -46,9 +46,8 @@ class HttpClientURLSessionHook: ClassHook<NSObject>, SpotifySessionDelegate {
         }
 
         guard let buffer = URLSessionHelper.shared.obtainData(for: task) else {
-            // We decided this URL should be modified, but we never captured any body bytes.
-            // This can happen with 0-byte responses, early completion, redirects, or concurrent callbacks.
-            // IMPORTANT: Always forward completion, otherwise Spotify may hang and get watchdog-killed.
+            // marked for modify but no body bytes (0-byte/early-completion/redirect).
+            // Always forward completion or Spotify hangs and gets watchdog-killed.
             if url.isCustomize, let cached = SpotifyResponsePatcher.cachedCustomizeData {
                 orig.URLSession(session, dataTask: task, didReceiveData: cached)
                 orig.URLSession(session, task: task, didCompleteWithError: nil)
@@ -68,7 +67,7 @@ class HttpClientURLSessionHook: ClassHook<NSObject>, SpotifySessionDelegate {
                     customLyricsData = try? getLyricsDataForCurrentTrack(url.path, originalLyrics: originalLyrics)
                     semaphore.signal()
                 }
-                _ = semaphore.wait(timeout: .now() + .milliseconds(5000))
+                _ = semaphore.wait(timeout: .now() + .milliseconds(18000))
                 orig.URLSession(session, dataTask: task, didReceiveData: customLyricsData ?? buffer)
                 orig.URLSession(session, task: task, didCompleteWithError: nil)
                 return
@@ -97,10 +96,13 @@ class HttpClientURLSessionHook: ClassHook<NSObject>, SpotifySessionDelegate {
     ) {
         if let url = task.currentRequest?.url, url.isCustomize, response.statusCode == 304,
            let cached = SpotifyResponsePatcher.cachedCustomizeData {
-            let synthetic = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "2.0", headerFields: [:])!
+            guard let synthetic = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "2.0", headerFields: [:]) else {
+                orig.URLSession(session, dataTask: task, didReceiveResponse: response, completionHandler: handler)
+                return
+            }
             orig.URLSession(session, dataTask: task, didReceiveResponse: synthetic, completionHandler: handler)
             orig.URLSession(session, dataTask: task, didReceiveData: cached)
-            SpotifyResponsePatcher.handledCustomizeTasks.insert(task.taskIdentifier)
+            SpotifyResponsePatcher.markCustomizeTaskHandled(task.taskIdentifier)
             return
         }
 
@@ -111,7 +113,10 @@ class HttpClientURLSessionHook: ClassHook<NSObject>, SpotifySessionDelegate {
 
         do {
             let data = try getLyricsDataForCurrentTrack(url.path)
-            let ok = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "2.0", headerFields: [:])!
+            guard let ok = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "2.0", headerFields: [:]) else {
+                orig.URLSession(session, dataTask: task, didReceiveResponse: response, completionHandler: handler)
+                return
+            }
             orig.URLSession(session, dataTask: task, didReceiveResponse: ok, completionHandler: handler)
             orig.URLSession(session, dataTask: task, didReceiveData: data)
         } catch {

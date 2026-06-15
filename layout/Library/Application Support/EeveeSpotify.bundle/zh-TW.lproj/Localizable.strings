@@ -1,122 +1,127 @@
-/* 標記: 設定 */
+/* 設定頁 */
 
-patching = "修補方案";
+patching = "修補";
 lyrics = "歌詞";
 customization = "客製化";
-experiments = "實驗性選項";
+experiments = "實驗性";
+sponsorblock = "SponsorBlock（實驗性）";
+appIcon = "圖標";
 
-common_issues_tip_title = "遇到問題?";
+common_issues_tip_title = "遇到問題？";
 
-common_issues_tip_message = "如果遇到了像是無法播放樂曲或其他問題, 請參閱";
+common_issues_tip_message = "若您正在面臨例如無法播放歌曲等問題，請務必查看";
 common_issues_tip_button = "常見問題";
 
-reset_data = "重設";
-reset_data_description = "清除快取並重新啟動Spotify.";
+reset_data = "重置資料";
+reset_data_description = "清除暫存並重啟";
 
-checking_for_update = "正在檢查更新...";
-update_available = "有可用的更新";
+checking_for_update = "正在檢查更新";
+update_available = "可用更新";
 
-restart_is_required_description = "選項變更後必須重新啟動Spotify";
+restart_is_required_description = "變更後需要重啟";
 
-// 修補方案
+// 修補
 
-do_not_patch_premium = "停用Premium修補";
-patching_description = "EeveeSpotify會即時攔截使用者資料請求, 反序列化並修改資料.
+do_not_patch_premium = "我擁有 Premium 訂閱";
+patching_description = "EeveeSpotify 會即時攔截使用者資料，將起反序列化後修改參數。
 
-若您擁有有效的Premium方案, 則可以啟用「停用Premium修補」. 啟用後EeveeSpotify將不會限制任何Premium功能.
+若您擁有有效的 Premium 訂閱，則可以啟用該選項。EeveeSpotify 將不會修改你的使用者資料亦或是限制部分 Premium 功能。
 
 %@";
 
 overwrite_configuration = "覆寫配置";
-overwrite_configuration_description = "使用轉存的Premium配置替換遠端配置. 該檔案定義了大部分的UI/UX參數, 雖然可能會導致一些問題, 但仍然很有用.";
+overwrite_configuration_description = "將遠端配置以 Premium 配置覆寫，該配置定義了大部分 UI/UX 參數。儘管可能導致一些問題，但大概率對您很有幫助。例如：該配置可能過時而導致無法啟用新功能、致使 Spotify 崩潰等等。";
+
+true_shuffle = "真隨機";
+true_shuffle_dec = "阻止 Spotify 的智慧型隨機播放將歌曲加入隨機播放清單。";
 
 // 歌詞
 
-do_not_replace_lyrics = "使用Spotify原版歌詞";
+do_not_replace_lyrics = "使用原生歌詞";
 lyrics_source = "歌詞來源";
-lyrics_source_description = "你可以在此選擇喜歡的歌詞來源.
+lyrics_source_description = "您可以選擇所喜歡的歌詞來源
 
-Genius: 為絕大多數歌曲提供最新且高品質的歌詞, 但無法使用同步歌詞.
+Genius: 最佳、最多、最新的歌詞來源，但不具備同步歌詞。
 
-LRCLIB: 最開放的歌詞來源, 可以使用同步歌詞. 然而歌詞庫不齊全.
+LRCLIB: 最開放的歌詞來源，並且提供同步歌詞，然而缺失大量歌曲。
 
-Musixmatch: Spotify使用的歌詞來源. 為大量歌曲提供同步歌詞以及翻譯, 但是你需要一個使用者權杖才可以使用該歌詞提供者. ";
-lyrics_additional_info = "若EeveeSpotify找不到或無法處理歌詞, 您將會看到「無法載入歌詞」. 雖然EeveeSpotify搜索歌詞的邏輯可能導致在使用Genius作為歌詞來源時顯示錯誤的歌詞, 但在大多數情況下, 它都能正常運作.";
-petitlyrics_description = "PetitLyrics: 提供大量日文已同步歌詞與一些非日文歌詞.";
+Musixmatch: 大部分地區 Spotify 預設使用的來源。雖然提供大量的同步歌詞與翻譯，您需要擁有使用者權杖以使用。";
+lyrics_additional_info = "若 EeveeSpotify 無法提供歌詞，則您會看到「無法加載歌詞」提示（可隱藏）。以 Genius 為來源時可能會由於 EeveeSpotify 查找歌詞方式的問題而出現曲詞對應錯誤的問題，不過在大部分情況下可以正常運作。";
+petitlyrics_description = "PetitLyrics: 日本區 Spotify 預設歌詞來源，提供大量的已同步日文歌歌詞和部分外文歌歌詞。";
 
-musixmatch_user_token = "Musixmatch使用者權杖";
-user_token_placeholder = "請在此輸入 Musixmatch 使用者權杖或貼上除錯資訊";
+musixmatch_user_token = "Musixmatch 使用者權杖";
+user_token_placeholder = "在此輸入 Musixmatch 使用者權杖或貼上除錯資訊";
 
 enter_user_token = "輸入使用者權杖";
-enter_user_token_message = "若要使用 Musixmatch 作為歌詞提供者, 你現在可以通過 EeveeSpotify 直接取得或是從官方應用程式中找到你的使用者權杖. 從App Store下載Musixmatch, 註冊或登錄, 接著來到 設定(右上角的齒輪圖示) > Get help > 複製除錯資訊, 並在此處貼上. 亦可使用中間人攻擊提取使用者權杖.";
+enter_user_token_message = "欲使用 Musixmatch 作為歌詞來源，您可以於 EeveeSpotify 內直接取得（建議方案）、從 Musixmatch 應用程式中複製除錯資訊（較繁瑣）亦或是對 Musixmatch 進行 MITM（中間人攻擊）來提取使用者權杖（較困難）。";
 
-genius_fallback = "Genius回退";
-genius_fallback_description = "如果無法從 %@ 載入歌詞, 將使用 Genius 作為歌詞來源.";
+genius_fallback = "回退至 Genius";
+genius_fallback_description = "若 %@ 發生問題則回退至 Genius。";
 
 show_fallback_reasons = "顯示回退原因";
 
-hide_lyrics_on_error = "發生錯誤時隱藏";
-hide_lyrics_on_error_description = "無法正確載入歌詞時隱藏歌詞框.";
+hide_lyrics_on_error = "出錯時隱藏";
+hide_lyrics_on_error_description = "出現錯誤時（不包含回退）隱藏歌詞框。";
 
 romanized_lyrics = "羅馬化歌詞";
-romanized_lyrics_description = "為中文, 日文以及韓文顯示羅馬化歌詞";
+romanized_lyrics_description = "羅馬化中、日、韓歌詞。";
 
-musixmatch_language = "Musixmatch 歌詞翻譯";
-musixmatch_language_description = "可以輸入兩個字母的 Musixmatch 語言碼, 並在翻譯可用時顯示. *繁體中文語言碼為z1";
+musixmatch_language = "Musixmatch 翻譯語言";
+musixmatch_language_description = "輸入二字 Musixmatch 語言代碼（繁中為 z1），可用時便會顯示翻譯按鈕。";
 
-// 圖型化介面
+// UI
 
-lyrics_background_color_section = "歌詞框背景色";
-lyrics_background_color_section_description = "若您啟用「顯示原彩」則會顯示Spotify原本的歌詞背景顏色（根據歌曲專輯封面動態調整）。
+lyrics_background_color_section = "歌詞框背景顏色";
+lyrics_background_color_section_description = "若您啟用「原彩」，則會像 Spotify 一樣根據封面進行取色。
 
-您亦可設定一個固定背景顏色或者設定顏色標準化程度。該選項決定了多少淺色被調深以及多少深色被調淺。通常來講，標準化程度越高則背景顏色越淺。";
+您亦可設定「固定顏色」或者「封面取色標準化程度因子」。該因子將會決定深色被變淺多少，反之亦然。通常來講，越高的數值帶來越淺的顏色。";
 
-display_original_colors = "顯示原彩";
+display_original_colors = "原彩";
 
-use_static_color = "使用固定背景顏色";
+use_static_color = "固定顏色";
 static_color = "固定背景顏色";
 
-color_normalization_factor = "顏色標準化程度";
-dark_popups = "深色提示";
+color_normalization_factor = "封面取色標準化程度因子";
+dark_popups = "深色的彈出式視窗";
 
-// Experiments
+// 實驗性
 
-show_instagram_destination = "分享至 Instagram";
-show_instagram_destination_description = "永遠顯示分享至 Instagram. %@";
+show_instagram_destination = "顯示分享至 Instagram";
+show_instagram_destination_description = "永遠顯示分享至 Instagram。%@";
 
-livecontainer_sharing = "分享至 LiveContainer";
-livecontainer_sharing_description = "當選擇的目標APP不支援時, 分享至 LiveContainer 並複製 URL.";
+livecontainer_sharing = "顯示分享至 LiveContainer";
+livecontainer_sharing_description = "若分享目標不可用，則分享至 LiveContainer 並複製連結。";
 
-/* 標記: Premium 彈出視窗 */
+/* MARK: Premium 提示 */
 
-have_premium_popup = "您似乎沒有訂閱Premium，所以EeveeSpotify不會對使用者資料做出修補或限制Premium功能。您可以在EeveeSpotify設定中管理。";
+have_premium_popup = "您看起來擁有可用的 Premium 訂閱，故 EeveeSpotify 將不會修改您的資料或限制部分 Premium 功能。您仍可於 EeveeSpotify 設定中管理。";
 
-high_audio_quality_popup = "由於極高音質由伺服器處理因此EeveeSpotify無法啟用該功能。";
-playlist_downloading_popup = "由於原生的下載功能由伺服器處理因此EeveeSpotify無法啟用該功能。不過您仍可下載Podcast與本機檔案。";
-download_local_playlist = "下載本機檔案";
+high_audio_quality_popup = "極高音質為伺服器端控制，故 EeveeSpotify 無法啟用。";
+playlist_downloading_popup = "原生的歌曲下載功能為伺服器端控制，故 EeveeSpotify 無法啟用。不過您仍可下載播客和本機（區域網路）檔案。";
+download_local_playlist = "下載區域網路歌曲或播放清單";
 
 //
 
-could_not_share_popup = "無法分享至目標APP或者 LiveContainer. URL 已被複製.";
+could_not_share_popup = "無法分享至目標或 LiveContainer，連結已複製。";
 
-/* 標記: 歌詞 */
+/* MARK: Lyrics */
 
-fallback_attribute = "替代歌詞";
-romanized_attribute = "羅馬拼音";
+fallback_attribute = "回退";
+romanized_attribute = "羅馬化";
 
-musixmatch_unauthorized_popup = "由於歌詞未授權因此EeveeSpotify無法從Musixmatch載入。請檢查或更新你的使用者權杖。若您正在使用iPad。則您需要從iPad版本的Musixmatch取得使用者權杖。";
-musixmatch_restricted_popup = "由於歌詞受到限制因此EeveeSpotify無法從Musixmatch載入。這可能是由於美國 IP 地址而導致的版權問題，因此如果在美國，則應更換 IP 位址或使用 VPN。";
+musixmatch_unauthorized_popup = "從 Musixmatch 加載時發生認證錯誤，請檢查或更新 Musixmatch 權杖。不同平台上取得的使用者權杖無法互通。";
+musixmatch_restricted_popup = "從 Musixmatch 加載時發生錯誤，這可能是由於基於地區的版權限制。";
 
-// 錯誤標題
+// 錯誤提示
 
 no_such_song = "找不到歌曲";
-musixmatch_restricted = "受限制";
-invalid_musixmatch_token = "未授權";
+musixmatch_restricted = "版權限制";
+invalid_musixmatch_token = "認證錯誤";
 decoding_error = "解碼錯誤";
-no_current_track = "目前未播放音樂";
+no_current_track = "尚未播放";
 unknown_error = "未知錯誤";
 
-// 純音樂標題
+// 純音樂
 
 song_is_instrumental = "此歌曲為純音樂。";
 let_the_music_play = "讓音樂演奏吧...";
@@ -127,10 +132,10 @@ liked_songs = "已按讚的歌曲";
 
 contributors = "貢獻者";
 
-request_anonymous_token = "請求匿名使用者權杖";
-request_anonymous_token_description = "點擊 「請求匿名使用者權杖」 後 EeveeSpotify 會嘗試在未授權的情況下從 Musixmatch 取得使用者權杖.";
+request_anonymous_token = "請求使用者權杖";
+request_anonymous_token_description = "點擊「請求使用者權杖」後 EeveeSpotify 將嘗試在沒有 Musixmatch 帳號的情況下取得。";
 
-lrclib_api = "伺服器地址";
+lrclib_api = "伺服器";
 
 // Snapshot of your benefits, should match official spotify loc
 
@@ -138,4 +143,146 @@ ad_free_music_listening = "無廣告暢聽音樂";
 play_songs_in_any_order = "由你決定歌曲播放順序";
 organize_listening_queue = "整理聆聽佇列";
 
-payment_notice = "EeveeSpotify 通過應用修補以啟用 Premium 功能且完全免費.";
+payment_notice = "EeveeSpotify 通過應用修補以啟用 Premium 功能且完全免費。";
+
+// 除錯
+
+debug_title = "除錯";
+export_debug_log = "匯出除錯日誌";
+clear_debug_log = "清除除錯日誌";
+debug_log_cleared = "已清理除錯日誌";
+debug_log_cleared_ok = "好";
+no_debug_log_found = "無需清理，除錯日誌將在 Spotify 啟動時自動記錄。";
+no_debug_log_found_ok = "好";
+debug_section_footer = "匯出或清理除錯日誌。";
+
+// Full reset
+resetButtonTitle = "完整重置";
+resetSubtitle = "清理 Spotify 鑰匙圈（Keychain）、沙箱（Sandbox）目錄與應用程式組容器(App-group container)，並會強制重新登錄，完成時將自動退出。";
+resetFooter = "清理 Spotify 鑰匙圈（Keychain）、沙箱（Sandbox）目錄與應用程式組容器(App-group container)，並會強制重新登錄，完成時將自動退出。不會影響到其他應用程式。";
+
+// Settings Bar
+eevee_inline_subtitle_text = "修補、歌詞、客製化以及實驗性內容";
+
+// App Icon Chooser
+appIconTitle = "選擇圖標";
+appIconSubtitle = "iOS/iPadOS 將會在第一次變更時顯示提示，主畫面可能需要一點時間來更新。";
+iconSelected = "選中";
+iconTapToApply = "輕觸以應用";
+
+// SponsorBlock
+categoryOneFooter = "在播客中跳過由社群標記的片段。";
+enableSponsorblock = "啟用 SponsorBlock";
+showColoredOverlay = "在進度列上顯示彩色標記";
+showToast = "跳過時顯示提示";
+skipToast = "跳過提示動作（投票/取消/隱藏）";
+respectManualSeek = "手調進度優先";
+categoriesHeader = "分類";
+categoriesFooter = "關閉 · 顯示 · 手動 · 自動，點擊取色器可變更顏色。";
+
+sponsor_category = "工商";
+selfpromo_category = "非付費/自我推廣";
+interaction_category = "互動提醒";
+intro_category = "幕間/開場";
+outro_category = "結尾/致謝";
+preview_category = "預覽/回顧";
+hook_category = "吸睛/問候";
+filler_category = "離題/補白";
+exclusive_access_category = "獨家";
+
+action_disabled = "關閉";
+action_show = "顯示";
+action_manual = "手動";
+action_auto = "自動";
+
+draftsTitle = "回報和草稿";
+errorNoPodcats = "尚未播放播客";
+markSegment = "為當前集數標記片段";
+advancedTitle = "進階";
+howToUseTitle = "如何使用";
+creditsTitle = "致謝";
+creditsSubtitle = "片段資料來自 SponsorBlock 社群（sponsor.ajay.app）。移植自 Spot-SponsorBlock 的 Spot-SponsorBlock-Extension。";
+linkButtonTitle = "在 GitHub 上查看 Spot-SponsorBlock-Extension";
+
+// SponsorBlock reports
+sponsorblock_reports_title = "SponsorBlock 回報";
+sponsorblockIDTitle = "您的 SponsorBlock 身份";
+sponsorblockIDFooter = "用於認定投票和提交身份，以私密密碼形式提供，請勿分享。";
+user_id_copied = "已複製使用者身份";
+copyButton = "複製";
+regenerateButton = "重新產生";
+draftsTitleSB = "草稿";
+draftsEmpty = "沒有草稿，長按進度列以開始標記。";
+draftsEpisodeLoc = "集數 %@";
+hidden_locally_header = "本機隱藏 (%@)";
+hiddenFooter = "這裡的片段在該裝置上將永遠不會被跳過，但仍存在於 SponsorBlock 伺服器上。";
+hiddenSegmentsEmpty = "無隱藏片段。";
+unhideButton = "顯示";
+
+popUpRegenerateTitle = "重新產生你的身份？";
+popUpRegenerateSubtitle = "當前的投票和提交將不再被連結至您";
+popUpClearAllButton = "清理全部";
+popUpClearAllTitle = "清理全部隱藏片段？";
+popUpClearAllSubtitle = "他們會根據您的分類規則再次被跳過。";
+
+readyButton = "準備好了";
+incompleteButton = "未完成";
+editSubmit = "編輯/提交";
+discardButton = "放棄";
+
+// SponsorBlock Advanced
+skipBehaviourTitle = "跳過行為";
+autoSkipSubmissionsTitle = "自動跳過我的提交";
+logOnlyToggle = "僅記錄（不會調整進度）";
+serverHeader = "伺服器";
+urlText = "連結";
+
+tuningTitle = "調整";
+minSegmentDuration = "最短片段時長：%.1f秒";
+toastDuration = "提示持續時長：%.1f秒";
+
+trackLogSubtitle = "當新的集數播放時轉存播客元資料（統一資源識別碼（URI）、是否為播客（isPodcast）、是否為影片（isVideo）等等）至除錯日誌。僅在 SponsorBlock 無法識別您期望被識別的播客時啟用。";
+trackLogToggle = "診斷追蹤日誌";
+resetButtonTrackLog = "重置";
+
+// SponsorBlock Reset Options Advanced
+resetTitle = "重置什麼？";
+resetSubtitle = "每項獨立";
+allResetSB = "全部";
+regenerateIDSB = "重新產生身份";
+localSubmissionsSB = "我的本機提交（%@）";
+votedRecordsSB = "投票紀錄（%@）";
+hiddenSegmentsSB = "隱藏的片段（%@）";
+draftsCountSB = "草稿（%@）";
+settingsResetSB = "設定（開關、顏色、分類）";
+
+// SponsorBlock How To Use
+playerGesturesTitle = "播放介面手勢";
+gesturesTitle1 = "長按進度列";
+gesturesDeps1 = "標記片段開始，在片段結束時再次長按以結束片段並打開提交選單。";
+gesturesTitle2 = "點擊片段";
+gesturesDeps2 = "投票、變更類別、或在本機隱藏。";
+
+submittingTitle = "提交";
+submittingSectionTitle1 = "提交選單";
+submittingSectionDeps1 = "使用滑塊微調片段開始或結束，選擇類別並提交至 sponsor.ajay.app。";
+submittingSectionTitle2 = "您的本機提交";
+submittingSectionDeps2 = "立刻在本機上自動跳過，當伺服器公開後即可投票。將會以「我的」徽章進行標記。";
+
+skipToastTitle = "跳過提示";
+skipToastSectionTitle1 = "取消";
+skipToastSectionDeps1 = "回道片段之前，且本次不會跳過，但調整進度後仍會跳過。";
+skipToastSectionTitle2 = "贊成/反對";
+skipToastSectionDeps2 = "👍 將會在伺服器上記錄您的投票，👎 則會打開選單以選擇反對、在本機隱藏、變更類別。";
+skipToastSectionTitle3 = "完整片段選單";
+skipToastSectionDeps3 = "和點擊片段一樣的選項。";
+
+managingSegmentsTitle = "片段管理";
+managingSegmentsSectionTitle1 = "管理片段";
+managingSegmentsSectionDeps1 = "長按進度列 → 「管理片段」會列出當前集數的全部片段之投票、隱藏、變更類別或者點選一行來跳至播放介面。";
+managingSegmentsSectionTitle2 = "回報和草稿";
+managingSegmentsSectionDeps2 = "設定 → 「回報和草稿」將會儲存您的草稿與隱藏的片段，草稿將一直保存。";
+
+categoriesTitle = "分類";
+categoriesSectionTitle1 = "分類動作";
+categoriesSectionDeps1 = "關閉 = 忽略，顯示 = 僅在進度列上顯示片段，手動 = 跳過前詢問，自動 = 直接跳過";

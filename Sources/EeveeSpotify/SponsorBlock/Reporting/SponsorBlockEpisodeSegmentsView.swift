@@ -192,7 +192,9 @@ struct SponsorBlockEpisodeSegmentsView: View {
     private func pickCategory(for seg: SponsorBlockSegment) {
         // Delegate to UIKit action sheet via top VC since SwiftUI confirmationDialog
         // is iOS 15+.
-        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+        let windowScenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        guard let scene = windowScenes.first(where: { $0.activationState == .foregroundActive })
+                ?? windowScenes.first,
               let win = scene.windows.first(where: { $0.isKeyWindow }) ?? scene.windows.first,
               var top = win.rootViewController else { return }
         while let p = top.presentedViewController { top = p }
