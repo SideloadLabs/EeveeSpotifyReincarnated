@@ -1,5 +1,106 @@
 import Foundation
 
+private class LrclibTLSDelegate: NSObject, URLSessionTaskDelegate {
+    let expectedHost: String
+
+    init(expectedHost: String) {
+        self.expectedHost = expectedHost
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        didReceive challenge: URLAuthenticationChallenge,
+        completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+    ) {
+        guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+              let serverTrust = challenge.protectionSpace.serverTrust else {
+            completionHandler(.performDefaultHandling, nil)
+            return
+        }
+
+        // Build a fresh trust object from the peer's certificate chain, evaluated
+        // against the original hostname. Re-using and mutating the trust object
+        // supplied by URLSession for a raw-IP connection can fail chain building
+        // (errSSLXCertChainInvalid / -9802) even when the certificate is valid.
+        //
+        // SecTrustGetCertificateAtIndex is deprecated in iOS 15 and returns nil on
+        // iOS 16+ / iOS 26+. Use SecTrustCopyCertificateChain where available.
+        //
+        // FIX: SecTrustCopyCertificateChain returns a plain CFTypeRef/CFArray on
+        // iOS 26; the Swift conditional cast `as? [SecCertificate]` can silently
+        // return nil on some OS builds when the bridging isn't automatic.
+        // Use CFArrayGetCount / CFArrayGetValueAtIndex to extract the chain safely.
+        let certChain: [SecCertificate]
+        if #available(iOS 15.0, *) {
+            guard let chainRef = SecTrustCopyCertificateChain(serverTrust) else {
+                completionHandler(.cancelAuthenticationChallenge, nil)
+                return
+            }
+            let count = CFArrayGetCount(chainRef)
+            guard count > 0 else {
+                completionHandler(.cancelAuthenticationChallenge, nil)
+                return
+            }
+            certChain = (0..<count).compactMap { i in
+                CFArrayGetValueAtIndex(chainRef, i)
+                    .map { Unmanaged<SecCertificate>.fromOpaque($0).takeUnretainedValue() }
+            }
+        } else {
+            let count = SecTrustGetCertificateCount(serverTrust)
+            guard count > 0 else {
+                completionHandler(.cancelAuthenticationChallenge, nil)
+                return
+            }
+            certChain = (0..<count).compactMap { SecTrustGetCertificateAtIndex(serverTrust, $0) }
+            guard !certChain.isEmpty else {
+                completionHandler(.cancelAuthenticationChallenge, nil)
+                return
+            }
+        }
+
+        let policy = SecPolicyCreateSSL(true, expectedHost as CFString)
+
+        var freshTrust: SecTrust?
+        guard SecTrustCreateWithCertificates(certChain as CFArray, policy, &freshTrust) == errSecSuccess,
+              let freshTrust else {
+            completionHandler(.cancelAuthenticationChallenge, nil)
+            return
+        }
+
+        var error: CFError?
+        if SecTrustEvaluateWithError(freshTrust, &error) {
+            completionHandler(.useCredential, URLCredential(trust: freshTrust))
+        } else {
+            writeDebugLog("[LRCLIB] TLS validation failed for \(expectedHost): \(String(describing: error))")
+            completionHandler(.cancelAuthenticationChallenge, nil)
+        }
+    }
+}
+
+private func resolveIPv4(_ host: String) -> String? {
+    var hints = addrinfo(
+        ai_flags: 0, ai_family: AF_INET, ai_socktype: SOCK_STREAM,
+        ai_protocol: 0, ai_addrlen: 0, ai_canonname: nil, ai_addr: nil, ai_next: nil
+    )
+    var result: UnsafeMutablePointer<addrinfo>?
+
+    guard getaddrinfo(host, nil, &hints, &result) == 0, let addr = result else {
+        return nil
+    }
+    defer { freeaddrinfo(result) }
+
+    var ipBuffer = [CChar](repeating: 0, count: Int(INET6_ADDRSTRLEN))
+    let sockaddrIn = addr.pointee.ai_addr.withMemoryRebound(to: sockaddr_in.self, capacity: 1) { $0 }
+    var sinAddr = sockaddrIn.pointee.sin_addr
+
+    guard inet_ntop(AF_INET, &sinAddr, &ipBuffer, socklen_t(INET6_ADDRSTRLEN)) != nil else {
+        return nil
+    }
+
+    return String(cString: ipBuffer)
+}
+
 class LrclibLyricsRepository: LyricsRepository {
     var apiUrl: String
     private let session: URLSession
@@ -7,15 +108,31 @@ class LrclibLyricsRepository: LyricsRepository {
     private init(apiUrl: String) {
         self.apiUrl = apiUrl
         
-        let configuration = URLSessionConfiguration.default
+        let configuration = URLSessionConfiguration.ephemeral
         configuration.httpAdditionalHeaders = [
             "User-Agent": "EeveeSpotify v\(EeveeSpotify.version) https://github.com/whoeevee/EeveeSpotify"
         ]
-        
-        session = URLSession(configuration: configuration)
+        // FIX: 4 seconds is far too short — LRCLIB can be slow to respond,
+        // and the IPv4-direct attempt + fallback each consumed the full 4s in
+        // the debug log, causing guaranteed timeouts. Use 10s instead.
+        configuration.timeoutIntervalForRequest = 10
+        configuration.timeoutIntervalForResource = 10
+        configuration.allowsExpensiveNetworkAccess = true
+        configuration.allowsConstrainedNetworkAccess = true
+        configuration.waitsForConnectivity = false
+
+        if let host = URL(string: apiUrl)?.host {
+            session = URLSession(
+                configuration: configuration,
+                delegate: LrclibTLSDelegate(expectedHost: host),
+                delegateQueue: nil
+            )
+        } else {
+            session = URLSession(configuration: configuration)
+        }
     }
     
-    static let originalApiUrl = "https://charlesl.qzz.io/api"
+    static let originalApiUrl = "https://lrclib.net/api"
     
     static let shared = LrclibLyricsRepository(
         apiUrl: UserDefaults.lyricsOptions.lrclibUrl
@@ -32,26 +149,75 @@ class LrclibLyricsRepository: LyricsRepository {
             stringUrl += "?\(queryString)"
         }
         
-        let request = URLRequest(url: URL(string: stringUrl)!)
+        guard let url = URL(string: stringUrl) else {
+            throw LyricsError.decodingError
+        }
+
+        var request = URLRequest(url: url)
+
+        // Some networks have broken/unroutable IPv6 paths to lrclib.net that cause
+        // ETIMEDOUT at the TCP layer for custom URLSession instances. Resolve to
+        // an IPv4 address explicitly and connect to it directly (TLS hostname
+        // validation against the original host is handled by LrclibTLSDelegate).
+        if let host = url.host, let ip = resolveIPv4(host) {
+            var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+            components?.host = ip
+            if let ipUrl = components?.url {
+                request = URLRequest(url: ipUrl)
+                request.setValue(host, forHTTPHeaderField: "Host")
+            }
+        }
+
+        request.setValue(
+            "EeveeSpotify v\(EeveeSpotify.version) https://github.com/whoeevee/EeveeSpotify",
+            forHTTPHeaderField: "User-Agent"
+        )
 
         let semaphore = DispatchSemaphore(value: 0)
         var data: Data?
         var error: Error?
 
-        let task = session.dataTask(with: request) { response, _, err in
+        let task = session.dataTask(with: request) { responseData, _, err in
             error = err
-            data = response
+            data = responseData
             semaphore.signal()
         }
 
         task.resume()
         semaphore.wait()
 
+        if error != nil, request.url != url {
+            // IPv4-direct attempt failed; retry with the original hostname URL.
+            writeDebugLog("[LRCLIB] IPv4-direct attempt failed (\(error!)), retrying via hostname")
+
+            let fallbackSemaphore = DispatchSemaphore(value: 0)
+            var fallbackRequest = URLRequest(url: url)
+            fallbackRequest.setValue(
+                "EeveeSpotify v\(EeveeSpotify.version) https://github.com/whoeevee/EeveeSpotify",
+                forHTTPHeaderField: "User-Agent"
+            )
+
+            let fallbackTask = session.dataTask(with: fallbackRequest) { response, _, err in
+                error = err
+                data = response
+                fallbackSemaphore.signal()
+            }
+
+            fallbackTask.resume()
+            fallbackSemaphore.wait()
+        }
+
         if let error = error {
+            writeDebugLog("[LRCLIB] Request error for \(stringUrl): \(error)")
             throw error
         }
 
-        return data!
+        guard let data else {
+            writeDebugLog("[LRCLIB] No data returned for \(stringUrl)")
+            throw LyricsError.decodingError
+        }
+        writeDebugLog("[LRCLIB] \(stringUrl) -> \(data.count) bytes")
+        return data
     }
     
     private func getSong(trackName: String, artistName: String) throws -> LrclibSong {
@@ -59,172 +225,42 @@ class LrclibLyricsRepository: LyricsRepository {
             "track_name": trackName,
             "artist_name": artistName
         ])
-        return try JSONDecoder().decode(LrclibSong.self, from: data)
-    }
-    
-    // 解析 LRC 格式歌词
-    private func parseLrcLyrics(_ lrcContent: String) -> [LyricsLineDto] {
-        var lines: [LyricsLineDto] = []
-        let pattern = "\\[(\\d+):(\\d+)\\.(\\d+)\\](.*)"
-        
         do {
-            let regex = try NSRegularExpression(pattern: pattern)
-            let nsString = lrcContent as NSString
-            let matches = regex.matches(in: lrcContent, range: NSRange(location: 0, length: nsString.length))
-            
-            for match in matches {
-                let minuteRange = match.range(at: 1)
-                let secondRange = match.range(at: 2)
-                let millisecondRange = match.range(at: 3)
-                let textRange = match.range(at: 4)
-                
-                let minute = Int(nsString.substring(with: minuteRange)) ?? 0
-                let second = Int(nsString.substring(with: secondRange)) ?? 0
-                let millisecond = Int(nsString.substring(with: millisecondRange)) ?? 0
-                let text = nsString.substring(with: textRange)
-                
-                let totalMs = (minute * 60 + second) * 1000 + millisecond * 10
-                
-                lines.append(LyricsLineDto(
-                    words: text,
-                    startTimeMs: Int64(totalMs),
-                    syllables: nil
-                ))
-            }
-            
-            // 按时间排序
-            lines.sort { ($0.startTimeMs ?? 0) < ($1.startTimeMs ?? 0) }
-            
+            return try JSONDecoder().decode(LrclibSong.self, from: data)
         } catch {
+            let body = String(data: data, encoding: .utf8) ?? "<non-utf8>"
+            writeDebugLog("[LRCLIB] Decode error for \(trackName)/\(artistName): \(error). Body: \(body.prefix(300))")
+            throw error
         }
-        
-        return lines
     }
     
-    // 解析逐字歌词 (YRC格式)
-    private func parseYrcLyrics(_ yrcContent: String) -> [LyricsLineDto] {
-        var lines: [LyricsLineDto] = []
-        
-        // 按行分割
-        let lineStrings = yrcContent.components(separatedBy: "\n")
-        
-        for lineString in lineStrings {
-            // 匹配整行时间戳格式: [start,duration]后面跟着内容
-            let linePattern = #"\[(\d+),(\d+)\](.*)"#
-            
-            do {
-                let regex = try NSRegularExpression(pattern: linePattern)
-                let nsString = lineString as NSString
-                let matches = regex.matches(in: lineString, range: NSRange(location: 0, length: nsString.length))
-                
-                guard let match = matches.first else { continue }
-                
-                let lineStartMsRange = match.range(at: 1)
-                let lineContentRange = match.range(at: 3)
-                
-                let lineStartMs = Int(nsString.substring(with: lineStartMsRange)) ?? 0
-                let lineContent = nsString.substring(with: lineContentRange)
-                
-                var syllables: [SyllableDto] = []
-                var fullLineText = ""
-                
-                // 匹配 "单词 (start,duration)" 模式，处理被额外括号包围的情况
-                let wordPattern = #"(?:\(*([^\(\)]+?)\)*)?\((\d+),(\d+)\)"#
-                
-                do {
-                    let wordRegex = try NSRegularExpression(pattern: wordPattern)
-                    let wordMatches = wordRegex.matches(in: lineContent, range: NSRange(location: 0, length: lineContent.count))
-                    let nsLineContent = lineContent as NSString
-                    
-                    for wordMatch in wordMatches {
-                        let wordTextRange = wordMatch.range(at: 1)
-                        let wordStartMsRange = wordMatch.range(at: 2)
-                        
-                        let wordStartMs = Int64(nsLineContent.substring(with: wordStartMsRange)) ?? 0
-                        
-                        // 如果找到单词文本
-                        if wordTextRange.location != NSNotFound {
-                            var wordText = nsLineContent.substring(with: wordTextRange)
-                            
-                            // 检查是否是特殊格式：((时间戳)单词)
-                            // 如果是，则添加括号使其显示为(单词)
-                            let specialPattern = #"\(\((\d+),(\d+)\)([^\(\)]+)\)"#
-                            let specialRegex = try NSRegularExpression(pattern: specialPattern)
-                            let specialMatches = specialRegex.matches(in: lineContent, range: NSRange(location: 0, length: lineContent.count))
-                            
-                            if !specialMatches.isEmpty {
-                                // 找到特殊格式，提取单词并添加括号
-                                for specialMatch in specialMatches {
-                                    let specialWordRange = specialMatch.range(at: 3)
-                                    let specialWord = nsLineContent.substring(with: specialWordRange)
-                                    wordText = "(\(specialWord))"
-                                    break // 只处理第一个匹配的特殊格式
-                                }
-                            }
-                            
-                            fullLineText += wordText
-                            
-                            let syllable = SyllableDto(
-                                startTimeMs: wordStartMs,
-                                numChars: Int64(wordText.count)
-                            )
-                            syllables.append(syllable)
-                        }
-                    }
-                } catch {
-                    continue
-                }
-                
-                let lineDto = LyricsLineDto(
-                    words: fullLineText,
-                    startTimeMs: Int64(lineStartMs),
-                    syllables: syllables.isEmpty ? nil : syllables
-                )
-                lines.append(lineDto)
-            } catch {
-                continue
+    private func mapSyncedLyricsLines(_ lines: [String]) -> [LyricsLineDto] {
+        return lines.compactMap { line in
+            guard let match = line.firstMatch(
+                "\\[(?<minute>\\d*):(?<seconds>\\d+\\.\\d+|\\d+)\\] ?(?<content>.*)"
+            ) else {
+                return nil
             }
-        }
-        
-        // 按时间排序
-        lines.sort { ($0.startTimeMs ?? 0) < ($1.startTimeMs ?? 0) }
-        
-        return lines
-    }
-        
-    // 解析纯文本歌词
-    private func parsePlainLyrics(_ plainLyrics: String) -> [LyricsLineDto] {
-        return plainLyrics
-            .components(separatedBy: "\n")
-            .map { LyricsLineDto(words: $0, startTimeMs: nil, syllables: nil) }
-    }
-    
-    // 对齐翻译歌词和原歌词
-    private func alignTranslations(originalLines: [LyricsLineDto], translationLines: [LyricsLineDto]) -> [String] {
-        var alignedTranslations: [String] = Array(repeating: "", count: originalLines.count)
-        
-        for translation in translationLines {
-            // 找到时间戳最接近的原歌词行
-            var closestIndex = -1
-            var minTimeDiff = Int.max
             
-            for (index, originalLine) in originalLines.enumerated() {
-                guard let originalStartTimeMs = originalLine.startTimeMs,
-                      let translationStartTimeMs = translation.startTimeMs else { continue }
+            var captures: [String: String] = [:]
+            
+            for name in ["minute", "seconds", "content"] {
+                let matchRange = match.range(withName: name)
                 
-                let timeDiff = abs(Int(originalStartTimeMs) - Int(translationStartTimeMs))
-                if timeDiff < minTimeDiff {
-                    minTimeDiff = timeDiff
-                    closestIndex = index
+                if let substringRange = Range(matchRange, in: line) {
+                    captures[name] = String(line[substringRange])
                 }
             }
             
-            if closestIndex >= 0 && closestIndex < alignedTranslations.count {
-                alignedTranslations[closestIndex] = translation.words
-            }
+            let minute = Int(captures["minute"]!)!
+            let seconds = Float(captures["seconds"]!)!
+            let content = captures["content"]!
+            
+            return LyricsLineDto(
+                content: content.lyricsNoteIfEmpty,
+                offsetMs: Int(minute * 60 * 1000 + Int(seconds * 1000))
+            )
         }
-        
-        return alignedTranslations
     }
 
     func getLyrics(_ query: LyricsSearchQuery, options: LyricsOptions) throws -> LyricsDto {
@@ -243,68 +279,35 @@ class LrclibLyricsRepository: LyricsRepository {
 
         if song.instrumental {
             return LyricsDto(
-                lines: [], 
-                timeSynced: false, 
-                isSyllableSynced: false,
-                romanization: .original,
-                translation: nil
+                lines: [],
+                timeSynced: false,
+                romanization: .original
             )
         }
 
-        var lyricsLines: [LyricsLineDto] = []
-        var timeSynced = false
-        var isSyllableSynced = false
-        var translation: LyricsTranslationDto? = nil
-        
-        // 优先使用逐字歌词 (yrcLyrics)
-        if let yrcLyrics = song.yrcLyrics, !yrcLyrics.isEmpty {
-            lyricsLines = parseYrcLyrics(yrcLyrics)
-            timeSynced = true
-            isSyllableSynced = true
-        }
-        // 其次使用时间轴歌词 (syncedLyrics)
-        else if let syncedLyrics = song.syncedLyrics, !syncedLyrics.isEmpty {
-            lyricsLines = parseLrcLyrics(syncedLyrics)
-            timeSynced = true
-        }
-        // 最后使用纯文本歌词 (plainLyrics)
-        else if let plainLyrics = song.plainLyrics, !plainLyrics.isEmpty {
-            lyricsLines = parsePlainLyrics(plainLyrics)
-            timeSynced = false
-        }
-        
-        // 处理翻译歌词 - 使用对齐方法
-        if let translatedLyrics = song.translatedLyrics, !translatedLyrics.isEmpty {
-            // 解析翻译歌词
-            let translationLines = parseLrcLyrics(translatedLyrics)
-            
-            // 使用时间戳对齐翻译和原歌词
-            let alignedTranslations = alignTranslations(
-                originalLines: lyricsLines,
-                translationLines: translationLines
-            )
-            
-            translation = LyricsTranslationDto(
-                languageCode: "zh",
-                lines: alignedTranslations
+        if let syncedLyrics = song.syncedLyrics, !syncedLyrics.isEmpty {
+            let lines = Array(syncedLyrics.components(separatedBy: "\n").dropLast())
+            return LyricsDto(
+                lines: mapSyncedLyricsLines(lines),
+                timeSynced: true,
+                romanization: lines.canBeRomanized ? .canBeRomanized : .original
             )
         }
         
-        // 处理罗马化歌词
-        var romanization = LyricsRomanizationStatus.original
-        
-        // 简单判断：如果有中文歌词，则认为可以罗马化
-        let hasChinese = lyricsLines.contains { line in
-            line.words.range(of: "[\\u4e00-\\u9fff]", options: .regularExpression) != nil
+        guard let plainLyrics = song.plainLyrics, !plainLyrics.isEmpty else {
+            return LyricsDto(
+                lines: [],
+                timeSynced: false,
+                romanization: .original
+            )
         }
-        romanization = hasChinese ? .canBeRomanized : .original
+        
+        let lines = Array(plainLyrics.components(separatedBy: "\n").dropLast())
         
         return LyricsDto(
-            lines: lyricsLines,
-            timeSynced: timeSynced,
-            isSyllableSynced: isSyllableSynced,
-            romanization: romanization,
-            translation: translation
+            lines: lines.map { content in LyricsLineDto(content: content) },
+            timeSynced: false,
+            romanization: lines.canBeRomanized ? .canBeRomanized : .original
         )
     }
 }
