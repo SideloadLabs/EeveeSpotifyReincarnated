@@ -132,7 +132,7 @@ jobs:
           PATCHED_OUT="${OUT_IPA%.ipa}-patched.ipa"
           cp "$OUT_IPA" "$PATCHED_OUT"
           ipapatch --input "$PATCHED_OUT" --inplace --noconfirm \
-                   --dylib extra_dylibs/zxPluginsInject.dylib
+                   --dylib packages/zxPluginsInject.dylib
           echo "PATCHED_IPA=$PATCHED_OUT" >> $GITHUB_ENV
 
       - name: Stage alternate app icons
