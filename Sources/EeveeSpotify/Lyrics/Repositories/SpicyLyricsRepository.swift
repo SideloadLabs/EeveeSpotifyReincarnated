@@ -203,7 +203,7 @@ class SpicyLyricsRepository: LyricsRepository {
         writeDebugLog("[SpicyLyrics] Lyrics type=\(type) for \(trackId)")
 
         switch type {
-        case "Syllable": return parseSyllableLyrics(packed)
+        case "Syllable": return parseSyllableLyrics(packed, trackId: trackId)
         case "Line":     return parseLineLyrics(packed)
         case "Static":   return parseStaticLyrics(packed)
         default:
@@ -214,10 +214,11 @@ class SpicyLyricsRepository: LyricsRepository {
 
     // MARK: Syllable lyrics
 
-    private func parseSyllableLyrics(_ root: SLObjPackValue) -> LyricsDto {
+    private func parseSyllableLyrics(_ root: SLObjPackValue, trackId: String) -> LyricsDto {
         guard let content = root["Content"]?.arrayValue else { return emptyDto() }
 
         var lines        = [LyricsLineDto]()
+        var karaokeLines = [KaraokeLineDto]()
         var hasRomanized = root["HasTransliterations"]?.boolValue ?? false
 
         for entry in content {
@@ -225,6 +226,8 @@ class SpicyLyricsRepository: LyricsRepository {
                   let lead = entry["Lead"] else { continue }
 
             let lineText: String
+            var karaokeSyllables = [KaraokeSyllableDto]()
+
             if let syllables = lead["Syllables"]?.arrayValue, !syllables.isEmpty {
                 // Real client rule (Syllable.ts): a syllable with IsPartOfWord=true
                 // attaches directly to the previous syllable (continues the same
@@ -239,6 +242,15 @@ class SpicyLyricsRepository: LyricsRepository {
                         text += " "
                     }
                     text += syllableText
+
+                    let startMs = syllable["StartTime"]?.doubleValue.map { Int($0 * 1000) } ?? 0
+                    let endMs   = syllable["EndTime"]?.doubleValue.map { Int($0 * 1000) } ?? startMs
+                    karaokeSyllables.append(KaraokeSyllableDto(
+                        text: syllableText,
+                        startMs: startMs,
+                        endMs: endMs,
+                        isPartOfWord: isPartOfWord
+                    ))
                 }
                 lineText = text
                 if syllables.contains(where: { ($0["TransliteratedText"]?.stringValue ?? "").isEmpty == false }) {
@@ -252,13 +264,33 @@ class SpicyLyricsRepository: LyricsRepository {
 
             if (lead["TransliteratedText"]?.stringValue ?? "").isEmpty == false { hasRomanized = true }
 
-            let offsetMs = lead["StartTime"]?.doubleValue.map { Int($0 * 1000) }
-            lines.append(LyricsLineDto(content: lineText.lyricsNoteIfEmpty, offsetMs: offsetMs))
+            let lineStartMs = lead["StartTime"]?.doubleValue.map { Int($0 * 1000) } ?? 0
+            let lineEndMs   = lead["EndTime"]?.doubleValue.map { Int($0 * 1000) }
+                ?? karaokeSyllables.last?.endMs
+                ?? lineStartMs
+
+            lines.append(LyricsLineDto(content: lineText.lyricsNoteIfEmpty, offsetMs: lineStartMs))
+
+            if !karaokeSyllables.isEmpty {
+                karaokeLines.append(KaraokeLineDto(
+                    syllables: karaokeSyllables,
+                    startMs: lineStartMs,
+                    endMs: lineEndMs
+                ))
+            }
         }
 
         let romanization: LyricsRomanizationStatus = hasRomanized
             ? .romanized
             : (lines.map(\.content).canBeRomanized ? .canBeRomanized : .original)
+
+        if !karaokeLines.isEmpty {
+            KaraokeLyricsStore.shared.set(
+                trackId: trackId,
+                lyrics: KaraokeLyricsDto(lines: karaokeLines)
+            )
+            writeDebugLog("[SpicyLyrics] Stored karaoke data: \(karaokeLines.count) lines for \(trackId)")
+        }
 
         return LyricsDto(lines: lines, timeSynced: true, romanization: romanization)
     }
