@@ -390,6 +390,7 @@ struct EeveeSpotify: Tweak {
             TrueShuffleHook.install()
             activateEeveeProbes()
             activateSponsorBlock()
+            activateKaraokeHooks()
             return
         }
 
