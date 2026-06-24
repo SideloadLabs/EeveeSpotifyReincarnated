@@ -285,9 +285,18 @@ class SpicyLyricsRepository: LyricsRepository {
             : (lines.map(\.content).canBeRomanized ? .canBeRomanized : .original)
 
         if !karaokeLines.isEmpty {
+            let songWriters = root["SongWriters"]?.arrayValue?.compactMap { $0.stringValue } ?? []
+            let providerCode = root["source"]?.stringValue
+            let providerDisplayName = providerCode == "ext" ? root["sourceName"]?.stringValue : nil
+
             KaraokeLyricsStore.shared.set(
                 trackId: trackId,
-                lyrics: KaraokeLyricsDto(lines: karaokeLines)
+                lyrics: KaraokeLyricsDto(
+                    lines: karaokeLines,
+                    songWriters: songWriters,
+                    providerCode: providerCode,
+                    providerDisplayName: providerDisplayName
+                )
             )
             writeDebugLog("[SpicyLyrics] Stored karaoke data: \(karaokeLines.count) lines for \(trackId)")
         }
