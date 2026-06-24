@@ -44,4 +44,16 @@ struct KaraokeLineDto {
 /// type is simply not constructed.
 struct KaraokeLyricsDto {
     var lines: [KaraokeLineDto]
+    /// Matches the real extension's Credits/ApplyLyricsCredits.ts
+    /// "Written by: ..." footer, sourced from the API's SongWriters array.
+    var songWriters: [String]
+    /// Raw provider code from the API's "source" field (e.g. "aml", "spt",
+    /// "spl", "ldb", "ext") — mapped to a display label the same way
+    /// Credits/ApplyLyricsProvider.ts does, kept as the raw code here so
+    /// the view layer owns the display-string mapping.
+    var providerCode: String?
+    /// Only present/used when providerCode == "ext" — the real extension's
+    /// ApplyLyricsProvider.ts falls back to a server-supplied display name
+    /// for external sources rather than a fixed ProviderMap entry.
+    var providerDisplayName: String?
 }
