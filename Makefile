@@ -32,6 +32,19 @@ internal-stage::
 	# SwiftProtobuf statically embedded in SpotifyShared.framework.
 	mkdir -p $(THEOS_STAGING_DIR)/Library/Frameworks
 	cp -r $(THEOS)/lib/iphone/rootless/EeveeSwiftProtobuf.framework $(THEOS_STAGING_DIR)/Library/Frameworks/
+	# Compile the karaoke background Metal shader into a .metallib and
+	# stage it next to the tweak binary so device.makeLibrary(filepath:)
+	# can load it at runtime (Theos's tweak.mk has no built-in Metal
+	# shader compilation step the way an Xcode app target's build phases
+	# do, so this is done by hand here — UNTESTED, no Theos/Metal
+	# toolchain was available to verify this actually produces a working
+	# .metallib or that the staged path is correct; if `make package`
+	# fails at this step or the shader doesn't load at runtime, check
+	# this block first).
+	xcrun -sdk iphoneos metal -c Sources/EeveeSpotify/Karaoke/KaraokeBackgroundShader.metal \
+		-o $(THEOS_OBJ_DIR)/KaraokeBackgroundShader.air
+	xcrun -sdk iphoneos metallib $(THEOS_OBJ_DIR)/KaraokeBackgroundShader.air \
+		-o $(THEOS_STAGING_DIR)/Library/MobileSubstrate/DynamicLibraries/KaraokeBackgroundShader.metallib
 
 # Build EeveeSwiftProtobuf.framework from apple/swift-protobuf source. Run
 # this once before `make package`. Re-run if SWIFTPROTOBUF_VERSION changes
