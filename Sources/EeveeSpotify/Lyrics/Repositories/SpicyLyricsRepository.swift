@@ -142,7 +142,7 @@ class SpicyLyricsRepository: LyricsRepository {
 
     // MARK: - Parse
 
-    private func parseLyricsData(_ data: Data, trackId: String) throws -> LyricsDto {
+    private func parseLyricsData(_ data: Data, trackId: String, query: LyricsSearchQuery, options: LyricsOptions) throws -> LyricsDto {
         guard
             let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
             let queriesRaw = json["queries"] as? [[String: Any]]
@@ -203,7 +203,7 @@ class SpicyLyricsRepository: LyricsRepository {
         writeDebugLog("[SpicyLyrics] Lyrics type=\(type) for \(trackId)")
 
         switch type {
-        case "Syllable": return parseSyllableLyrics(packed, trackId: trackId)
+        case "Syllable": return parseSyllableLyrics(packed, trackId: trackId, query: query, options: options)
         case "Line":     return parseLineLyrics(packed)
         case "Static":   return parseStaticLyrics(packed)
         default:
@@ -214,7 +214,7 @@ class SpicyLyricsRepository: LyricsRepository {
 
     // MARK: Syllable lyrics
 
-    private func parseSyllableLyrics(_ root: SLObjPackValue, trackId: String) -> LyricsDto {
+    private func parseSyllableLyrics(_ root: SLObjPackValue, trackId: String, query: LyricsSearchQuery, options: LyricsOptions) -> LyricsDto {
         guard let content = root["Content"]?.arrayValue else { return emptyDto() }
 
         var lines        = [LyricsLineDto]()
@@ -289,10 +289,16 @@ class SpicyLyricsRepository: LyricsRepository {
             let providerCode = root["source"]?.stringValue
             let providerDisplayName = providerCode == "ext" ? root["sourceName"]?.stringValue : nil
 
+            let filledKaraokeLines = LyricsUncensorFill.fillKaraoke(
+                lines: karaokeLines,
+                query: query,
+                options: options
+            )
+
             KaraokeLyricsStore.shared.set(
                 trackId: trackId,
                 lyrics: KaraokeLyricsDto(
-                    lines: karaokeLines,
+                    lines: filledKaraokeLines,
                     songWriters: songWriters,
                     providerCode: providerCode,
                     providerDisplayName: providerDisplayName
@@ -352,6 +358,16 @@ class SpicyLyricsRepository: LyricsRepository {
             throw LyricsError.noSuchSong
         }
         let data = try performQuery(trackId: trackId)
-        return try parseLyricsData(data, trackId: trackId)
+        var dto = try parseLyricsData(data, trackId: trackId, query: query, options: options)
+
+        let filledContents = LyricsUncensorFill.fill(
+            lines: dto.lines.map(\.content),
+            query: query,
+            options: options
+        )
+        for (index, content) in filledContents.enumerated() where index < dto.lines.count {
+            dto.lines[index].content = content
+        }
+        return dto
     }
 }
