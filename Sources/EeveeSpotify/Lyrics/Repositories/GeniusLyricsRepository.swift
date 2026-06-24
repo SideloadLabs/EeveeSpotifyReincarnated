@@ -1,6 +1,7 @@
 import Foundation
 
 class GeniusLyricsRepository: LyricsRepository {
+    static let shared = GeniusLyricsRepository()
     private let jsonDecoder: JSONDecoder
     private let apiUrl = "https://api.genius.com"
     private let session: URLSession

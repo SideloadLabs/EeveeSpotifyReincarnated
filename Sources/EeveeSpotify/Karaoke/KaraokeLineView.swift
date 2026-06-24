@@ -10,6 +10,7 @@ import SwiftUI
 /// concatenation; separate words get normal space-separated layout via
 /// SwiftUI's flexible wrapping (a custom flow layout, not a plain HStack,
 /// since lines need to wrap naturally at the screen edge like Spicetify's).
+@available(iOS 15.0, *)
 struct KaraokeLineView: View {
     let line: KaraokeLineDto
     let currentMs: Int
@@ -54,6 +55,7 @@ struct KaraokeLineView: View {
 /// YOffsetRange curves — the original applies these per letter for an
 /// even finer effect (LetterScaleRange), but per-word is a reasonable
 /// first-pass fidelity level without needing per-character layout.
+@available(iOS 15.0, *)
 private struct KaraokeWordView: View {
     let syllables: [KaraokeSyllableDto]
     let currentMs: Int
@@ -110,6 +112,7 @@ private struct KaraokeWordView: View {
 ///   - during window:   progressively brightened left-to-right via a
 ///                       gradient mask, for the classic karaoke "fill" look
 ///   - after endMs:     fully bright (already sung)
+@available(iOS 15.0, *)
 private struct KaraokeSyllableTextView: View {
     let syllable: KaraokeSyllableDto
     let currentMs: Int

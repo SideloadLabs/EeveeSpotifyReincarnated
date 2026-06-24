@@ -10,6 +10,7 @@ import MetalKit
 /// that fails — since the album art lookup is a best-effort UIView-walking
 /// heuristic that won't always succeed, and Metal itself could
 /// theoretically be unavailable (e.g. simulator).
+@available(iOS 15.0, *)
 struct KaraokeBackgroundView: View {
     @State private var albumArtImage: UIImage?
     @State private var colors: [Color] = KaraokeBackgroundView.placeholderColors
@@ -32,6 +33,7 @@ struct KaraokeBackgroundView: View {
         .onAppear { loadAlbumArt() }
     }
 
+    @available(iOS 15.0, *)
     private var gradientFallback: some View {
         TimelineView(.periodic(from: .now, by: 1.0 / 12.0)) { timeline in
             let t = timeline.date.timeIntervalSinceReferenceDate

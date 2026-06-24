@@ -6,6 +6,7 @@ import SwiftUI
 /// determines which line is "active" right now, and renders all lines
 /// with KaraokeLineView — auto-scrolling so the active line stays
 /// vertically centered, matching Spicetify's lyrics panel behavior.
+@available(iOS 15.0, *)
 struct KaraokeLyricsView: View {
     let lyrics: KaraokeLyricsDto
     /// Called when the user dismisses the view (e.g. tapping the close button).
@@ -20,6 +21,7 @@ struct KaraokeLyricsView: View {
         .preferredColorScheme(.dark)
     }
 
+    @available(iOS 15.0, *)
     private var content: some View {
         TimelineView(.periodic(from: .now, by: 1.0 / 30.0)) { _ in
             // Reading the tracker here, inside the TimelineView's per-tick
@@ -65,6 +67,7 @@ struct KaraokeLyricsView: View {
 /// Separated into its own view so SwiftUI can diff/update just the
 /// scrolling content each tick without re-creating the ScrollViewReader's
 /// identity, which would otherwise reset scroll position every frame.
+@available(iOS 15.0, *)
 private struct KaraokeScrollingLines: View {
     let lyrics: KaraokeLyricsDto
     let currentMs: Int

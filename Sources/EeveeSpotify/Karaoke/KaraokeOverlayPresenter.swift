@@ -16,6 +16,10 @@ final class KaraokeOverlayPresenter {
     /// existing lyrics button — the actual trigger wiring is a separate
     /// step from this presentation helper).
     static func present() {
+        guard #available(iOS 15.0, *) else {
+            writeDebugLog("[Karaoke] present() skipped: requires iOS 15+")
+            return
+        }
         guard let host = topVC() else {
             writeDebugLog("[Karaoke] present() called but no top view controller found")
             return
