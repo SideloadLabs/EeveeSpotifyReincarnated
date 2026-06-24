@@ -48,11 +48,40 @@ struct KaraokeLineView: View {
 }
 
 /// One word: its syllables rendered with zero inter-syllable spacing,
-/// each syllable independently colored based on highlight progress.
+/// each syllable independently colored based on highlight progress. The
+/// whole word also scales/glows/bobs together as it's being actively
+/// sung, matching LyricsAnimator.ts's word-level ScaleRange/GlowRange/
+/// YOffsetRange curves — the original applies these per letter for an
+/// even finer effect (LetterScaleRange), but per-word is a reasonable
+/// first-pass fidelity level without needing per-character layout.
 private struct KaraokeWordView: View {
     let syllables: [KaraokeSyllableDto]
     let currentMs: Int
     let isActiveLine: Bool
+
+    private var wordStartMs: Int { syllables.first?.startMs ?? 0 }
+    private var wordEndMs: Int { syllables.last?.endMs ?? wordStartMs }
+
+    /// 0 before the word starts, 1 once it's fully sung — drives all
+    /// three animation curves the same way the syllable fill gradient's
+    /// `progress` drives the color sweep.
+    private var wordProgress: Double {
+        guard isActiveLine, wordEndMs > wordStartMs else {
+            return currentMs >= wordEndMs ? 1 : 0
+        }
+        let raw = Double(currentMs - wordStartMs) / Double(wordEndMs - wordStartMs)
+        return min(1, max(0, raw))
+    }
+
+    /// Only animate scale/glow/bob while currentMs is actually inside the
+    /// word's window — once fully sung (progress reaches 1 and stays
+    /// there as playback moves on), the curve's own Time=1 keyframe
+    /// already settles back to neutral (scale 1.0, glow 0, offset 0), so
+    /// this doesn't need a separate "is currently being sung" gate beyond
+    /// what the curves already encode.
+    private var scale: Double { KaraokeAnimationCurve.wordScale.value(at: wordProgress) }
+    private var glow: Double { KaraokeAnimationCurve.glow.value(at: wordProgress) }
+    private var yOffsetFraction: Double { KaraokeAnimationCurve.yOffset.value(at: wordProgress) }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -64,6 +93,14 @@ private struct KaraokeWordView: View {
                 )
             }
         }
+        .scaleEffect(scale)
+        // yOffsetFraction is expressed as a fraction of font size in the
+        // original (1/100, -1/60 etc applied to em-based units) — 28pt
+        // matches the syllable text's font size below, so multiplying by
+        // it converts the fraction into actual points.
+        .offset(y: CGFloat(yOffsetFraction) * 28)
+        .shadow(color: .white.opacity(glow * 0.8), radius: CGFloat(glow * 8))
+        .animation(.linear(duration: 1.0 / 30.0), value: wordProgress)
     }
 }
 

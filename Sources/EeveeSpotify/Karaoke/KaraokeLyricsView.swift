@@ -86,12 +86,20 @@ private struct KaraokeScrollingLines: View {
                         .padding(.horizontal, 24)
                     }
 
+                    KaraokeCreditsFooterView(lyrics: lyrics)
+
                     Spacer().frame(height: 200)
                 }
             }
             .onChange(of: activeLineIndex) { newIndex in
                 guard let newIndex = newIndex, newIndex < lyrics.lines.count else { return }
-                withAnimation(.easeInOut(duration: 0.5)) {
+                // Approximates ScrollIntoCenterView's piecewise curve (slow
+                // start, speed up, slight overshoot past 1.0 around 65-85%,
+                // settle back) with a single cubic timing curve — SwiftUI's
+                // withAnimation only takes one Bezier, not the original's
+                // 4-segment piecewise function, but control points beyond
+                // 1.0 still produce a similar overshoot-and-settle feel.
+                withAnimation(.timingCurve(0.3, 1.4, 0.7, 1.0, duration: 0.8)) {
                     proxy.scrollTo(newIndex, anchor: .center)
                 }
             }
