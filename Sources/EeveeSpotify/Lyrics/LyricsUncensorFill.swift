@@ -169,8 +169,10 @@ struct LyricsUncensorFill {
     }
 
     /// Walks the line's syllables, grouping them into words the same way
-    /// the rendering layer does (KaraokeLineView's `words` grouping —
-    /// consecutive IsPartOfWord runs), and replaces any word whose plain
+    /// the rendering layer does (KaraokeLineView's `words` grouping — a
+    /// syllable joins the current group when the *previous* syllable's
+    /// IsPartOfWord flag was true, since the flag is forward-looking; see
+    /// KaraokeSyllableDto's doc comment), and replaces any word whose plain
     /// text contained a censor with a single syllable carrying the
     /// resolved replacement text and the original word's full time span
     /// (so playback timing/highlighting is unaffected, even though the
@@ -183,11 +185,12 @@ struct LyricsUncensorFill {
         var wordGroups: [[KaraokeSyllableDto]] = []
         var current: [KaraokeSyllableDto] = []
         for syllable in original.syllables {
-            if !syllable.isPartOfWord || current.isEmpty {
-                if !current.isEmpty { wordGroups.append(current) }
-                current = [syllable]
-            } else {
+            let previousContinues = current.last?.isPartOfWord ?? false
+            if current.isEmpty || previousContinues {
                 current.append(syllable)
+            } else {
+                wordGroups.append(current)
+                current = [syllable]
             }
         }
         if !current.isEmpty { wordGroups.append(current) }
@@ -204,7 +207,13 @@ struct LyricsUncensorFill {
                     text: String(resolvedPlainWords[groupIndex]),
                     startMs: group.first?.startMs ?? 0,
                     endMs: group.last?.endMs ?? group.first?.startMs ?? 0,
-                    isPartOfWord: group.first?.isPartOfWord ?? false
+                    // The merged syllable stands in for the whole word, so its
+                    // forward-attachment behavior (does the *next* word glue
+                    // onto it) should come from the *last* original syllable,
+                    // not the first — the first syllable's flag only described
+                    // attachment to the second syllable within this same word,
+                    // which no longer applies once they're merged into one.
+                    isPartOfWord: group.last?.isPartOfWord ?? false
                 ))
             } else {
                 newSyllables.append(contentsOf: group)

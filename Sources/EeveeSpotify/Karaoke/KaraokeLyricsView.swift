@@ -1,24 +1,77 @@
 import SwiftUI
 
-/// Full-screen karaoke lyrics view. Uses a SwiftUI TimelineView (the
-/// supported, declarative equivalent of a manual CADisplayLink/Timer loop
-/// inside SwiftUI) to re-evaluate playback position ~30 times per second,
+/// Karaoke lyrics view. Uses a SwiftUI TimelineView (the supported,
+/// declarative equivalent of a manual CADisplayLink/Timer loop inside
+/// SwiftUI) to re-evaluate playback position ~30 times per second,
 /// determines which line is "active" right now, and renders all lines
 /// with KaraokeLineView — auto-scrolling so the active line stays
 /// vertically centered, matching Spicetify's lyrics panel behavior.
+///
+/// Supports two presentation modes, controlled by `isCompact` (driven by
+/// LyricsOptions.karaokeShrinkOverlay, set by KaraokeOverlayPresenter):
+///   - Full (isCompact == false): edge-to-edge takeover, opaque
+///     background, matching the original behavior.
+///   - Compact (isCompact == true): a smaller, rounded-corner card with
+///     margins on all sides, floating over a dimmed scrim — the caller
+///     (KaraokeOverlayPresenter) is responsible for presenting with a
+///     transparent hosting background and .overFullScreen so whatever was
+///     underneath (Spotify's own native Lyrics screen) stays visible
+///     through the scrim and around the card's margins, rather than this
+///     view replacing it outright.
 @available(iOS 15.0, *)
 struct KaraokeLyricsView: View {
     let lyrics: KaraokeLyricsDto
-    /// Called when the user dismisses the view (e.g. tapping the close button).
+    var isCompact: Bool = false
+    /// Called when the user dismisses the view (e.g. tapping the close
+    /// button, or tapping the scrim in compact mode).
     var onDismiss: () -> Void
 
     var body: some View {
+        ZStack {
+            if isCompact {
+                compactBody
+            } else {
+                fullScreenBody
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    private var fullScreenBody: some View {
         ZStack(alignment: .topTrailing) {
             KaraokeBackgroundView()
             content
             closeButton
         }
-        .preferredColorScheme(.dark)
+    }
+
+    private var compactBody: some View {
+        ZStack {
+            // The hosting UIWindow's own background is already transparent
+            // (set by KaraokeOverlayPresenter), so this scrim is the only
+            // thing dimming the native Lyrics screen behind it. Tapping
+            // outside the card dismisses, mirroring how tapping outside a
+            // sheet/popover normally behaves.
+            Color.black.opacity(0.55)
+                .ignoresSafeArea()
+                .contentShape(Rectangle())
+                .onTapGesture { onDismiss() }
+
+            ZStack(alignment: .topTrailing) {
+                KaraokeBackgroundView()
+                content
+                closeButton
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.45), radius: 30, y: 14)
+            .padding(.horizontal, 14)
+            .padding(.top, 64)
+            .padding(.bottom, 100)
+        }
     }
 
     @available(iOS 15.0, *)
@@ -36,7 +89,8 @@ struct KaraokeLyricsView: View {
             KaraokeScrollingLines(
                 lyrics: lyrics,
                 currentMs: currentMs,
-                activeLineIndex: activeIndex
+                activeLineIndex: activeIndex,
+                isCompact: isCompact
             )
         }
     }
@@ -56,11 +110,11 @@ struct KaraokeLyricsView: View {
             Image(systemName: "chevron.down")
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundColor(.white.opacity(0.85))
-                .padding(14)
+                .padding(isCompact ? 10 : 14)
                 .background(Circle().fill(Color.white.opacity(0.12)))
         }
-        .padding(.top, 50)
-        .padding(.trailing, 20)
+        .padding(.top, isCompact ? 16 : 50)
+        .padding(.trailing, isCompact ? 14 : 20)
     }
 }
 
@@ -72,26 +126,28 @@ private struct KaraokeScrollingLines: View {
     let lyrics: KaraokeLyricsDto
     let currentMs: Int
     let activeLineIndex: Int?
+    var isCompact: Bool = false
 
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 28) {
-                    Spacer().frame(height: 80)
+                VStack(alignment: .leading, spacing: isCompact ? 18 : 28) {
+                    Spacer().frame(height: isCompact ? 24 : 80)
 
                     ForEach(Array(lyrics.lines.enumerated()), id: \.offset) { index, line in
                         KaraokeLineView(
                             line: line,
                             currentMs: currentMs,
-                            isActiveLine: index == activeLineIndex
+                            isActiveLine: index == activeLineIndex,
+                            isCompact: isCompact
                         )
                         .id(index)
-                        .padding(.horizontal, 24)
+                        .padding(.horizontal, isCompact ? 16 : 24)
                     }
 
                     KaraokeCreditsFooterView(lyrics: lyrics)
 
-                    Spacer().frame(height: 200)
+                    Spacer().frame(height: isCompact ? 60 : 200)
                 }
             }
             .onChange(of: activeLineIndex) { newIndex in

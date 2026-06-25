@@ -69,6 +69,11 @@ romanized_lyrics_description = "Display romanized lyrics for Japanese, Korean, a
 musixmatch_language = "Musixmatch Lyrics Language";
 musixmatch_language_description = "You can enter a 2-letter Musixmatch language code and see translated lyrics on Musixmatch if they are available.";
 
+karaoke_shrink_overlay = "Shrink Word-Synced Overlay";
+karaoke_shrink_overlay_description = "Show word-synced lyrics as a smaller card floating over Spotify's own lyrics screen instead of taking over the whole screen. You can also toggle this from the lyrics screen itself.";
+
+karaoke_word_synced_button = "Word-Synced";
+
 // UI
 
 lyrics_background_color_section = "Lyrics Background Color";

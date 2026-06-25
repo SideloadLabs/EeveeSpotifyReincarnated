@@ -15,20 +15,30 @@ struct KaraokeLineView: View {
     let line: KaraokeLineDto
     let currentMs: Int
     let isActiveLine: Bool
+    var isCompact: Bool = false
 
     /// Groups syllables into words (consecutive IsPartOfWord runs joined),
     /// since highlight progress is most naturally computed and the text
     /// laid out per syllable but wrapping should happen between words, not
     /// mid-word.
+    ///
+    /// isPartOfWord is forward-looking (see KaraokeSyllableDto's doc
+    /// comment) — a syllable glues onto the *next* one when *its own* flag
+    /// is true, which is equivalent to: a syllable joins the *current*
+    /// group when the *previous* syllable's flag was true. Checking the
+    /// current syllable's own flag here (as an earlier version did) is the
+    /// backwards reading that caused broken word boundaries like "Lo"/"la"
+    /// splitting apart while "was"/"Lo" wrongly glued together.
     private var words: [[KaraokeSyllableDto]] {
         var result: [[KaraokeSyllableDto]] = []
         var current: [KaraokeSyllableDto] = []
         for syllable in line.syllables {
-            if !syllable.isPartOfWord || current.isEmpty {
-                if !current.isEmpty { result.append(current) }
-                current = [syllable]
-            } else {
+            let previousContinues = current.last?.isPartOfWord ?? false
+            if current.isEmpty || previousContinues {
                 current.append(syllable)
+            } else {
+                result.append(current)
+                current = [syllable]
             }
         }
         if !current.isEmpty { result.append(current) }
@@ -36,9 +46,14 @@ struct KaraokeLineView: View {
     }
 
     var body: some View {
-        KaraokeFlowLayout(spacing: 8) {
+        KaraokeFlowLayout(spacing: isCompact ? 5 : 8) {
             ForEach(Array(words.enumerated()), id: \.offset) { _, word in
-                KaraokeWordView(syllables: word, currentMs: currentMs, isActiveLine: isActiveLine)
+                KaraokeWordView(
+                    syllables: word,
+                    currentMs: currentMs,
+                    isActiveLine: isActiveLine,
+                    isCompact: isCompact
+                )
             }
         }
         .opacity(isActiveLine ? 1.0 : 0.4)
@@ -60,6 +75,7 @@ private struct KaraokeWordView: View {
     let syllables: [KaraokeSyllableDto]
     let currentMs: Int
     let isActiveLine: Bool
+    var isCompact: Bool = false
 
     private var wordStartMs: Int { syllables.first?.startMs ?? 0 }
     private var wordEndMs: Int { syllables.last?.endMs ?? wordStartMs }
@@ -84,6 +100,7 @@ private struct KaraokeWordView: View {
     private var scale: Double { KaraokeAnimationCurve.wordScale.value(at: wordProgress) }
     private var glow: Double { KaraokeAnimationCurve.glow.value(at: wordProgress) }
     private var yOffsetFraction: Double { KaraokeAnimationCurve.yOffset.value(at: wordProgress) }
+    private var fontSize: CGFloat { isCompact ? 19 : 28 }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -91,16 +108,17 @@ private struct KaraokeWordView: View {
                 KaraokeSyllableTextView(
                     syllable: syllable,
                     currentMs: currentMs,
-                    isActiveLine: isActiveLine
+                    isActiveLine: isActiveLine,
+                    fontSize: fontSize
                 )
             }
         }
         .scaleEffect(scale)
         // yOffsetFraction is expressed as a fraction of font size in the
-        // original (1/100, -1/60 etc applied to em-based units) — 28pt
+        // original (1/100, -1/60 etc applied to em-based units) — fontSize
         // matches the syllable text's font size below, so multiplying by
         // it converts the fraction into actual points.
-        .offset(y: CGFloat(yOffsetFraction) * 28)
+        .offset(y: CGFloat(yOffsetFraction) * fontSize)
         .shadow(color: .white.opacity(glow * 0.8), radius: CGFloat(glow * 8))
         .animation(.linear(duration: 1.0 / 30.0), value: wordProgress)
     }
@@ -117,6 +135,7 @@ private struct KaraokeSyllableTextView: View {
     let syllable: KaraokeSyllableDto
     let currentMs: Int
     let isActiveLine: Bool
+    var fontSize: CGFloat = 28
 
     private var progress: Double {
         guard isActiveLine, syllable.endMs > syllable.startMs else {
@@ -128,7 +147,7 @@ private struct KaraokeSyllableTextView: View {
 
     var body: some View {
         Text(syllable.text)
-            .font(.system(size: 28, weight: .bold))
+            .font(.system(size: fontSize, weight: .bold))
             .foregroundStyle(
                 LinearGradient(
                     stops: [

@@ -1,7 +1,12 @@
 import UIKit
 
-/// Attaches a long-press gesture recognizer to the Now Playing lyrics button
-/// so the user can summon the custom karaoke overlay.
+/// Attaches a long-press gesture recognizer to the app window so the user
+/// can summon the custom karaoke overlay from anywhere with a 0.5s
+/// long-press. This was originally the *only* way to trigger the karaoke
+/// view, which made it effectively undiscoverable — KaraokeButtonOverlay
+/// now provides a real, visible button on Spotify's native Lyrics screen
+/// and is the primary trigger. This gesture is kept as a secondary
+/// shortcut for anyone who already relies on it.
 /// Call attachIfNeeded() whenever playback state changes — it's idempotent.
 final class KaraokeGestureTrigger {
     static let shared = KaraokeGestureTrigger()

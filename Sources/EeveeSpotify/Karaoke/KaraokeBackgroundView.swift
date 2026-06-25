@@ -7,9 +7,9 @@ import MetalKit
 /// album art image itself is available and Metal is supported on-device.
 /// Falls back to a simpler animated gradient using extracted dominant
 /// colors (AlbumArtColorExtractor) — or fixed placeholder colors if even
-/// that fails — since the album art lookup is a best-effort UIView-walking
-/// heuristic that won't always succeed, and Metal itself could
-/// theoretically be unavailable (e.g. simulator).
+/// that fails, e.g. if Spotify hasn't published artwork to
+/// MPNowPlayingInfoCenter yet and the UIView-walking fallback also comes
+/// up empty, or if Metal itself is unavailable (e.g. simulator).
 @available(iOS 15.0, *)
 struct KaraokeBackgroundView: View {
     @State private var albumArtImage: UIImage?
@@ -49,11 +49,16 @@ struct KaraokeBackgroundView: View {
         }
     }
 
-    /// AlbumArtLocator walks UIView/UIImageView, which must happen on the
-    /// main thread. If found, we both keep the raw image (for the Metal
-    /// path) and kick off color extraction in the background (for the
-    /// gradient fallback path, in case Metal setup fails downstream even
-    /// though the image itself was found).
+    /// AlbumArtLocator now checks MPNowPlayingInfoCenter's published artwork
+    /// first (reliable, no view-hierarchy timing concerns) and only falls
+    /// back to walking the Now Playing UIView tree if that's unavailable.
+    /// Reading NowPlayingInfo must happen on the main thread, which
+    /// AlbumArtLocator itself already handles — this call stays on
+    /// .onAppear's (main-thread) caller for that reason. If found, we both
+    /// keep the raw image (for the Metal path) and kick off color
+    /// extraction in the background (for the gradient fallback path, in
+    /// case Metal setup fails downstream even though the image itself was
+    /// found).
     private func loadAlbumArt() {
         guard let image = AlbumArtLocator.currentAlbumArt() else {
             writeDebugLog("[Karaoke] no album art view found — using placeholder gradient")

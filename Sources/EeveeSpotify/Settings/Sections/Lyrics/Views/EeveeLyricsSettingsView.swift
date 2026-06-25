@@ -19,6 +19,10 @@ struct EeveeLyricsSettingsView: View {
                     musixmatchLanguageSection()
                 }
             }
+
+            if viewModel.lyricsSource == .spicylyrics {
+                karaokeShrinkOverlaySection()
+            }
             
             SpacerView()
         }
@@ -89,6 +93,17 @@ struct EeveeLyricsSettingsView: View {
             )
         } footer: {
             Text("musixmatch_language_description".localized)
+        }
+    }
+
+    @ViewBuilder private func karaokeShrinkOverlaySection() -> some View {
+        Section {
+            Toggle(
+                "karaoke_shrink_overlay".localized,
+                isOn: $viewModel.lyricsOptions.karaokeShrinkOverlay
+            )
+        } footer: {
+            Text("karaoke_shrink_overlay_description".localized)
         }
     }
 }

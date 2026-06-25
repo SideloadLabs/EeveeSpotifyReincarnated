@@ -11,11 +11,21 @@ import SwiftUI
 /// Mirrors SponsorBlockReportingUI.swift's topVC()+UIHostingController
 /// presentation pattern, which is already proven working in this codebase.
 final class KaraokeOverlayPresenter {
-    /// Call this wherever the user triggers the karaoke view (e.g. a new
-    /// button added to the Now Playing screen, or a long-press on the
-    /// existing lyrics button — the actual trigger wiring is a separate
-    /// step from this presentation helper).
+    /// True while the karaoke view itself is on screen. KaraokeButtonOverlay
+    /// checks this (alongside isAvailableForCurrentTrack) so the floating
+    /// launcher button hides itself once the karaoke view is open — without
+    /// this, the button's overlay window (which sits above the app's main
+    /// window so it can float over Spotify's native Lyrics screen) would
+    /// also float on top of the karaoke view once presented, and tapping it
+    /// again would stack a second presentation on top of the first.
+    private(set) static var isPresented = false
+
+    /// Call this wherever the user triggers the karaoke view — the visible
+    /// "Word-Synced Lyrics" button on Spotify's native Lyrics screen
+    /// (KaraokeButtonOverlay) is the primary trigger; the long-press
+    /// gesture (KaraokeGestureTrigger) remains as a secondary shortcut.
     static func present() {
+        guard !isPresented else { return }
         guard #available(iOS 15.0, *) else {
             writeDebugLog("[Karaoke] present() skipped: requires iOS 15+")
             return
@@ -30,13 +40,32 @@ final class KaraokeOverlayPresenter {
             return
         }
 
-        let view = KaraokeLyricsView(lyrics: lyrics, onDismiss: {
+        let isCompact = UserDefaults.lyricsOptions.karaokeShrinkOverlay
+
+        let view = KaraokeLyricsView(lyrics: lyrics, isCompact: isCompact, onDismiss: {
+            isPresented = false
             topVC()?.dismiss(animated: true)
         })
         let hosting = UIHostingController(rootView: view)
-        hosting.modalPresentationStyle = .fullScreen
         hosting.overrideUserInterfaceStyle = .dark
-        hosting.view.backgroundColor = .black
+
+        if isCompact {
+            // .overFullScreen (rather than .fullScreen) keeps `host`'s own
+            // view — Spotify's native Lyrics screen, whatever's currently
+            // on top — alive underneath instead of removing it from the
+            // view hierarchy, and the clear background lets it show
+            // through KaraokeLyricsView's own scrim/card. This is what
+            // makes the overlay actually "shrink over" the native screen
+            // rather than just being a smaller view on an otherwise
+            // identical opaque takeover.
+            hosting.modalPresentationStyle = .overFullScreen
+            hosting.view.backgroundColor = .clear
+        } else {
+            hosting.modalPresentationStyle = .fullScreen
+            hosting.view.backgroundColor = .black
+        }
+
+        isPresented = true
         host.present(hosting, animated: true)
     }
 

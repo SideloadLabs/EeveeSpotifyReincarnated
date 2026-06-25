@@ -1,4 +1,5 @@
 import UIKit
+import MediaPlayer
 
 /// Extracts a small palette of dominant colors from an image, for the
 /// karaoke background gradient — the iOS equivalent of what Android's
@@ -105,19 +106,53 @@ struct AlbumArtColorExtractor {
     }
 }
 
-/// Locates the currently-displayed album art image without any new network
-/// fetch — Spotify's own Now Playing UI already has the artwork loaded
-/// into a UIImageView somewhere in its view hierarchy, so this walks
-/// `nowPlayingScrollViewController.view`'s subviews (the same safe,
-/// in-process technique SponsorBlockOverlay already uses to find sliders)
-/// to find it, rather than guessing at internal KVC keys or standing up a
-/// new authenticated request to fetch artwork ourselves.
+/// Locates the currently-displayed album art image. The karaoke background
+/// previously relied solely on the UIView-walking heuristic below, which is
+/// why the background sometimes stayed on the flat placeholder gradient
+/// instead of the cover art's colors — it depends on the Now Playing
+/// screen's image view still being laid out with a non-zero frame
+/// somewhere in the (now covered-up, since the karaoke view is presented
+/// full-screen on top of it) view hierarchy, which isn't guaranteed at the
+/// exact moment KaraokeBackgroundView.onAppear fires.
+///
+/// MPNowPlayingInfoCenter is a far more reliable source: Spotify already
+/// publishes the current track's artwork there for the lock screen/Control
+/// Center (the same place this codebase already reads title/artist from in
+/// CustomLyrics.x.swift's loadCustomLyricsForTrackId), independent of
+/// whatever's currently rendered on screen — no view-hierarchy timing or
+/// "biggest UIImageView" guessing involved. We try that first and only
+/// fall back to the UIView walk if it's unavailable.
 struct AlbumArtLocator {
-    /// Heuristic: the largest UIImageView with a non-nil image in the Now
-    /// Playing view's subtree is almost certainly the album art — it's
-    /// typically the single largest image element on that screen by a wide
-    /// margin (icon-sized images like buttons are much smaller).
     static func currentAlbumArt() -> UIImage? {
+        if let artwork = artworkFromNowPlayingInfo() {
+            return artwork
+        }
+        return artworkFromViewHierarchy()
+    }
+
+    /// Must be read on the main thread, matching the existing
+    /// MPNowPlayingInfoCenter read pattern in CustomLyrics.x.swift.
+    private static func artworkFromNowPlayingInfo() -> UIImage? {
+        var artwork: MPMediaItemArtwork?
+        if Thread.isMainThread {
+            artwork = MPNowPlayingInfoCenter.default().nowPlayingInfo?[MPMediaItemPropertyArtwork] as? MPMediaItemArtwork
+        } else {
+            DispatchQueue.main.sync {
+                artwork = MPNowPlayingInfoCenter.default().nowPlayingInfo?[MPMediaItemPropertyArtwork] as? MPMediaItemArtwork
+            }
+        }
+        guard let artwork = artwork else { return nil }
+        // boundsSize is only a hint to the artwork provider for which
+        // resolution to render — passing the artwork's own reported size
+        // asks for its full native resolution rather than a thumbnail.
+        return artwork.image(at: artwork.bounds.size)
+    }
+
+    /// Heuristic fallback: the largest UIImageView with a non-nil image in
+    /// the Now Playing view's subtree is almost certainly the album art —
+    /// it's typically the single largest image element on that screen by a
+    /// wide margin (icon-sized images like buttons are much smaller).
+    private static func artworkFromViewHierarchy() -> UIImage? {
         guard let controller = nowPlayingScrollViewController as? UIViewController,
               let rootView = controller.view else { return nil }
 

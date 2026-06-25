@@ -229,19 +229,31 @@ class SpicyLyricsRepository: LyricsRepository {
             var karaokeSyllables = [KaraokeSyllableDto]()
 
             if let syllables = lead["Syllables"]?.arrayValue, !syllables.isEmpty {
-                // Real client rule (Syllable.ts): a syllable with IsPartOfWord=true
-                // attaches directly to the previous syllable (continues the same
-                // word, e.g. "re" + "call" -> "recall"); otherwise it starts a new
-                // word and needs a preceding space. Plain .joined() (no separator)
-                // ignored this entirely, producing "Doyourecall,notlongago?".
+                // Real client rule (Syllable.ts / tools.ts): IsPartOfWord is a
+                // FORWARD-looking flag — a syllable with IsPartOfWord=true means
+                // the word continues into the *next* syllable with no gap (e.g.
+                // "Lo" (IsPartOfWord=true) + "la" -> "Lola"). So whether a space
+                // goes before the *current* syllable depends on the *previous*
+                // syllable's flag, not this one's own. (Verified directly against
+                // the real client: Syllable.ts's word-grouping gates inclusion on
+                // `lead.IsPartOfWord || (prev?.IsPartOfWord && currentWordGroup)`,
+                // and tools.ts's convertSyllableToStatic appends a space *after*
+                // a syllable only `if (!syllable.IsPartOfWord)`.) Reading this
+                // backwards (checking the current syllable's own flag to decide
+                // the preceding space, as an earlier version of this file did)
+                // is what produced broken spacing like "wasLo la" instead of
+                // "was Lola" — plain .joined() (no separator) had the same
+                // underlying problem, producing "Doyourecall,notlongago?".
                 var text = ""
+                var previousIsPartOfWord = false
                 for syllable in syllables {
                     guard let syllableText = syllable["Text"]?.stringValue else { continue }
                     let isPartOfWord = syllable["IsPartOfWord"]?.boolValue ?? false
-                    if !text.isEmpty && !isPartOfWord {
+                    if !text.isEmpty && !previousIsPartOfWord {
                         text += " "
                     }
                     text += syllableText
+                    previousIsPartOfWord = isPartOfWord
 
                     let startMs = syllable["StartTime"]?.doubleValue.map { Int($0 * 1000) } ?? 0
                     let endMs   = syllable["EndTime"]?.doubleValue.map { Int($0 * 1000) } ?? startMs
