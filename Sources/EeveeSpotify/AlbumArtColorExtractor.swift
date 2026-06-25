@@ -142,10 +142,23 @@ struct AlbumArtLocator {
             }
         }
         guard let artwork = artwork else { return nil }
-        // boundsSize is only a hint to the artwork provider for which
-        // resolution to render — passing the artwork's own reported size
-        // asks for its full native resolution rather than a thumbnail.
-        return artwork.image(at: artwork.bounds.size)
+
+        // artwork.bounds is just metadata the *publisher* (Spotify) chose
+        // to report — it isn't guaranteed to be meaningful, and asking for
+        // .zero (which some publishers do report) made image(at:) hand
+        // back a degenerate, effectively-blank image. That image was still
+        // non-nil, so it passed straight through as "found" and got fed to
+        // the Metal renderer, which then had nothing real to texture from —
+        // rendering solid black instead of ever falling back to the
+        // gradient. Asking for a fixed, generous size sidesteps that: this
+        // requests the artwork rendered at (at least) 600x600 regardless of
+        // whatever bounds metadata was reported.
+        guard let image = artwork.image(at: CGSize(width: 600, height: 600)),
+              let cgImage = image.cgImage,
+              cgImage.width > 1, cgImage.height > 1 else {
+            return nil
+        }
+        return image
     }
 
     /// Heuristic fallback: the largest UIImageView with a non-nil image in

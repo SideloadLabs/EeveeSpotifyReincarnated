@@ -23,7 +23,9 @@ struct KaraokeBackgroundView: View {
 
     var body: some View {
         Group {
-            if let albumArtImage = albumArtImage, MTLCreateSystemDefaultDevice() != nil {
+            if let albumArtImage = albumArtImage,
+               albumArtImage.size.width > 1, albumArtImage.size.height > 1,
+               MTLCreateSystemDefaultDevice() != nil {
                 KaraokeMetalBackgroundView(albumArt: albumArtImage)
                     .ignoresSafeArea()
             } else {

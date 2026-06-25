@@ -16,13 +16,29 @@ import UIKit
 /// for the credits footer) because the button needs to work identically
 /// across all the Lyrics_*ViewController class variants this codebase
 /// already has to switch on by iOS/Spotify version — a separate overlay
-/// window sidesteps that entirely, at the cost of not being "really"
-/// part of the native screen's own view tree.
+/// window sidesteps that entirely, at the cost of not being "really" part
+/// of the native screen's own view tree.
+///
+/// The window's frame is deliberately sized to just the button row's own
+/// corner — NOT the full screen — positioned top-right. A UIWindow only
+/// ever receives touches that land within its own frame, so this is what
+/// lets every tap *outside* that corner reach Spotify's window untouched,
+/// with no custom hitTest logic needed at all. An earlier version made
+/// this window full-screen and tried to manually pass non-button touches
+/// through via a hitTest override that compared the hit-tested view
+/// against the hosting controller's root view — that didn't work, because
+/// SwiftUI's hosting view does its own internal touch routing and hands
+/// back *itself* as the hit-test result for essentially any point inside
+/// it (SwiftUI buttons aren't discrete child UIViews at their own frame
+/// the way a plain UIButton would be), so the "is this actually empty
+/// space, or a real button" check could never tell the difference —
+/// every tap, including real button taps, looked identical to that check
+/// and got silently swallowed as "not a button."
 @available(iOS 15.0, *)
 final class KaraokeButtonOverlay {
     static let shared = KaraokeButtonOverlay()
 
-    private var window: PassthroughWindow?
+    private var window: UIWindow?
 
     private init() {}
 
@@ -32,7 +48,34 @@ final class KaraokeButtonOverlay {
             .compactMap({ $0 as? UIWindowScene })
             .first(where: { $0.activationState == .foregroundActive }) else { return }
 
-        let overlayWindow = PassthroughWindow(windowScene: scene)
+        let screenBounds = scene.screen.bounds
+        let safeAreaTop = scene.windows
+            .first(where: { $0.isKeyWindow })?.safeAreaInsets.top ?? 44
+
+        // Generous size for the two-button row — wider than it needs to be
+        // for the current English copy so there's headroom for longer
+        // translated strings once other languages get these new keys
+        // translated, and tall enough that the buttons' own tap targets
+        // (including their padding) are never clipped by the window edge.
+        let areaWidth: CGFloat = 240
+        let areaHeight: CGFloat = 64
+        // Sits just below the safe area, clear of the status bar/notch —
+        // and, since this is the *top*-right corner, clear of Spotify's
+        // native playback controls at the bottom too. If this overlaps
+        // Spotify's own header controls on some screen size, nudge
+        // topInset up/down here.
+        let topInset: CGFloat = 8
+        let trailingInset: CGFloat = 8
+
+        let frame = CGRect(
+            x: screenBounds.width - areaWidth - trailingInset,
+            y: safeAreaTop + topInset,
+            width: areaWidth,
+            height: areaHeight
+        )
+
+        let overlayWindow = UIWindow(windowScene: scene)
+        overlayWindow.frame = frame
         overlayWindow.windowLevel = .alert - 1
         overlayWindow.backgroundColor = .clear
         overlayWindow.isHidden = false
@@ -50,20 +93,6 @@ final class KaraokeButtonOverlay {
     }
 }
 
-/// A UIWindow that only intercepts touches that actually land on one of
-/// its own button subviews — everywhere else, touches pass straight
-/// through to whatever's underneath (Spotify's native Lyrics screen), so
-/// this overlay never blocks scrolling or tapping on the screen beneath it.
-private final class PassthroughWindow: UIWindow {
-    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
-        guard let hit = super.hitTest(point, with: event) else { return nil }
-        // The hosting controller's own root view fills the whole window
-        // and would otherwise swallow every touch; only let through hits
-        // that landed on a real subview (an actual button) of it.
-        return (hit == self || hit == rootViewController?.view) ? nil : hit
-    }
-}
-
 @available(iOS 15.0, *)
 private struct KaraokeButtonOverlayView: View {
     @State private var isAvailable = KaraokeOverlayPresenter.isAvailableForCurrentTrack()
@@ -71,21 +100,16 @@ private struct KaraokeButtonOverlayView: View {
     @State private var shrinkOverlay = UserDefaults.lyricsOptions.karaokeShrinkOverlay
 
     var body: some View {
-        VStack {
-            Spacer()
-            HStack {
-                Spacer()
-                if isAvailable {
-                    HStack(spacing: 10) {
-                        shrinkToggleButton
-                        wordSyncedButton
-                    }
-                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
-                }
+        HStack(spacing: 10) {
+            if isAvailable {
+                shrinkToggleButton
+                wordSyncedButton
             }
         }
-        .padding(.trailing, 20)
-        .padding(.bottom, 110) // clears Spotify's native playback controls
+        // Right-aligned within the window's own (already top-right
+        // positioned) frame, rather than the window itself spanning the
+        // full screen with alignment logic inside it.
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
         .animation(.easeOut(duration: 0.25), value: isAvailable)
         // Polling rather than an event/notification hook: karaoke data can
         // finish loading slightly after the Lyrics screen itself appears
