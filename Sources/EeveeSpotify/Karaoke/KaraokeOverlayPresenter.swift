@@ -8,20 +8,23 @@ import SwiftUI
 /// safely (Spotify's anti-instrumentation protections crash on Frida attach
 /// before enumeration/hooking can happen).
 ///
-/// Mirrors SponsorBlockReportingUI.swift's topVC()+UIHostingController
-/// presentation pattern, which is already proven working in this codebase.
+/// Presents via WindowHelper.shared's captured-at-launch root view
+/// controller (see topVC()'s doc comment for why a fresh windows-array
+/// lookup, the pattern SponsorBlockReportingUI.swift's topVC() uses, isn't
+/// safe to copy here now that KaraokeButtonOverlay's own small window
+/// exists alongside Spotify's main one).
 final class KaraokeOverlayPresenter {
     /// True while the karaoke view itself is on screen. KaraokeButtonOverlay
     /// checks this (alongside isAvailableForCurrentTrack) so the floating
     /// launcher button hides itself once the karaoke view is open — without
     /// this, the button's overlay window (which sits above the app's main
-    /// window so it can float over Spotify's native Lyrics screen) would
-    /// also float on top of the karaoke view once presented, and tapping it
-    /// again would stack a second presentation on top of the first.
+    /// window so it can float over the Now Playing screen) would also float
+    /// on top of the karaoke view once presented, and tapping it again
+    /// would stack a second presentation on top of the first.
     private(set) static var isPresented = false
 
     /// Call this wherever the user triggers the karaoke view — the visible
-    /// "Word-Synced Lyrics" button on Spotify's native Lyrics screen
+    /// "Word-Synced Lyrics" button on the Now Playing screen
     /// (KaraokeButtonOverlay) is the primary trigger; the long-press
     /// gesture (KaraokeGestureTrigger) remains as a secondary shortcut.
     static func present() {
@@ -40,30 +43,14 @@ final class KaraokeOverlayPresenter {
             return
         }
 
-        let isCompact = UserDefaults.lyricsOptions.karaokeShrinkOverlay
-
-        let view = KaraokeLyricsView(lyrics: lyrics, isCompact: isCompact, onDismiss: {
+        let view = KaraokeLyricsView(lyrics: lyrics, onDismiss: {
             isPresented = false
             topVC()?.dismiss(animated: true)
         })
         let hosting = UIHostingController(rootView: view)
         hosting.overrideUserInterfaceStyle = .dark
-
-        if isCompact {
-            // .overFullScreen (rather than .fullScreen) keeps `host`'s own
-            // view — Spotify's native Lyrics screen, whatever's currently
-            // on top — alive underneath instead of removing it from the
-            // view hierarchy, and the clear background lets it show
-            // through KaraokeLyricsView's own scrim/card. This is what
-            // makes the overlay actually "shrink over" the native screen
-            // rather than just being a smaller view on an otherwise
-            // identical opaque takeover.
-            hosting.modalPresentationStyle = .overFullScreen
-            hosting.view.backgroundColor = .clear
-        } else {
-            hosting.modalPresentationStyle = .fullScreen
-            hosting.view.backgroundColor = .black
-        }
+        hosting.modalPresentationStyle = .fullScreen
+        hosting.view.backgroundColor = .black
 
         isPresented = true
         host.present(hosting, animated: true)
@@ -77,15 +64,31 @@ final class KaraokeOverlayPresenter {
         return KaraokeLyricsStore.shared.lyrics(forTrackId: trackId) != nil
     }
 
+    /// Walks from WindowHelper's captured-at-launch root view controller
+    /// (NOT a fresh `UIApplication.shared...windows` lookup) down to
+    /// whatever's actually topmost right now.
+    ///
+    /// This used to re-derive the "current key window" from scratch on
+    /// every call, with `ws.windows.first(where: { $0.isKeyWindow }) ??
+    /// ws.windows.first` as the fallback if nothing currently reports
+    /// itself as key — and that fallback is exactly what was producing
+    /// "loads it small": KaraokeButtonOverlay's own small floating-button
+    /// window is a real, persistent window in that same windows array
+    /// (deliberately small and non-key, since it only needs to occupy the
+    /// button's own corner — see KaraokeButtonOverlay.swift). If the
+    /// fallback ever triggered while that window happened to be first in
+    /// the array, `top` resolved to *its* tiny hosting controller instead
+    /// of Spotify's real screen — and presenting "full screen" from a
+    /// host whose own window is only ~180x56 constrains the new view to
+    /// that window's bounds, not the device's actual screen.
+    /// WindowHelper.shared.window is captured once, very early at launch
+    /// (well before this overlay window ever exists), so starting from it
+    /// instead sidesteps the ambiguity entirely.
     private static func topVC() -> UIViewController? {
-        for scene in UIApplication.shared.connectedScenes {
-            guard let ws = scene as? UIWindowScene,
-                  ws.activationState == .foregroundActive else { continue }
-            let win = ws.windows.first(where: { $0.isKeyWindow }) ?? ws.windows.first
-            guard var top = win?.rootViewController else { continue }
-            while let p = top.presentedViewController { top = p }
-            return top
+        var top = WindowHelper.shared.rootViewController
+        while let presented = top.presentedViewController {
+            top = presented
         }
-        return nil
+        return top
     }
 }

@@ -23,16 +23,18 @@ struct KaraokeCreditsFooterView: View {
 
     var body: some View {
         if !lyrics.songWriters.isEmpty || providerLabel != nil {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .center, spacing: 4) {
                 if !lyrics.songWriters.isEmpty {
                     Text("Written by: \(lyrics.songWriters.joined(separator: ", "))")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(.white.opacity(0.55))
+                        .multilineTextAlignment(.center)
                 }
                 if let providerLabel = providerLabel {
                     Text("Lyrics provided by \(providerLabel)")
                         .font(.system(size: 12, weight: .regular))
                         .foregroundColor(.white.opacity(0.4))
+                        .multilineTextAlignment(.center)
                 }
             }
             .padding(.horizontal, 24)

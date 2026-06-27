@@ -1,48 +1,99 @@
 import SwiftUI
 import UIKit
 
-/// A small floating button shown on top of Spotify's native Lyrics
-/// fullscreen screen whenever word-synced (karaoke) data is available for
-/// the current track — this is the visible, discoverable way to open the
-/// karaoke view, replacing the previous behavior where the *only* trigger
-/// was an undocumented 0.5s long-press anywhere on screen
-/// (KaraokeGestureTrigger, which still works as a shortcut once you know
-/// about it, but isn't something a user would ever stumble onto).
+/// A small floating button shown on top of the Now Playing screen
+/// whenever word-synced (karaoke) data is available for the current
+/// track — this is the visible, discoverable way to open the karaoke
+/// view, replacing the previous behavior where the *only* trigger was an
+/// undocumented 0.5s long-press anywhere on screen (KaraokeGestureTrigger,
+/// which still works as a shortcut once you know about it, but isn't
+/// something a user would ever stumble onto).
 ///
-/// Shown/hidden by KaraokeButtonOverlayHooks.x.swift's viewDidAppear/
-/// viewWillDisappear hooks on the native Lyrics screen. Implemented as a
-/// separate UIWindow (rather than injecting a UIView into Spotify's own
-/// Encore view hierarchy, the way CustomLyrics+ShowAttributes.x.swift does
-/// for the credits footer) because the button needs to work identically
-/// across all the Lyrics_*ViewController class variants this codebase
-/// already has to switch on by iOS/Spotify version — a separate overlay
-/// window sidesteps that entirely, at the cost of not being "really" part
-/// of the native screen's own view tree.
+/// Visibility is driven by polling rather than a viewDidAppear/
+/// viewWillDisappear hook on some specific Now Playing view controller
+/// class. An earlier version did try a class-name-targeted hook, but
+/// pointed it at the wrong screen (Spotify's native *Lyrics* fullscreen
+/// page) — and more fundamentally, the Now Playing experience here is a
+/// single UICollectionView hosting Now Playing/Lyrics/Queue as swipeable
+/// pages within ONE container view controller (see
+/// NowPlayingScrollViewController.swift / NPVScrollViewController.swift's
+/// `collectionView()` — confirmed by NowPlayingScrollPrivateService
+/// ImplementationHook in NowPlayingScrollViewControllerInstanceHook.x.swift,
+/// which is what actually populates the `nowPlayingScrollViewController`/
+/// `npvScrollViewController` globals this file reads), not a stack of
+/// separately-lifecycled per-page view controllers — so there's no single
+/// "page appeared" callback to hook here in the first place. Checking
+/// whether that already-tracked collection view currently has a non-nil
+/// `.window` is a simple, reliable stand-in: it's true exactly when the
+/// Now Playing screen (in any of its swiped-to pages) is actually on
+/// screen, false otherwise, and it reuses infrastructure
+/// (`nowPlayingScrollViewController`/`npvScrollViewController`) that's
+/// already proven to populate reliably elsewhere in this codebase.
 ///
-/// The window's frame is deliberately sized to just the button row's own
-/// corner — NOT the full screen — positioned top-right. A UIWindow only
-/// ever receives touches that land within its own frame, so this is what
-/// lets every tap *outside* that corner reach Spotify's window untouched,
-/// with no custom hitTest logic needed at all. An earlier version made
-/// this window full-screen and tried to manually pass non-button touches
-/// through via a hitTest override that compared the hit-tested view
-/// against the hosting controller's root view — that didn't work, because
-/// SwiftUI's hosting view does its own internal touch routing and hands
-/// back *itself* as the hit-test result for essentially any point inside
-/// it (SwiftUI buttons aren't discrete child UIViews at their own frame
-/// the way a plain UIButton would be), so the "is this actually empty
-/// space, or a real button" check could never tell the difference —
-/// every tap, including real button taps, looked identical to that check
-/// and got silently swallowed as "not a button."
+/// Implemented as a separate UIWindow (rather than injecting a UIView
+/// into Spotify's own Encore view hierarchy, the way
+/// CustomLyrics+ShowAttributes.x.swift does for the credits footer) so it
+/// doesn't depend on Now Playing's internal layout at all. The window's
+/// frame is sized to just the button's own corner — NOT the full screen —
+/// positioned top-right. A UIWindow only ever receives touches that land
+/// within its own frame, so this is what lets every tap *outside* that
+/// corner reach Spotify's window untouched, with no custom hitTest logic
+/// needed at all. (An earlier version made this window full-screen and
+/// tried to manually pass non-button touches through via a hitTest
+/// override — that didn't work, because SwiftUI's hosting view does its
+/// own internal touch routing and hands back *itself* as the hit-test
+/// result for essentially any point inside it, so the "is this actually
+/// empty space, or a real button" check could never tell the difference.)
 @available(iOS 15.0, *)
 final class KaraokeButtonOverlay {
     static let shared = KaraokeButtonOverlay()
 
     private var window: UIWindow?
+    private var pollTimer: Timer?
 
-    private init() {}
+    private init() {
+        // Timer setup needs the main run loop; init() can in principle be
+        // triggered from any thread the first time .shared is touched, so
+        // hop to main rather than assuming the caller already is.
+        DispatchQueue.main.async { [weak self] in
+            self?.startPolling()
+        }
+    }
 
-    func show() {
+    private func startPolling() {
+        pollTimer?.invalidate()
+        let timer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
+            self?.refresh()
+        }
+        // .common (not .default) so this keeps firing even while the user
+        // is mid-scroll/mid-drag elsewhere in the app, since UIScrollView
+        // tracking normally pauses .default-mode timers.
+        RunLoop.main.add(timer, forMode: .common)
+        pollTimer = timer
+        refresh()
+    }
+
+    private func refresh() {
+        let isNowPlayingScreenVisible =
+            (nowPlayingScrollViewController?.collectionView().window != nil) ||
+            (npvScrollViewController?.collectionView().window != nil)
+        let hasKaraokeData = KaraokeOverlayPresenter.isAvailableForCurrentTrack()
+        // !isPresented: while the karaoke view itself is open (full-screen,
+        // on top of everything, including this overlay window's level),
+        // there's nothing for this button to do, and leaving the window
+        // visible there risks it swallowing taps meant for the karaoke
+        // view's own close button if their corners ever overlap.
+        let shouldShow = isNowPlayingScreenVisible && hasKaraokeData && !KaraokeOverlayPresenter.isPresented
+
+        if shouldShow {
+            ensureWindowExists()
+            window?.isHidden = false
+        } else {
+            window?.isHidden = true
+        }
+    }
+
+    private func ensureWindowExists() {
         guard window == nil else { return }
         guard let scene = UIApplication.shared.connectedScenes
             .compactMap({ $0 as? UIWindowScene })
@@ -52,18 +103,12 @@ final class KaraokeButtonOverlay {
         let safeAreaTop = scene.windows
             .first(where: { $0.isKeyWindow })?.safeAreaInsets.top ?? 44
 
-        // Generous size for the two-button row — wider than it needs to be
-        // for the current English copy so there's headroom for longer
-        // translated strings once other languages get these new keys
-        // translated, and tall enough that the buttons' own tap targets
-        // (including their padding) are never clipped by the window edge.
-        let areaWidth: CGFloat = 240
-        let areaHeight: CGFloat = 64
-        // Sits just below the safe area, clear of the status bar/notch —
-        // and, since this is the *top*-right corner, clear of Spotify's
-        // native playback controls at the bottom too. If this overlaps
-        // Spotify's own header controls on some screen size, nudge
-        // topInset up/down here.
+        // Generous-but-tight size for the single button — wide enough for
+        // longer translated copy once other languages get this key
+        // translated, tall enough that the button's own tap target
+        // (including its padding) is never clipped by the window edge.
+        let areaWidth: CGFloat = 180
+        let areaHeight: CGFloat = 56
         let topInset: CGFloat = 8
         let trailingInset: CGFloat = 8
 
@@ -78,7 +123,7 @@ final class KaraokeButtonOverlay {
         overlayWindow.frame = frame
         overlayWindow.windowLevel = .alert - 1
         overlayWindow.backgroundColor = .clear
-        overlayWindow.isHidden = false
+        overlayWindow.isHidden = true // refresh() unhides it when appropriate
 
         let hosting = UIHostingController(rootView: KaraokeButtonOverlayView())
         hosting.view.backgroundColor = .clear
@@ -86,45 +131,11 @@ final class KaraokeButtonOverlay {
 
         window = overlayWindow
     }
-
-    func hide() {
-        window?.isHidden = true
-        window = nil
-    }
 }
 
 @available(iOS 15.0, *)
 private struct KaraokeButtonOverlayView: View {
-    @State private var isAvailable = KaraokeOverlayPresenter.isAvailableForCurrentTrack()
-        && !KaraokeOverlayPresenter.isPresented
-    @State private var shrinkOverlay = UserDefaults.lyricsOptions.karaokeShrinkOverlay
-
     var body: some View {
-        HStack(spacing: 10) {
-            if isAvailable {
-                shrinkToggleButton
-                wordSyncedButton
-            }
-        }
-        // Right-aligned within the window's own (already top-right
-        // positioned) frame, rather than the window itself spanning the
-        // full screen with alignment logic inside it.
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-        .animation(.easeOut(duration: 0.25), value: isAvailable)
-        // Polling rather than an event/notification hook: karaoke data can
-        // finish loading slightly after the Lyrics screen itself appears
-        // (the SpicyLyrics fetch is async), and the current track can
-        // change while the Lyrics screen stays open (skipping tracks
-        // without leaving the screen), so a periodic re-check is simpler
-        // and more robust here than threading a notification through every
-        // place that could affect availability.
-        .onReceive(Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()) { _ in
-            isAvailable = KaraokeOverlayPresenter.isAvailableForCurrentTrack()
-                && !KaraokeOverlayPresenter.isPresented
-        }
-    }
-
-    private var wordSyncedButton: some View {
         Button(action: { KaraokeOverlayPresenter.present() }) {
             HStack(spacing: 6) {
                 Image(systemName: "text.bubble.fill")
@@ -140,26 +151,9 @@ private struct KaraokeButtonOverlayView: View {
             .shadow(color: .black.opacity(0.3), radius: 8, y: 2)
         }
         .buttonStyle(.plain)
-    }
-
-    /// Lets the shrink/full preference be flipped right from the Lyrics
-    /// screen, in addition to the persistent toggle in Lyrics Settings —
-    /// both read/write the same LyricsOptions.karaokeShrinkOverlay value.
-    private var shrinkToggleButton: some View {
-        Button(action: {
-            shrinkOverlay.toggle()
-            var options = UserDefaults.lyricsOptions
-            options.karaokeShrinkOverlay = shrinkOverlay
-            UserDefaults.lyricsOptions = options
-        }) {
-            Image(systemName: shrinkOverlay ? "arrow.up.left.and.arrow.down.right" : "arrow.down.right.and.arrow.up.left")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(.white.opacity(0.85))
-                .padding(10)
-                .background(Circle().fill(Color.white.opacity(0.14)))
-                .overlay(Circle().strokeBorder(Color.white.opacity(0.2), lineWidth: 1))
-                .shadow(color: .black.opacity(0.3), radius: 8, y: 2)
-        }
-        .buttonStyle(.plain)
+        // Right-aligned within the window's own (already top-right
+        // positioned) frame, rather than the window itself spanning the
+        // full screen with alignment logic inside it.
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
     }
 }

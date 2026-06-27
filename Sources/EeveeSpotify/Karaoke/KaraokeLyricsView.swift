@@ -7,75 +7,46 @@ import SwiftUI
 /// with KaraokeLineView — auto-scrolling so the active line stays
 /// vertically centered, matching Spicetify's lyrics panel behavior.
 ///
-/// Supports two presentation modes, controlled by `isCompact` (driven by
-/// LyricsOptions.karaokeShrinkOverlay, set by KaraokeOverlayPresenter):
-///   - Full (isCompact == false): edge-to-edge takeover, opaque
-///     background, matching the original behavior.
-///   - Compact (isCompact == true): a smaller, rounded-corner card with
-///     margins on all sides, floating over a dimmed scrim — the caller
-///     (KaraokeOverlayPresenter) is responsible for presenting with a
-///     transparent hosting background and .overFullScreen so whatever was
-///     underneath (Spotify's own native Lyrics screen) stays visible
-///     through the scrim and around the card's margins, rather than this
-///     view replacing it outright.
+/// Lyrics text itself is horizontally centered (VStack(alignment: .center)
+/// below, plus the matching per-row centering inside KaraokeFlowLayout) —
+/// matching Spotify's own lyrics view and Spicetify's, rather than ragged
+/// left-aligned text. The screen width is read explicitly via
+/// GeometryReader and threaded all the way down to KaraokeLineView as a
+/// concrete `availableWidth`, rather than relying on `.frame(maxWidth:
+/// .infinity)` to implicitly pass a usable width to the custom
+/// Layout-conforming KaraokeFlowLayoutImpl. That implicit approach is
+/// what an earlier version of this file used, and it doesn't actually
+/// work for a custom Layout: `.frame(maxWidth: .infinity)` expands the
+/// *outer* container to fill available space, but during the sizing
+/// query it can still propose a nil/unspecified width to the *child* —
+/// and KaraokeFlowLayoutImpl's sizeThatFits falls back to `proposal.width
+/// ?? .infinity` when that happens, meaning no wrapping decision gets
+/// made at all: the whole line renders as one long unwrapped row at its
+/// natural width, which then gets positioned (not centered the way a
+/// plain Text would be) within the expanded frame — reading as left-
+/// aligned/overflowing rather than centered. Giving KaraokeLineView a
+/// concrete, non-nil width to apply via `.frame(width:)` (a fixed
+/// constraint, not a flexible one) removes that ambiguity entirely.
 @available(iOS 15.0, *)
 struct KaraokeLyricsView: View {
     let lyrics: KaraokeLyricsDto
-    var isCompact: Bool = false
     /// Called when the user dismisses the view (e.g. tapping the close
-    /// button, or tapping the scrim in compact mode).
+    /// button).
     var onDismiss: () -> Void
 
     var body: some View {
-        ZStack {
-            if isCompact {
-                compactBody
-            } else {
-                fullScreenBody
+        GeometryReader { geo in
+            ZStack(alignment: .topTrailing) {
+                KaraokeBackgroundView()
+                content(screenWidth: geo.size.width)
+                closeButton
             }
         }
         .preferredColorScheme(.dark)
     }
 
-    private var fullScreenBody: some View {
-        ZStack(alignment: .topTrailing) {
-            KaraokeBackgroundView()
-            content
-            closeButton
-        }
-    }
-
-    private var compactBody: some View {
-        ZStack {
-            // The hosting UIWindow's own background is already transparent
-            // (set by KaraokeOverlayPresenter), so this scrim is the only
-            // thing dimming the native Lyrics screen behind it. Tapping
-            // outside the card dismisses, mirroring how tapping outside a
-            // sheet/popover normally behaves.
-            Color.black.opacity(0.55)
-                .ignoresSafeArea()
-                .contentShape(Rectangle())
-                .onTapGesture { onDismiss() }
-
-            ZStack(alignment: .topTrailing) {
-                KaraokeBackgroundView()
-                content
-                closeButton
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
-            )
-            .shadow(color: .black.opacity(0.45), radius: 30, y: 14)
-            .padding(.horizontal, 14)
-            .padding(.top, 64)
-            .padding(.bottom, 100)
-        }
-    }
-
     @available(iOS 15.0, *)
-    private var content: some View {
+    private func content(screenWidth: CGFloat) -> some View {
         TimelineView(.periodic(from: .now, by: 1.0 / 30.0)) { _ in
             // Reading the tracker here, inside the TimelineView's per-tick
             // closure, is what actually drives the animation — TimelineView
@@ -90,7 +61,7 @@ struct KaraokeLyricsView: View {
                 lyrics: lyrics,
                 currentMs: currentMs,
                 activeLineIndex: activeIndex,
-                isCompact: isCompact
+                screenWidth: screenWidth
             )
         }
     }
@@ -110,11 +81,11 @@ struct KaraokeLyricsView: View {
             Image(systemName: "chevron.down")
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundColor(.white.opacity(0.85))
-                .padding(isCompact ? 10 : 14)
+                .padding(14)
                 .background(Circle().fill(Color.white.opacity(0.12)))
         }
-        .padding(.top, isCompact ? 16 : 50)
-        .padding(.trailing, isCompact ? 14 : 20)
+        .padding(.top, 50)
+        .padding(.trailing, 20)
     }
 }
 
@@ -126,29 +97,42 @@ private struct KaraokeScrollingLines: View {
     let lyrics: KaraokeLyricsDto
     let currentMs: Int
     let activeLineIndex: Int?
-    var isCompact: Bool = false
+    let screenWidth: CGFloat
+
+    private let horizontalPadding: CGFloat = 24
 
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: isCompact ? 18 : 28) {
-                    Spacer().frame(height: isCompact ? 24 : 80)
+                VStack(alignment: .center, spacing: 28) {
+                    Spacer().frame(height: 80)
 
                     ForEach(Array(lyrics.lines.enumerated()), id: \.offset) { index, line in
                         KaraokeLineView(
                             line: line,
                             currentMs: currentMs,
                             isActiveLine: index == activeLineIndex,
-                            isCompact: isCompact
+                            availableWidth: max(0, screenWidth - horizontalPadding * 2)
                         )
                         .id(index)
-                        .padding(.horizontal, isCompact ? 16 : 24)
+                        .padding(.horizontal, horizontalPadding)
                     }
 
                     KaraokeCreditsFooterView(lyrics: lyrics)
 
-                    Spacer().frame(height: isCompact ? 60 : 200)
+                    Spacer().frame(height: 200)
                 }
+                .frame(maxWidth: .infinity)
+            }
+            .onAppear {
+                // Without this, opening the view mid-song shows the very
+                // top of the lyrics (the ScrollView's default starting
+                // position) rather than the line that's actually playing
+                // right now — .onChange below only fires on a *change*,
+                // not for the initial value, so the very first active line
+                // needs its own explicit, unanimated jump to center here.
+                guard let activeLineIndex = activeLineIndex, activeLineIndex < lyrics.lines.count else { return }
+                proxy.scrollTo(activeLineIndex, anchor: .center)
             }
             .onChange(of: activeLineIndex) { newIndex in
                 guard let newIndex = newIndex, newIndex < lyrics.lines.count else { return }

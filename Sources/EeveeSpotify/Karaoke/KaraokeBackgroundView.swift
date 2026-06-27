@@ -21,6 +21,33 @@ struct KaraokeBackgroundView: View {
         Color(red: 0.05, green: 0.20, blue: 0.55),
     ]
 
+    /// Whether the Metal background renderer actually works on this build —
+    /// computed once and cached (Swift `static let` initializes lazily on
+    /// first access). This used to be approximated as just
+    /// `MTLCreateSystemDefaultDevice() != nil` (i.e. "is Metal supported on
+    /// this device at all"), which is true on essentially any real iPhone
+    /// — it said nothing about whether KaraokeBackgroundRenderer's shader
+    /// library actually loaded. That matters here because the renderer
+    /// loads its .metallib from a fixed path that a Makefile step has to
+    /// produce at build time (see the UNTESTED note in
+    /// KaraokeBackgroundRenderer's init) — if that step didn't run or
+    /// staged the file somewhere else, `KaraokeBackgroundRenderer(device:)`
+    /// returns nil, but the previous code had *already* committed to
+    /// showing KaraokeMetalBackgroundView's MTKView by that point. An
+    /// MTKView with a device but no delegate still runs its normal render
+    /// loop and presents its default clear color every frame — solid
+    /// black — instead of falling back to anything. This is what was
+    /// actually producing the black background, and why it only appeared
+    /// once album art started being found at all: before that, albumArtImage
+    /// was always nil and this branch was never reached, so the gradient
+    /// fallback (which doesn't depend on the .metallib loading) was always
+    /// shown instead. Testing renderer construction up front, before
+    /// deciding which view to show, fixes that.
+    private static let metalRendererSupported: Bool = {
+        guard let device = MTLCreateSystemDefaultDevice() else { return false }
+        return KaraokeBackgroundRenderer(device: device) != nil
+    }()
+
     var body: some View {
         Group {
             if let albumArtImage = albumArtImage,

@@ -430,5 +430,16 @@ struct EeveeSpotify: Tweak {
         }
         UniversalSettingsIntegrationNavGroup().activate()
         SettingsIntegrationGroup().activate()
+
+        // These were previously only activated in the 9.1.x branch above
+        // (before its early `return`) — meaning karaoke, SponsorBlock, and
+        // the debug probes never ran at all on the current/latest Spotify
+        // version, only on 9.1.x installs. Each of these functions already
+        // self-guards internally on its own enabled/feature flags (see
+        // activateSponsorBlock's `opts.enabled` check, for example), so
+        // it's safe to call them unconditionally here too.
+        activateEeveeProbes()
+        activateSponsorBlock()
+        activateKaraokeHooks()
     }
 }
