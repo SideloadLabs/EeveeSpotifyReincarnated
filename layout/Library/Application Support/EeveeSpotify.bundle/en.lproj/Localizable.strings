@@ -171,6 +171,8 @@ appIconTitle = "Choose Icon";
 appIconSubtitle = "iOS shows a confirmation the first time. The home screen may take a few seconds to refresh.";
 iconSelected = "Selected";
 iconTapToApply = "Tap to apply";
+prettifyIconNames = "Prettify Icon Names";
+prettifyIconNamesDescription = "Converts underscores, hyphens, and camelCase into spaces";
 
 // SponsorBlock
 categoryOneFooter = "Skips community-marked segments in podcast episodes.";

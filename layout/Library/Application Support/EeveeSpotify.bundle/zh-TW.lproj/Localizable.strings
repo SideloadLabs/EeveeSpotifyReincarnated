@@ -169,6 +169,8 @@ appIconTitle = "選擇圖標";
 appIconSubtitle = "iOS/iPadOS 將會在第一次變更時顯示提示，主畫面可能需要一點時間來更新。";
 iconSelected = "選中";
 iconTapToApply = "輕觸以應用";
+prettifyIconNames = "最佳化圖標名稱";
+prettifyIconNamesDescription = "將底線、連字號和駝峰命名轉換為空格";
 
 // SponsorBlock
 categoryOneFooter = "在播客中跳過由社群標記的片段。";

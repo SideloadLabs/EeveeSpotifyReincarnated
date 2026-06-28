@@ -159,6 +159,8 @@ appIconTitle = "选择图标";
 appIconSubtitle = "iOS 会在首次选择时显示确认提示，主屏幕可能需要几秒钟才能刷新。";
 iconSelected = "已选择";
 iconTapToApply = "点击以应用";
+prettifyIconNames = "优化图标名称";
+prettifyIconNamesDescription = "将下划线、连字符和驼峰命名转换为空格";
 
 // SponsorBlock
 categoryOneFooter = "跳过社区标记的播客片段。";

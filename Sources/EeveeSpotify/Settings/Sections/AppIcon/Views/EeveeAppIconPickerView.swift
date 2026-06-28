@@ -39,9 +39,9 @@ struct EeveeAppIconPickerView: View {
                     }
                 )) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Prettify Icon Names")
+                        Text("prettifyIconNames".localized)
                             .font(.system(size: 16, weight: .semibold))
-                        Text("Converts underscores, hyphens, and camelCase into spaces")
+                        Text("prettifyIconNamesDescription".localized)
                             .font(.system(size: 13))
                             .foregroundColor(.secondary)
                     }
@@ -56,7 +56,7 @@ struct EeveeAppIconPickerView: View {
             get: { errorMessage.map(AlertWrapper.init) },
             set: { errorMessage = $0?.message }
         )) { wrapped in
-            Alert(title: Text("App Icon"),
+            Alert(title: Text("appIcon".localized),
                   message: Text(wrapped.message),
                   dismissButton: .default(Text("OK".uiKitLocalized)))
         }
