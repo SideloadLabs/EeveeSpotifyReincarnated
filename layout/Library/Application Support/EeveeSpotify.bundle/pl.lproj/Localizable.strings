@@ -4,6 +4,8 @@ patching = "Modyfikacje";
 lyrics = "Teksty utworów";
 customization = "Personalizacja";
 experiments = "Eksperymenty";
+sponsorblock = "SponsorBlock (BETA)";
+appIcon = "Ikona aplikacji";
 
 common_issues_tip_title = "Napotkałeś problem?";
 
@@ -29,6 +31,9 @@ Jeśli masz aktywną subskrypcję premium, możesz włączyć tę opcję. Modyfi
 
 overwrite_configuration = "Nadpisz konfigurację";
 overwrite_configuration_description = "Zastępuje zdalną konfigurację zrzuconą konfiguracją premium. Może to naprawić niektóre problemy, takie jak pojawiające się reklamy, ale nie jest to gwarantowane.";
+
+true_shuffle = "Prawdziwe losowanie";
+true_shuffle_dec = "Blokuje funkcję Smart Shuffle z darmowej wersji Spotify przed dodawaniem polecanych utworów do kolejki. Losowanie pozostaje w obrębie playlisty. ";
 
 // Lyrics
 
@@ -139,3 +144,147 @@ play_songs_in_any_order = "Odtwarzanie w dowolnej kolejności";
 organize_listening_queue = "Zarządzanie swoją kolejką odtwarzania";
 
 payment_notice = "EeveeSpotify stosuje modyfikacje, aby odblokować niektóre funkcje Premium. Całkowicie za darmo.";
+
+// Debug
+
+debug_title = "Debugowanie";
+export_debug_log = "Eksportuj dziennik debugowania";
+clear_debug_log = "Wyczyść dziennik debugowania";
+debug_log_cleared = "Dziennik debugowania wyczyszczony.";
+debug_log_cleared_ok = "OK";
+no_debug_log_found = "Nie znaleziono dziennika debugowania. Dziennik zaczyna być zapisywany po uruchomieniu aplikacji.";
+no_debug_log_found_ok = "OK";
+debug_section_footer = "Eksportuj lub wyczyść dziennik debugowania.";
+
+// Full reset
+resetButtonTitle = "Pełny reset";
+resetSubtitle = "Czyści pęk kluczy Spotify, katalogi piaskownicy i kontenery grup aplikacji. Wymusza ponowne logowanie. Po zakończeniu aplikacja zostanie zamknięta.";
+resetFooter = "Wymusza ponowne logowanie. Czyści wpisy pęku kluczy Spotify, katalogi piaskownicy i kontenery grup aplikacji. Inne aplikacje instalowane poza App Store pozostają nietknięte. Po zakończeniu aplikacja zostanie zamknięta.";
+
+// Settings Bar
+eevee_inline_subtitle_text = "Modyfikacje, teksty utworów, personalizacja i eksperymenty";
+
+// App Icon Chooser
+appIconTitle = "Wybierz ikonę";
+appIconSubtitle = "iOS wyświetli potwierdzenie przy pierwszej zmianie. Odświeżenie ekranu głównego może potrwać kilka sekund.";
+iconSelected = "Wybrano";
+iconTapToApply = "Stuknij, aby zastosować";
+prettifyIconNames = "Upiększ nazwy ikon";
+prettifyIconNamesDescription = "Zamienia podkreślenia, łączniki i camelCase na spacje";
+
+// SponsorBlock
+categoryOneFooter = "Pomija oznaczone przez społeczność segmenty w odcinkach podcastów.";
+enableSponsorblock = "Włącz SponsorBlock";
+showColoredOverlay = "Pokaż kolorową nakładkę na pasku postępu";
+showToast = "Pokaż powiadomienie przy pomijaniu";
+skipToast = "Przyciski akcji powiadomienia pomijania (głos / cofnij / ukryj)";
+respectManualSeek = "Szanuj ręczne przewijanie (nie pomijaj ponownie)";
+categoriesHeader = "Kategorie";
+categoriesFooter = "Wył. · Pokaż · Ręcznie · Auto. Stuknij kolorowe kółko, aby zmienić kolor.";
+
+sponsor_category = "Sponsor";
+selfpromo_category = "Niepłatna/autopromocja";
+interaction_category = "Przypomnienie o interakcji";
+intro_category = "Przerywnik/intro";
+outro_category = "Outro/napisy końcowe";
+preview_category = "Zapowiedź/podsumowanie";
+hook_category = "Zaczepka/powitanie";
+filler_category = "Dygresja/wypełniacz";
+exclusive_access_category = "Dostęp ekskluzywny";
+
+action_disabled = "Wył.";
+action_show = "Pokaż";
+action_manual = "Ręcznie";
+action_auto = "Auto";
+
+draftsTitle = "Zgłoszenia i szkice";
+errorNoPodcats = "Obecnie nie jest odtwarzany żaden podcast.";
+markSegment = "Oznacz segment bieżącego odcinka";
+advancedTitle = "Zaawansowane";
+howToUseTitle = "Jak używać";
+creditsTitle = "Podziękowania";
+creditsSubtitle = "Dane segmentów pochodzą od społeczności SponsorBlock (sponsor.ajay.app). Integracja przeniesiona z rozszerzenia Spot-SponsorBlock-Extension autorstwa Spot-SponsorBlock.";
+linkButtonTitle = "Spot-SponsorBlock-Extension na GitHubie";
+
+// SponsorBlock reports
+sponsorblock_reports_title = "Zgłoszenia SponsorBlock";
+sponsorblockIDTitle = "Twój identyfikator SponsorBlock";
+sponsorblockIDFooter = "Służy do przypisywania Twoich zgłoszeń i głosów. Traktuj go jak prywatne hasło — nie udostępniaj go.";
+user_id_copied = "Skopiowano identyfikator użytkownika";
+copyButton = "Kopiuj";
+regenerateButton = "Wygeneruj ponownie";
+draftsTitleSB = "Szkice";
+draftsEmpty = "Brak szkiców. Przytrzymaj pasek postępu podcastu, aby zacząć oznaczać segment.";
+draftsEpisodeLoc = "Odcinek %@";
+hidden_locally_header = "Ukryte lokalnie (%@)";
+hiddenFooter = "Segmenty tutaj nigdy nie będą automatycznie pomijane na tym urządzeniu. Nadal istnieją na serwerze SponsorBlock.";
+hiddenSegmentsEmpty = "Brak ukrytych segmentów.";
+unhideButton = "Odkryj";
+
+popUpRegenerateTitle = "Wygenerować ponownie identyfikator użytkownika?";
+popUpRegenerateSubtitle = "Istniejące zgłoszenia i głosy nie będą już z Tobą powiązane.";
+popUpClearAllButton = "Wyczyść wszystko";
+popUpClearAllTitle = "Wyczyścić wszystkie ukryte segmenty?";
+popUpClearAllSubtitle = "Zaczną być ponownie pomijane zgodnie z regułami kategorii.";
+
+readyButton = "Gotowe";
+incompleteButton = "Niekompletne";
+editSubmit = "Edytuj / wyślij";
+discardButton = "Odrzuć";
+
+// SponsorBlock Advanced
+skipBehaviourTitle = "Zachowanie pomijania";
+autoSkipSubmissionsTitle = "Automatycznie pomijaj moje zgłoszenia";
+logOnlyToggle = "Tylko zapisuj w dzienniku (bez faktycznego przewijania)";
+serverHeader = "Serwer";
+urlText = "URL";
+
+tuningTitle = "Dostrajanie";
+minSegmentDuration = "Minimalny czas trwania segmentu: %.1fs";
+toastDuration = "Czas wyświetlania powiadomienia: %.1fs";
+
+trackLogSubtitle = "Zapisuje metadane ścieżki podcastu (URI, isPodcast, isVideo itd.) do dziennika debugowania przy każdym nowym utworze. Włącz tylko wtedy, gdy SponsorBlock nie wykrywa oczekiwanego podcastu.";
+trackLogToggle = "Diagnostyczny dziennik ścieżek";
+resetButtonTrackLog = "Resetuj…";
+
+// SponsorBlock Reset Options Advanced
+resetTitle = "Co zresetować?";
+resetSubtitle = "Każda opcja jest niezależna.";
+allResetSB = "Wszystko (wszystkie powyższe)";
+regenerateIDSB = "Wygeneruj ponownie identyfikator użytkownika";
+localSubmissionsSB = "Moje lokalne zgłoszenia (%@)";
+votedRecordsSB = "Oddane głosy (%@)";
+hiddenSegmentsSB = "Ukryte segmenty (%@)";
+draftsCountSB = "Szkic (%@)";
+settingsResetSB = "Ustawienia (przełączniki + kategorie + kolory)";
+
+// SponsorBlock How To Use
+playerGesturesTitle = "Gesty w odtwarzaczu";
+gesturesTitle1 = "Przytrzymaj pasek postępu";
+gesturesDeps1 = "Oznacza początek segmentu. Przytrzymaj ponownie na końcu segmentu, aby ustawić KONIEC i otworzyć formularz zgłoszenia.";
+gesturesTitle2 = "Stuknij segment na pasku";
+gesturesDeps2 = "Zagłosuj, zmień kategorię albo ukryj segment tylko na tym urządzeniu.";
+
+submittingTitle = "Wysyłanie";
+submittingSectionTitle1 = "Formularz zgłoszenia";
+submittingSectionDeps1 = "Suwaki i przyciski korekty pozwalają doprecyzować początek/koniec. Wybierz kategorię. Wysłanie publikuje zgłoszenie na sponsor.ajay.app.";
+submittingSectionTitle2 = "Twoje lokalne zgłoszenia";
+submittingSectionDeps2 = "Są natychmiast automatycznie pomijane na tym urządzeniu. Głosowanie odblokuje się, gdy serwer je opublikuje. Oznacza je plakietka „MOJE”.";
+
+skipToastTitle = "Powiadomienie pomijania";
+skipToastSectionTitle1 = "Cofnij";
+skipToastSectionDeps1 = "Przewija z powrotem do początku segmentu. Tym razem segment zostanie odtworzony. Przewinięcie do przodu i z powrotem resetuje go, więc znów zostanie pominięty.";
+skipToastSectionTitle2 = "Głos w górę / w dół";
+skipToastSectionDeps2 = "👍 zapisuje Twój głos na serwerze. 👎 otwiera menu głosu w dół, ukrycia lokalnego lub zmiany kategorii.";
+skipToastSectionTitle3 = "Pełne menu segmentu";
+skipToastSectionDeps3 = "Te same opcje co po stuknięciu segmentu na pasku postępu.";
+
+managingSegmentsTitle = "Zarządzanie segmentami";
+managingSegmentsSectionTitle1 = "Zarządzaj segmentami…";
+managingSegmentsSectionDeps1 = "Przytrzymaj pasek → „Zarządzaj segmentami” wyświetla każdy segment bieżącego odcinka. Głosuj, ukrywaj, zmieniaj kategorię albo stuknij wiersz, aby przeskoczyć odtwarzacz.";
+managingSegmentsSectionTitle2 = "Zgłoszenia i szkice";
+managingSegmentsSectionDeps2 = "Ustawienia → „Zgłoszenia i szkice” przechowuje robocze szkice (niedokończone oznaczenia) oraz ukryte segmenty. Szkice pozostają po ponownym uruchomieniu.";
+
+categoriesTitle = "Kategorie";
+categoriesSectionTitle1 = "Akcje dla kategorii";
+categoriesSectionDeps1 = "Wył. = ignoruj. Pokaż = tylko rysuj na pasku. Ręcznie = pytaj przed pominięciem. Auto = pomijaj bez pytania.";
