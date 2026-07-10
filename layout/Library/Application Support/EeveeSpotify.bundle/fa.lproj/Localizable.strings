@@ -1,62 +1,75 @@
 /* MARK: Settings */
 
 patching = "پچ کردن";
-lyrics = "متن ترانه";
-customization = "شخصی سازی";
+lyrics = "متن آهنگ";
+customization = "شخصی‌سازی";
+experiments = "قابلیت‌های آزمایشی";
+sponsorblock = "SponsorBlock (بتا)";
+appIcon = "آیکون برنامه";
 
-common_issues_tip_title = "مشکلی دارید؟";
+common_issues_tip_title = "به مشکل خوردید؟";
 
-common_issues_tip_message = "اگر با مشکلی مانند ناتوانی در پخش هیچ آهنگی روبرو هستید، بررسی کنید";
-common_issues_tip_button = "مسائل رایج";
+common_issues_tip_message = "اگر با مشکلی مانند پخش نشدن آهنگ‌ها مواجه هستید، بخش";
+common_issues_tip_button = "مشکلات رایج";
 
-reset_data = "بازنشانی داده ها";
-reset_data_description = "پاک کردن کش و راه اندازی مجدد";
+reset_data = "بازنشانی داده‌ها";
+reset_data_description = "داده‌های کش را پاک کرده و برنامه را مجدداً راه‌اندازی می‌کند.";
 
-checking_for_update = "درحال بررسی بروزرسانی...";
-update_available = "آپدیت موجود است";
+checking_for_update = "در حال بررسی به‌روزرسانی...";
+update_available = "به‌روزرسانی موجود است";
 
-restart_is_required_description = "راه اندازی مجدد بعد از اعمال تغییرات";
+restart_is_required_description = "پس از اعمال تغییرات، باید برنامه را مجدداً راه‌اندازی کنید.";
 
 // Patching
 
-do_not_patch_premium = "پچ نکردن حالت ویژه";
-patching_description = "این توییک درخواست‌ها را برای بارگیری داده‌های کاربر رهگیری می‌کند، آن‌ها را از حالت serialized خارج می‌کند و پارامترها را در real-time تغییر می‌دهد.
+do_not_patch_premium = "پچ نکردن پریمیوم";
+patching_description = "EeveeSpotify درخواست‌های بارگذاری اطلاعات کاربر را رهگیری کرده، آن‌ها را از حالت سریال‌شده خارج می‌کند و پارامترها را به‌صورت لحظه‌ای تغییر می‌دهد.
 
-اگر اشتراک Premium فعال دارید، می‌توانید Do Not Patch Premium را روشن کنید. این توییک داده‌ها را اصلاح نمی‌کند یا استفاده از ویژگی‌های سمت سرور Premium را محدود نمی‌کند. راه اندازی مجدد برنامه پس از تغییر لازم است.";
+اگر اشتراک پریمیوم فعال دارید، می‌توانید گزینه «پچ نکردن پریمیوم» را فعال کنید. در این حالت، توییک اطلاعات را پچ نمی‌کند و محدودیتی برای استفاده از قابلیت‌های سمت سرور پریمیوم ایجاد نمی‌شود.
+
+%@";
 
 overwrite_configuration = "بازنویسی پیکربندی";
-overwrite_configuration_description = "پیکربندی از راه دور را با Premium حذف شده جایگزین کنید. ممکن است برخی از مشکلات، مانند نمایش تبلیغات را برطرف کند، اما تضمینی نیست.";
+overwrite_configuration_description = "پیکربندی راه دور را با نسخه استخراج‌شده از پریمیوم جایگزین می‌کند. این پیکربندی بیشتر تنظیمات رابط و تجربه کاربری (UI/UX) را تعیین می‌کند و ممکن است مفید باشد، هرچند احتمال بروز برخی مشکلات نیز وجود دارد.";
+
+true_shuffle = "پخش تصادفی واقعی";
+true_shuffle_dec = "از اضافه شدن آهنگ‌های پیشنهادی توسط قابلیت Smart Shuffle نسخه رایگان اسپاتیفای به صف پخش جلوگیری می‌کند. در نتیجه، حالت پخش تصادفی فقط بین آهنگ‌های همان پلی‌لیست انجام می‌شود.";
 
 // Lyrics
 
-do_not_replace_lyrics = "متن ترانه را جایگزین نکن";
-lyrics_source = "منبع متن ترانه";
-lyrics_source_description = "می توانید منبع متن ترانه دلخواه خود را انتخاب کنید.
+do_not_replace_lyrics = "جایگزین نکردن متن آهنگ";
+lyrics_source = "منبع متن آهنگ";
+lyrics_source_description = "می‌توانید منبع متن آهنگ مورد نظر خود را انتخاب کنید.
 
-Genius: بهترین اشعار را ارائه می دهد، بیشترین آهنگ ها را ارائه می دهد و اشعار را با بیشترین سرعت به روز می کند. هیچ وقت همگام سازی نمی شود و نخواهد بود.
+Genius: بهترین کیفیت متن آهنگ را ارائه می‌دهد، بیشترین تعداد آهنگ را پوشش می‌دهد و سریع‌ترین به‌روزرسانی‌ها را دارد. از متن همگام با زمان پشتیبانی نمی‌کند و هرگز نخواهد کرد.
 
-LRCLIB: بازترین سرویس، ارائه اشعار همگام‌سازی شده با زمان. با این حال، برای بسیاری از آهنگ ها فاقد شعر است.
+LRCLIB: آزادترین سرویس متن آهنگ که متن‌های همگام با زمان را ارائه می‌دهد. با این حال، برای بسیاری از آهنگ‌ها متن در دسترس ندارد.
 
-Musixmatch: سرویس Spotify از آن استفاده می کند. برای بسیاری از آهنگ‌ها، اشعار همگام‌سازی شده با زمان را فراهم می‌کند، اما برای استفاده از این منبع به یک نشانه کاربری نیاز دارید.";
-lyrics_additional_info = "اگر این توییک نتواند آهنگی را پیدا کند یا متن اشعار را پردازش کند، پیام \"متن آهنگ برای این آهنگ بارگیری نشد\" را مشاهده خواهید کرد. ممکن است هنگام استفاده از Genius، اشعار برای برخی از آهنگ‌ها اشتباه باشد زیرا این توییک چگونه آهنگ‌ها را جستجو می‌کند. من آن را در بیشتر موارد کار کردم.";
-petitlyrics_description = "PetitLyrics: بسیاری از اشعار ژاپنی و برخی از اشعار بین المللی را ارائه می دهد.";
+Musixmatch: سرویسی که اسپاتیفای از آن استفاده می‌کند. برای بسیاری از آهنگ‌ها متن همگام با زمان ارائه می‌دهد، اما برای استفاده از آن به توکن کاربری نیاز دارید.";
 
-musixmatch_user_token = "کلید کاربر Musixmatch";
-user_token_placeholder = "کلید کاربر را وارد کنید یا اطلاعات اشکال زدایی را جایگذاری کنید";
+lyrics_additional_info = "اگر EeveeSpotify نتواند آهنگی را پیدا کند یا متن آن را پردازش کند، پیام «متن این آهنگ بارگیری نشد» را مشاهده خواهید کرد. هنگام استفاده از Genius ممکن است متن برخی آهنگ‌ها به دلیل نحوه جستجوی آهنگ‌ها توسط توییک نادرست باشد، اما این مشکل در بیشتر موارد برطرف شده است.";
 
-enter_user_token = "کلید کاربر را وارد کنید";
-enter_user_token_message = "برای استفاده از Musixmatch، باید کلید کاربری خود را از برنامه رسمی بازیابی کنید. Musixmatch را از اپ استور دانلود کنید، ثبت نام کنید، سپس به تنظیمات > دریافت راهنمایی > کپی اطلاعات اشکال زدایی بروید و آن را در اینجا جایگذاری کنید. شما همچنین می توانید توکن را با استفاده از MITM استخراج کنید.";
+petitlyrics_description = "PetitLyrics: مجموعه بزرگی از متن‌های همگام با زمان برای آهنگ‌های ژاپنی و تعدادی از آهنگ‌های بین‌المللی را ارائه می‌دهد.";
 
-genius_fallback = "Genius Fallback";
-genius_fallback_description = "اگر مشکلی با %@ وجود دارد، اشعار را از Genius بارگذاری کنید.";
+musixmatch_user_token = "توکن کاربری Musixmatch";
+user_token_placeholder = "توکن کاربری را وارد کنید یا اطلاعات اشکال‌زدایی را جای‌گذاری کنید";
 
-show_fallback_reasons = "نمایش دلایل بازگشتی";
+enter_user_token = "وارد کردن توکن کاربری";
+enter_user_token_message = "برای استفاده از Musixmatch باید توکن کاربری خود را از برنامه رسمی آن دریافت کنید. برنامه Musixmatch را از App Store دانلود کرده، وارد حساب خود شوید، سپس به مسیر Settings > Get help > Copy debug info بروید و اطلاعات را اینجا جای‌گذاری کنید. همچنین می‌توانید توکن را با استفاده از MITM استخراج کنید.";
 
-romanized_lyrics = "متن ترانه های عاشقانه";
-romanized_lyrics_description = "نمایش اشعار عاشقانه برای ژاپنی، کره ای، و چینی.";
+genius_fallback = "جایگزین Genius";
+genius_fallback_description = "اگر در %@ مشکلی وجود داشته باشد، متن آهنگ از Genius بارگیری می‌شود.";
+
+show_fallback_reasons = "نمایش دلیل استفاده از منبع جایگزین";
+
+hide_lyrics_on_error = "مخفی کردن هنگام خطا";
+hide_lyrics_on_error_description = "اگر بارگیری متن آهنگ با خطا مواجه شود، بخش متن آهنگ را مخفی می‌کند.";
+
+romanized_lyrics = "متن آوانویسی‌شده";
+romanized_lyrics_description = "نمایش متن آوانویسی‌شده برای آهنگ‌های ژاپنی، کره‌ای و چینی.";
 
 musixmatch_language = "زبان متن آهنگ Musixmatch";
-musixmatch_language_description = "می توانید یک کد زبان 2 حرفی Musixmatch را وارد کنید و در صورت موجود بودن اشعار ترجمه شده را در Musixmatch مشاهده کنید.";
+musixmatch_language_description = "می‌توانید کد دوحرفی زبان Musixmatch را وارد کنید تا در صورت موجود بودن، متن ترجمه‌شده آهنگ نمایش داده شود.";
 
 // UI
 
@@ -72,6 +85,14 @@ static_color = "رنگ ثابت";
 
 color_normalization_factor = "ضریب عادی سازی رنگ";
 dark_popups = "پاپ آپ های تیره";
+
+// Experiments
+
+show_instagram_destination = "نمایش مقصد اینستاگرام";
+show_instagram_destination_description = "همیشه گزینه اشتراک‌گذاری در اینستاگرام را نمایش دهد. %@";
+
+livecontainer_sharing = "اشتراک‌گذاری در LiveContainer";
+livecontainer_sharing_description = "در صورتی که مقصد انتخاب‌شده پشتیبانی نشود، محتوا را در LiveContainer به اشتراک گذاشته و نشانی (URL) را کپی می‌کند.";
 
 /* MARK: Premium PopUps */
 
@@ -113,3 +134,155 @@ request_anonymous_token = "درخواست توکن ناشناس";
 request_anonymous_token_description = "برای درخواست توکن از Musixmatch بدون مجوز روی «درخواست توکن ناشناس» ضربه بزنید.";
 
 lrclib_api = "آدرس سرور";
+
+// Snapshot of your benefits, should match official spotify loc
+
+ad_free_music_listening = "گوش دادن به موسیقی بدون تبلیغات";
+play_songs_in_any_order = "پخش آهنگ‌ها به هر ترتیبی";
+organize_listening_queue = "مدیریت صف پخش";
+
+payment_notice = "EeveeSpotify با اعمال پچ، برخی از قابلیت‌های پریمیوم را فعال می‌کند. استفاده از آن رایگان است.";
+
+// Debug
+
+debug_title = "اشکال‌زدایی";
+export_debug_log = "خروجی گرفتن از گزارش اشکال‌زدایی";
+clear_debug_log = "پاک کردن گزارش اشکال‌زدایی";
+debug_log_cleared = "گزارش اشکال‌زدایی پاک شد.";
+debug_log_cleared_ok = "باشه";
+no_debug_log_found = "هیچ گزارش اشکال‌زدایی یافت نشد. ثبت گزارش از زمان اجرای برنامه آغاز می‌شود.";
+no_debug_log_found_ok = "باشه";
+debug_section_footer = "گزارش اشکال‌زدایی را صادر یا پاک کنید.";
+
+// Full reset
+resetButtonTitle = "بازنشانی کامل";
+resetSubtitle = "اطلاعات Keychain اسپاتیفای، پوشه‌های Sandbox و کانتینرهای App Group را پاک می‌کند. ورود مجدد اجباری خواهد بود و پس از اتمام، برنامه بسته می‌شود.";
+resetFooter = "ورود مجدد را اجباری می‌کند. اطلاعات Keychain اسپاتیفای، پوشه‌های Sandbox و کانتینرهای App Group را پاک می‌کند. سایر برنامه‌های سایدلودشده تغییری نمی‌کنند. پس از اتمام، برنامه بسته می‌شود.";
+
+// Settings Bar
+eevee_inline_subtitle_text = "پچ، متن آهنگ، شخصی‌سازی و قابلیت‌های آزمایشی";
+
+// App Icon Chooser
+appIconTitle = "انتخاب آیکون";
+appIconSubtitle = "در اولین تغییر، iOS یک پیام تأیید نمایش می‌دهد. ممکن است چند ثانیه طول بکشد تا صفحه اصلی به‌روزرسانی شود.";
+iconSelected = "انتخاب شده";
+iconTapToApply = "برای اعمال لمس کنید";
+prettifyIconNames = "بهبود نمایش نام آیکون‌ها";
+prettifyIconNamesDescription = "خط زیر (_)، خط تیره (-) و نام‌های camelCase را به فاصله تبدیل می‌کند.";
+
+// SponsorBlock
+categoryOneFooter = "بخش‌های علامت‌گذاری‌شده توسط جامعه کاربران را در قسمت‌های پادکست رد می‌کند.";
+enableSponsorblock = "فعال کردن SponsorBlock";
+showColoredOverlay = "نمایش نوار رنگی روی نوار پیشرفت";
+showToast = "نمایش اعلان هنگام رد کردن";
+skipToast = "دکمه‌های اعلان رد کردن (رأی / بازگردانی / مخفی کردن)";
+respectManualSeek = "رعایت جابه‌جایی دستی (دوباره رد نکند)";
+categoriesHeader = "دسته‌بندی‌ها";
+categoriesFooter = "خاموش · نمایش · دستی · خودکار. برای تغییر رنگ، روی دایره رنگی ضربه بزنید.";
+
+sponsor_category = "اسپانسر";
+selfpromo_category = "تبلیغ شخصی / بدون اسپانسر";
+interaction_category = "درخواست تعامل";
+intro_category = "مقدمه";
+outro_category = "پایان / تیتراژ";
+preview_category = "پیش‌نمایش / مرور";
+hook_category = "خوش‌آمدگویی / شروع";
+filler_category = "مطالب اضافی";
+exclusive_access_category = "دسترسی انحصاری";
+
+action_disabled = "خاموش";
+action_show = "نمایش";
+action_manual = "دستی";
+action_auto = "خودکار";
+
+draftsTitle = "گزارش‌ها و پیش‌نویس‌ها";
+errorNoPodcats = "در حال حاضر هیچ پادکستی در حال پخش نیست.";
+markSegment = "علامت‌گذاری بخشی از قسمت فعلی";
+advancedTitle = "پیشرفته";
+howToUseTitle = "راهنمای استفاده";
+creditsTitle = "اعتبارات";
+creditsSubtitle = "اطلاعات بخش‌ها از جامعه SponsorBlock (sponsor.ajay.app) دریافت می‌شود. این قابلیت از Spot-SponsorBlock-Extension اقتباس شده است.";
+linkButtonTitle = "Spot-SponsorBlock-Extension در GitHub";
+
+// SponsorBlock reports
+sponsorblock_reports_title = "گزارش‌های SponsorBlock";
+sponsorblockIDTitle = "شناسه SponsorBlock شما";
+sponsorblockIDFooter = "برای ثبت ارسال‌ها و رأی‌های شما استفاده می‌شود. آن را مانند یک رمز عبور خصوصی نگه دارید و با دیگران به اشتراک نگذارید.";
+user_id_copied = "شناسه کاربری کپی شد";
+copyButton = "کپی";
+regenerateButton = "ایجاد مجدد";
+draftsTitleSB = "پیش‌نویس‌ها";
+draftsEmpty = "هیچ پیش‌نویسی وجود ندارد. برای شروع علامت‌گذاری یک بخش، نوار پیشرفت پادکست را لمس و نگه دارید.";
+draftsEpisodeLoc = "قسمت %@";
+hidden_locally_header = "مخفی‌شده‌های محلی (%@)";
+hiddenFooter = "این بخش‌ها در این دستگاه هرگز به‌صورت خودکار رد نمی‌شوند، اما همچنان روی سرور SponsorBlock وجود دارند.";
+hiddenSegmentsEmpty = "هیچ بخش مخفی‌شده‌ای وجود ندارد.";
+unhideButton = "نمایش مجدد";
+
+popUpRegenerateTitle = "شناسه کاربری دوباره ساخته شود؟";
+popUpRegenerateSubtitle = "ارسال‌ها و رأی‌های قبلی دیگر به این شناسه متصل نخواهند بود.";
+popUpClearAllButton = "پاک کردن همه";
+popUpClearAllTitle = "همه بخش‌های مخفی پاک شوند؟";
+popUpClearAllSubtitle = "پس از این، مطابق قوانین دسته‌بندی دوباره به‌صورت خودکار رد خواهند شد.";
+
+readyButton = "آماده";
+incompleteButton = "ناتمام";
+editSubmit = "ویرایش / ارسال";
+discardButton = "حذف";
+
+// SponsorBlock Advanced
+skipBehaviourTitle = "رفتار هنگام رد کردن";
+autoSkipSubmissionsTitle = "رد خودکار ارسال‌های خودم";
+logOnlyToggle = "فقط ثبت در گزارش (بدون جابه‌جایی)";
+serverHeader = "سرور";
+urlText = "نشانی";
+
+tuningTitle = "تنظیمات";
+minSegmentDuration = "حداقل مدت بخش: %.1fs";
+toastDuration = "مدت نمایش اعلان: %.1fs";
+
+trackLogSubtitle = "اطلاعات آهنگ پادکست (مانند URI، وضعیت پادکست، ویدیو و ...) را هنگام پخش هر آهنگ جدید در گزارش اشکال‌زدایی ثبت می‌کند. فقط زمانی فعال کنید که SponsorBlock پادکست مورد انتظار شما را تشخیص نمی‌دهد.";
+trackLogToggle = "گزارش تشخیصی آهنگ";
+resetButtonTrackLog = "بازنشانی…";
+
+// SponsorBlock Reset Options Advanced
+resetTitle = "چه چیزی بازنشانی شود؟";
+resetSubtitle = "هر مورد مستقل از دیگری است.";
+allResetSB = "همه موارد (تمام گزینه‌های بالا)";
+regenerateIDSB = "ایجاد مجدد شناسه کاربری";
+localSubmissionsSB = "ارسال‌های محلی من (%@)";
+votedRecordsSB = "رأی‌های ثبت‌شده (%@)";
+hiddenSegmentsSB = "بخش‌های مخفی (%@)";
+draftsCountSB = "پیش‌نویس (%@)";
+settingsResetSB = "تنظیمات (کلیدها، دسته‌بندی‌ها و رنگ‌ها)";
+
+// SponsorBlock How To Use
+playerGesturesTitle = "ژست‌های پخش‌کننده";
+gesturesTitle1 = "لمس و نگه داشتن نوار پیشرفت";
+gesturesDeps1 = "شروع یک بخش را علامت‌گذاری کنید. دوباره در پایان بخش لمس و نگه دارید تا نقطه پایان تعیین شده و فرم ارسال باز شود.";
+gesturesTitle2 = "ضربه روی یک بخش از نوار";
+gesturesDeps2 = "رأی بدهید، دسته‌بندی را تغییر دهید یا فقط در این دستگاه آن بخش را مخفی کنید.";
+
+submittingTitle = "ارسال";
+submittingSectionTitle1 = "فرم ارسال";
+submittingSectionDeps1 = "با استفاده از لغزنده‌ها و دکمه‌های تنظیم دقیق، زمان شروع و پایان را اصلاح کنید. سپس دسته‌بندی را انتخاب کرده و به sponsor.ajay.app ارسال کنید.";
+submittingSectionTitle2 = "ارسال‌های محلی من";
+submittingSectionDeps2 = "این بخش‌ها بلافاصله در همین دستگاه به‌صورت خودکار رد می‌شوند. پس از انتشار روی سرور، امکان رأی دادن فعال خواهد شد. نشان «MINE» آن‌ها را مشخص می‌کند.";
+
+skipToastTitle = "اعلان رد کردن";
+skipToastSectionTitle1 = "بازگردانی";
+skipToastSectionDeps1 = "پخش را به ابتدای بخش بازمی‌گرداند. این بار بخش پخش خواهد شد. با جلو و عقب بردن پخش، دوباره به‌صورت خودکار رد می‌شود.";
+skipToastSectionTitle2 = "رأی مثبت / منفی";
+skipToastSectionDeps2 = "👍 رأی شما را روی سرور ثبت می‌کند. 👎 منویی برای رأی منفی، مخفی کردن محلی یا تغییر دسته‌بندی باز می‌کند.";
+skipToastSectionTitle3 = "منوی کامل بخش";
+skipToastSectionDeps3 = "همان گزینه‌هایی را دارد که با ضربه زدن روی بخش موجود در نوار پیشرفت مشاهده می‌کنید.";
+
+managingSegmentsTitle = "مدیریت بخش‌ها";
+managingSegmentsSectionTitle1 = "مدیریت بخش‌ها…";
+managingSegmentsSectionDeps1 = "نوار را لمس و نگه دارید ← «مدیریت بخش‌ها» همه بخش‌های قسمت فعلی را نمایش می‌دهد. می‌توانید رأی بدهید، مخفی کنید، دسته‌بندی را تغییر دهید یا با لمس هر ردیف، پخش را به همان نقطه ببرید.";
+managingSegmentsSectionTitle2 = "گزارش‌ها و پیش‌نویس‌ها";
+managingSegmentsSectionDeps2 = "در مسیر تنظیمات ← «گزارش‌ها و پیش‌نویس‌ها» می‌توانید پیش‌نویس‌های نیمه‌تمام و بخش‌های مخفی‌شده خود را مدیریت کنید. پیش‌نویس‌ها پس از بستن برنامه نیز حفظ می‌شوند.";
+
+categoriesTitle = "دسته‌بندی‌ها";
+categoriesSectionTitle1 = "عملکرد هر دسته‌بندی";
+categoriesSectionDeps1 = "خاموش = نادیده گرفتن. نمایش = فقط روی نوار نمایش داده شود. دستی = قبل از رد کردن سؤال شود. خودکار = بدون نمایش پیام به‌صورت خودکار رد شود.";
