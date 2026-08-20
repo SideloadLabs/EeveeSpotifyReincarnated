@@ -76,6 +76,13 @@ show_instagram_destination_description = "始终将 Instagram 作为分享目标
 livecontainer_sharing = "分享到 LiveContainer";
 livecontainer_sharing_description = "如果不支持所选分享目标，则分享到 LiveContainer 并复制 URL。";
 
+// 杂项设定
+
+miscellaneous = "杂项设定"; 
+clean_share_links = "移除追踪参数"; 
+clean_share_links_description = "清除网址追踪码";
+
+
 /* MARK: Premium PopUps */
 
 have_premium_popup = "看来您有一个真实有效的 Premium 订阅，因此此插件不会修补数据或限制 Premium 服务器端功能的使用。可以在 EeveeSpotify 设置中管理此操作。";

@@ -3,7 +3,7 @@
 # EeveeSpotifyReincarnated
 
 **Maintainers:** [jaydenjcpy](https://github.com/jaydenjcpy) & [faroukbmiled](https://github.com/faroukbmiled) & [Mod4](https://github.com/M0d-4) <br />
-**Last Update:** `6/28/26` **Spotify Version:** `9.1.60`
+**Last Update:** `8/02/26` **Spotify Version:** `9.1.68`
 
 This tweak makes Spotify think you have a Premium subscription, granting free listening, just like Spotilife, and provides some additional features like custom lyrics.
 
@@ -13,8 +13,8 @@ This tweak makes Spotify think you have a Premium subscription, granting free li
 ## Custom Lyrics Support
 
 **Spotify 9.1.56 and above** - Full custom lyrics functionality is available with the following providers:
-
-- **Musixmatch**
+- **Spicy Lyrics**
+- **Musixmatch(Requires Musixmatch Token)**
 - **PetitLyrics**
 - **LRCLIB**
 - **Genius**
@@ -106,16 +106,20 @@ Thanks for all of the community's support, also, thanks to all the devs who work
 
 [whoeevee](https://github.com/whoeevee) 
 
+## Disclaimer
+
+This project is an **independent modification (tweak)** for the Spotify app. We are **not affiliated, associated, authorized, endorsed by, or in any way officially connected with Spotify**, or any of its subsidiaries or affiliates. 
+
+This tweak is created solely for **personal and educational purposes**. Use it at your own risk.
+
+**We do not take any responsibility for any issues, damages, or consequences** resulting from the use or misuse of this tweak. If something breaks, it's not our problem.
+
 ## Star History
 
-<a href="https://www.star-history.com/?repos=jaydenjcpy%2FEeveeSpotifyReincarnated&type=date&legend=top-left">
+<a href="https://www.star-history.com/?repos=SideloadLabs%2FEeveeSpotifyReincarnated&type=date&legend=top-left">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=jaydenjcpy/EeveeSpotifyReincarnated&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=jaydenjcpy/EeveeSpotifyReincarnated&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=jaydenjcpy/EeveeSpotifyReincarnated&type=date&legend=top-left" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=SideloadLabs/EeveeSpotifyReincarnated&type=date&theme=dark&legend=top-left&sealed_token=C1hKWTv3UNdLAgsZjjCL7Rthp6YSGB4Mm9kIalnH1lgZXZnYVL09WbBt57E-FFzQXg8gZyFOW356S5XMTWmvQdIuEihF66WxqGuJTejmAdJx5XJHxC2l3A" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=SideloadLabs/EeveeSpotifyReincarnated&type=date&legend=top-left&sealed_token=C1hKWTv3UNdLAgsZjjCL7Rthp6YSGB4Mm9kIalnH1lgZXZnYVL09WbBt57E-FFzQXg8gZyFOW356S5XMTWmvQdIuEihF66WxqGuJTejmAdJx5XJHxC2l3A" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=SideloadLabs/EeveeSpotifyReincarnated&type=date&legend=top-left&sealed_token=C1hKWTv3UNdLAgsZjjCL7Rthp6YSGB4Mm9kIalnH1lgZXZnYVL09WbBt57E-FFzQXg8gZyFOW356S5XMTWmvQdIuEihF66WxqGuJTejmAdJx5XJHxC2l3A" />
  </picture>
 </a>
-
-
-
-

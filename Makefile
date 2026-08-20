@@ -20,6 +20,15 @@ EeveeSpotify_SWIFTFLAGS = -ISources/EeveeSpotifyC/include -Osize
 EeveeSpotify_EXTRA_FRAMEWORKS = EeveeSwiftProtobuf
 EeveeSpotify_CFLAGS = -fobjc-arc -ISources/EeveeSpotifyC/include -Os
 
+# RootHide's compatibility implementation of libroot resolves jailbreak paths
+# through libroothide at runtime. Rootless builds continue to use libroot.
+ifeq ($(THEOS_PACKAGE_SCHEME),roothide)
+EeveeSpotify_SWIFTFLAGS += -D ROOTHIDE
+EeveeSpotify_LDFLAGS += -lroothide -Xlinker -rpath -Xlinker @loader_path/.jbroot/Library/Frameworks
+else
+EeveeSpotify_LDFLAGS += -lroot
+endif
+
 # Sideload compatibility (keychain redirect, group containers, CloudKit) is
 # handled out-of-process by modules/zxPluginsInject — LC-injected via ipapatch
 # in build-ipa-local.sh and the GitHub workflow. No flags needed here.
@@ -31,7 +40,7 @@ internal-stage::
 	# SwiftProtobuf so the @objc class names don't collide with the
 	# SwiftProtobuf statically embedded in SpotifyShared.framework.
 	mkdir -p $(THEOS_STAGING_DIR)/Library/Frameworks
-	cp -r $(THEOS)/lib/iphone/rootless/EeveeSwiftProtobuf.framework $(THEOS_STAGING_DIR)/Library/Frameworks/
+	cp -r $(THEOS)/lib/iphone/$(or $(THEOS_PACKAGE_SCHEME),rootless)/EeveeSwiftProtobuf.framework $(THEOS_STAGING_DIR)/Library/Frameworks/
 	# Compile the karaoke background Metal shader into a .metallib and
 	# stage it next to the tweak binary so device.makeLibrary(filepath:)
 	# can load it at runtime (Theos's tweak.mk has no built-in Metal

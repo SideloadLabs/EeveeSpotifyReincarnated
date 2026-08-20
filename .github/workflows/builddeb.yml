@@ -1,4 +1,4 @@
-name: Build rootless .deb + Draft Release
+name: Build rootless + RootHide .debs + Draft Release
 
 on:
   workflow_dispatch:
@@ -19,15 +19,26 @@ on:
         options: ["false", "true"]
 
 env:
-  THEOS: ${{ github.workspace }}/theos
   SWIFTPROTOBUF_VERSION: "1.29.0"
 
 jobs:
   build-debs:
-    name: Build arm64 .deb
+    name: Build ${{ matrix.label }} .deb
     runs-on: macos-latest
-    permissions:
-      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - scheme: rootless
+            label: rootless
+            theos_repository: theos/theos
+          - scheme: roothide
+            label: RootHide
+            theos_repository: roothide/theos
+
+    env:
+      THEOS: ${{ github.workspace }}/theos
+      THEOS_PACKAGE_SCHEME: ${{ matrix.scheme }}
 
     steps:
       - name: Checkout repo
@@ -40,10 +51,10 @@ jobs:
         with:
           xcode-version: "26.3.0"
 
-      - name: Checkout Theos
+      - name: Checkout ${{ matrix.label }} Theos
         uses: actions/checkout@v4
         with:
-          repository: theos/theos
+          repository: ${{ matrix.theos_repository }}
           path: ${{ github.workspace }}/theos
           submodules: recursive
 
@@ -52,50 +63,64 @@ jobs:
           brew install make dpkg ldid
           echo "$(brew --prefix make)/libexec/gnubin" >> "$GITHUB_PATH"
 
-      - name: Build EeveeSwiftProtobuf.framework (required once)
-        run: |
-          make build-eeveeswiftprotobuf
+      - name: Build EeveeSwiftProtobuf.framework
+        run: make build-eeveeswiftprotobuf
 
-      - name: Install EeveeSwiftProtobuf into Theos
-        run: |
-          # Find the built framework (adjust if your build script outputs somewhere specific)
-          FW=$(find "$GITHUB_WORKSPACE" -name "EeveeSwiftProtobuf.framework" -type d | head -n 1)
-          [ -n "$FW" ] || { echo "EeveeSwiftProtobuf.framework not found" >&2; exit 1; }
-
-          mkdir -p "$THEOS/vendor/lib"
-          rm -rf "$THEOS/vendor/lib/EeveeSwiftProtobuf.framework"
-          cp -R "$FW" "$THEOS/vendor/lib/EeveeSwiftProtobuf.framework"
-
-
-      - name: Build arm64 .deb
+      - name: Build ${{ matrix.label }} .deb
         env:
           REPO_SLUG: ${{ github.repository }}
         run: |
           make clean || true
-          make package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME="rootless"
-          ls -la packages || true
+          make package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME="${{ matrix.scheme }}"
+          ls -la packages
 
-      - name: Save arm64 artifact
+      - name: Stage ${{ matrix.label }} artifact
         run: |
           mkdir -p Outputs/DEBS
-          # pick newest deb produced by Theos
-          ARM64_DEB="$(ls -t packages/*.deb | head -n 1)"
-          cp -f "$ARM64_DEB" "Outputs/DEBS/$(basename "$ARM64_DEB" .deb).deb"
-          echo "ARM64_DEB=Outputs/DEBS/$(basename "$ARM64_DEB" .deb).deb" >> "$GITHUB_ENV"
+          DEB_PATH="$(ls -t packages/*.deb | head -n 1)"
+          [ -n "$DEB_PATH" ] || { echo "No .deb produced" >&2; exit 1; }
+          if [ "${{ matrix.scheme }}" = "roothide" ]; then
+            OUT_NAME="$(basename "$DEB_PATH" .deb)-roothide.deb"
+          else
+            OUT_NAME="$(basename "$DEB_PATH")"
+          fi
+          cp -f "$DEB_PATH" "Outputs/DEBS/$OUT_NAME"
 
-      - name: Upload deb artifacts
+      - name: Validate package metadata and layout
+        run: |
+          DEB_PATH="$(find Outputs/DEBS -name '*.deb' -type f | head -n 1)"
+          dpkg-deb --info "$DEB_PATH"
+          dpkg-deb --contents "$DEB_PATH"
+          if [ "${{ matrix.scheme }}" = "roothide" ]; then
+            [ "$(dpkg-deb -f "$DEB_PATH" Architecture)" = "iphoneos-arm64e" ]
+          fi
+
+      - name: Upload ${{ matrix.label }} artifact
         uses: actions/upload-artifact@v4
         with:
-          name: EeveeSpotify-DEBS
+          name: EeveeSpotify-${{ matrix.label }}-DEB
           path: Outputs/DEBS/*.deb
           if-no-files-found: error
 
-      - name: Draft GitHub Release and attach .debs
+  draft-release:
+    name: Create draft release
+    needs: build-debs
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download both packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: EeveeSpotify-*-DEB
+          path: Outputs/DEBS
+          merge-multiple: true
+
+      - name: Draft GitHub Release and attach both .debs
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ inputs.tag }}
           name: ${{ inputs.release_name != '' && inputs.release_name || inputs.tag }}
           draft: true
           prerelease: ${{ inputs.prerelease == 'true' }}
-          files: |
-            ${{ env.ARM64_DEB }}
+          files: Outputs/DEBS/*.deb

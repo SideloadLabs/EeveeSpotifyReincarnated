@@ -129,6 +129,19 @@ struct EeveeSettingsView: View {
                 )
             }
 
+            Button {
+                pushSettingsController(
+                    with: EeveeMiscellaneousSettingsView(),
+                    title: "miscellaneous".localized
+                )
+            } label: {
+                NavigationSectionView(
+                    color: .gray,
+                    title: "miscellaneous".localized,
+                    imageSystemName: "ellipsis.circle.fill"
+                )
+            }
+
             //
 
             Section(header: Text("debug_title".localized), footer: Text("debug_section_footer".localized)) {

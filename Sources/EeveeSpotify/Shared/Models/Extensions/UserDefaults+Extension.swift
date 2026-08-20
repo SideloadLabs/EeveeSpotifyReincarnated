@@ -13,6 +13,7 @@ extension UserDefaults {
     private static let hasShownCommonIssuesTipKey = "hasShownCommonIssuesTip"
     private static let hasPatchedBootstrapKey = "eeveeHasPatchedBootstrap"
     private static let iconNamePrettifyKey = "iconNamePrettify"
+    private static let cleanShareLinksKey = "cleanShareLinks"
 
     static var musixmatchToken: String {
         get {
@@ -87,6 +88,16 @@ extension UserDefaults {
         }
         set {
             container.set(newValue, forKey: iconNamePrettifyKey)
+        }
+    }
+
+    /// When true, the `si` tracking parameter is stripped from shared Spotify links.
+    static var cleanShareLinks: Bool {
+        get {
+            container.object(forKey: cleanShareLinksKey) as? Bool ?? false
+        }
+        set (cleanShareLinks) {
+            container.set(cleanShareLinks, forKey: cleanShareLinksKey)
         }
     }
 }

@@ -1,6 +1,6 @@
 import Foundation
 import SwiftUI
-import libroot
+import EeveeSpotifyC
 
 class BundleHelper {
     private let bundleName = "EeveeSpotify"
@@ -20,7 +20,7 @@ class BundleHelper {
         } 
         // If not found, try locating in file system (jailbreak path)
         else {
-            let jbPath = jbRootPath("/Library/Application Support/\(bundleName).bundle")
+            let jbPath = EeveeJBRootPath("/Library/Application Support/\(bundleName).bundle")
             if let b = Bundle(path: jbPath) {
                 self.bundle = b
                 NSLog("[EeveeSpotify] Loaded bundle from filesystem: \(jbPath)")

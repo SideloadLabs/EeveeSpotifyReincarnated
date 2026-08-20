@@ -236,7 +236,15 @@ func activateEeveePremiumForce() {
           enableDirectGetters ? "on" : "off",
           enableAdsHook       ? "on" : "off",
           enablePassiveProductStateLog ? "on" : "off")
-    if enableDictRewrite || enableDirectGetters || enableAdsHook || enablePassiveProductStateLog {
-        EeveePremiumForceGroup().activate()
+    guard enableDictRewrite || enableDirectGetters || enableAdsHook || enablePassiveProductStateLog else {
+        return
     }
+    // This ran completely unguarded before - unlike every other hook group in this
+    // codebase - so a Spotify build that renames/removes one of these methods would
+    // fail the hook and (pre handleError override) instantly crash at launch.
+    guard NSClassFromString("SPTCoreProductState") != nil else {
+        NSLog("[FORCE] Skipped: SPTCoreProductState not found")
+        return
+    }
+    EeveePremiumForceGroup().activate()
 }

@@ -4,7 +4,7 @@
 # with the SwiftProtobuf statically embedded in SpotifyShared.framework.
 #
 # Outputs a fat (arm64+arm64e) framework at:
-#   $THEOS/lib/iphone/rootless/EeveeSwiftProtobuf.framework
+#   $THEOS/lib/iphone/$THEOS_PACKAGE_SCHEME/EeveeSwiftProtobuf.framework
 #
 # Why we do this instead of using the prebuilt SwiftProtobuf deb:
 # duplicate-class warnings + SIGSEGV crashes when both copies (ours +
@@ -16,8 +16,15 @@ set -euo pipefail
 VERSION="${SWIFTPROTOBUF_VERSION:-1.29.0}"
 SRC="${SRC_DIR:-/tmp/swiftprotobuf-build}"
 MODULE="EeveeSwiftProtobuf"
-OUT="$THEOS/lib/iphone/rootless/${MODULE}.framework"
+PACKAGE_SCHEME="${THEOS_PACKAGE_SCHEME:-rootless}"
+OUT="$THEOS/lib/iphone/${PACKAGE_SCHEME}/${MODULE}.framework"
 DEPLOY_TARGET="${DEPLOY_TARGET:-14.0}"
+
+if [ "$PACKAGE_SCHEME" = "roothide" ]; then
+    INSTALL_NAME="@loader_path/.jbroot/Library/Frameworks/${MODULE}.framework/${MODULE}"
+else
+    INSTALL_NAME="@rpath/${MODULE}.framework/${MODULE}"
+fi
 
 [ -n "${THEOS:-}" ] || { echo "THEOS env not set"; exit 1; }
 
@@ -44,7 +51,7 @@ build_arch() {
         -module-name "$MODULE" \
         -enable-library-evolution -emit-module-interface \
         -Xfrontend -enable-testing -parse-as-library \
-        -Xlinker -install_name -Xlinker "@rpath/${MODULE}.framework/${MODULE}" \
+        -Xlinker -install_name -Xlinker "$INSTALL_NAME" \
         -Xlinker -application_extension \
         -o "$OBJDIR/${MODULE}" \
         -emit-module-path "$OBJDIR/${MODULE}.swiftmodule" \
@@ -59,6 +66,13 @@ rm -rf "$OUT"
 mkdir -p "$OUT/Modules/${MODULE}.swiftmodule"
 
 lipo -create "$SRC/build-arm64/${MODULE}" "$SRC/build-arm64e/${MODULE}" -output "$OUT/${MODULE}"
+
+# RootHide enforces signatures on injected dependencies too. Keep the classic
+# rootless framework build unchanged; only its RootHide counterpart needs this.
+if [ "$PACKAGE_SCHEME" = "roothide" ]; then
+    command -v ldid >/dev/null 2>&1 || { echo "ldid not found"; exit 1; }
+    ldid -S "$OUT/${MODULE}"
+fi
 
 for ARCH in arm64 arm64e; do
     OBJDIR="$SRC/build-$ARCH"

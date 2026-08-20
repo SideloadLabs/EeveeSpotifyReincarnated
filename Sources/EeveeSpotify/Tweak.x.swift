@@ -199,7 +199,7 @@ func eeveeEnvFlag(_ name: String) -> Bool {
 }
 
 struct EeveeSpotify: Tweak {
-    static let version = "6.6.6"
+    static let version = "6.6.8"
     static let buildNumber = "1"
     static let repoSlug = GeneratedConfig.repoSlug
     
@@ -221,6 +221,28 @@ struct EeveeSpotify: Tweak {
         }
     }
     
+    // MARK: - Non-fatal hook error handling
+    //
+    // Orion's default `handleError(_:)` forwards to `handleErrorDefault(_:)`, which logs
+    // and then calls `fatalError`, instantly killing the app. This fires for ANY hook that
+    // fails to activate - a missing target class, a renamed/removed selector, a method-add
+    // conflict, etc. Critically, this can happen for hooks in `DefaultGroup`
+    // (e.g. UIOpenURLContextHook, UIApplicationLiveContainerSharingHook), which Orion
+    // activates automatically during its init sequence, BEFORE `EeveeSpotify.init()` runs -
+    // so none of the NSClassFromString/selector guards below can protect against it.
+    //
+    // Since this codebase already treats individual hook groups as independently optional
+    // (kill switches, per-group existence checks, "minimal" fallbacks for 9.1.x), a single
+    // hook failing to bind on an unexpected Spotify/iOS build should degrade gracefully
+    // instead of taking down the whole app. Log it and move on.
+    static func handleError(_ error: OrionHookError) {
+        let description = error.description
+        NSLog("[EeveeSpotify][OrionError] Hook activation failed (non-fatal): %@", description)
+        writeDebugLog("[ORION ERROR] \(description)")
+        eeveeBreadcrumb("Orion hook activation failed (continuing): \(description)")
+        // Deliberately NOT calling handleErrorDefault(error) here - that is what fatalErrors.
+    }
+
     init() {
         eeveeBreadcrumb("Tweak init() entered")
         // Reset per-launch bootstrap state; this MUST NOT persist across restarts.
@@ -255,6 +277,12 @@ struct EeveeSpotify: Tweak {
             eeveeBreadcrumb("EEVEE_DISABLE_ALL=1 -> returning without hooks")
             return
         }
+
+        // Clean Share Links: swizzle the concrete class of UIPasteboard.general in
+        // addition to the ClassHook<UIPasteboard> hooks — the general pasteboard is a
+        // private subclass whose overridden setters would otherwise bypass base-class
+        // swizzles. Installed unconditionally; cleaning is gated per-call by the toggle.
+        PasteboardConcreteSwizzler.install()
 
         // Activate session logout protection first.
         // NOTE: On some Spotify 9.1.x builds, Orion can still crash even if a selector exists

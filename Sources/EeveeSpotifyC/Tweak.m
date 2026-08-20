@@ -3,6 +3,20 @@
 #import <objc/message.h>
 #import "Tweak.h"
 
+#if THEOS_PACKAGE_SCHEME_ROOTHIDE
+#import <roothide.h>
+#else
+#import <libroot.h>
+#endif
+
+NSString *EeveeJBRootPath(NSString *path) {
+#if THEOS_PACKAGE_SCHEME_ROOTHIDE
+    return jbroot(path);
+#else
+    return JBROOT_PATH_NSSTRING(path);
+#endif
+}
+
 void EeveeSBInvokeSeekDouble(id target, SEL selector, double argument) {
     if (!target || !selector) return;
     typedef id (*SeekFn)(id, SEL, double);

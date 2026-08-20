@@ -94,6 +94,16 @@ show_instagram_destination_description = "Always show the Instagram share destin
 livecontainer_sharing = "Share to LiveContainer";
 livecontainer_sharing_description = "Share to LiveContainer and copy the URL if the selected destination is not supported.";
 
+disable_feelings_for_elsa = "Disable feelings for Elsa";
+disable_feelings_for_elsa_description = "Warning: This toggle is permanent. You have been warned.";
+
+// Miscellaneous
+
+miscellaneous = "Miscellaneous";
+
+clean_share_links = "Clean Share Links";
+clean_share_links_description = "Removes the \"si\" tracking parameter from shared Spotify links, so they don't reveal which device or account the link came from.";
+
 /* MARK: Premium PopUps */
 
 have_premium_popup = "It looks like you have an active Premium subscription, so the tweak won't patch the data or restrict the use of Premium server-sided features. You can manage this in the EeveeSpotify settings.";

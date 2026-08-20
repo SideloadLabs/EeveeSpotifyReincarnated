@@ -13,6 +13,15 @@ on:
         default: ""
         required: true
         type: string
+      upload_method:
+        description: "Where to upload the built IPA(s)"
+        default: "artifacts"
+        required: true
+        type: choice
+        options:
+          - artifacts
+          - filebin
+          - both
 
 env:
   THEOS: ${{ github.workspace }}/theos
@@ -141,6 +150,7 @@ jobs:
           Tools/alt-icons.sh "$OUT_IPA"
 
       - name: Upload IPA artifact
+        if: ${{ inputs.upload_method == 'artifacts' || inputs.upload_method == 'both' }}
         uses: actions/upload-artifact@v4
         with:
           name: EeveeSpotify-IPA
@@ -148,3 +158,23 @@ jobs:
             ${{ env.OUT_IPA }}
             ${{ env.PATCHED_OUT }}
           if-no-files-found: error
+
+      - name: Upload IPA(s) to filebin.net
+        if: ${{ inputs.upload_method == 'filebin' || inputs.upload_method == 'both' }}
+        run: |
+          BIN="eevee-${{ github.run_id }}-${{ github.run_attempt }}"
+          {
+            echo "### 📦 filebin.net download"
+          } >> "$GITHUB_STEP_SUMMARY"
+          for IPA_PATH in "$OUT_IPA" "$PATCHED_OUT"; do
+            [ -n "$IPA_PATH" ] || continue
+            FILENAME=$(basename "$IPA_PATH")
+            curl -fsS -X POST \
+                 -H "Content-Type: application/octet-stream" \
+                 --data-binary "@${IPA_PATH}" \
+                 "https://filebin.net/${BIN}/${FILENAME}" >/dev/null
+            DOWNLOAD_URL="https://filebin.net/${BIN}/${FILENAME}"
+            echo "Uploaded to: ${DOWNLOAD_URL}"
+            echo "- **${FILENAME}:** ${DOWNLOAD_URL}" >> "$GITHUB_STEP_SUMMARY"
+          done
+          echo "- _Filebin auto-deletes bins after a period of inactivity — download promptly._" >> "$GITHUB_STEP_SUMMARY"
