@@ -9,26 +9,31 @@ import UIKit
 /// which still works as a shortcut once you know about it, but isn't
 /// something a user would ever stumble onto).
 ///
-/// Visibility is driven by polling rather than a viewDidAppear/
-/// viewWillDisappear hook on some specific Now Playing view controller
-/// class. An earlier version did try a class-name-targeted hook, but
-/// pointed it at the wrong screen (Spotify's native *Lyrics* fullscreen
-/// page) — and more fundamentally, the Now Playing experience here is a
-/// single UICollectionView hosting Now Playing/Lyrics/Queue as swipeable
-/// pages within ONE container view controller (see
+/// Visibility is primarily driven by polling rather than a
+/// viewDidAppear/viewWillDisappear hook on some specific Now Playing view
+/// controller class. The Now Playing experience here is a single
+/// UICollectionView hosting Now Playing/Lyrics/Queue as swipeable pages
+/// within ONE container view controller (see
 /// NowPlayingScrollViewController.swift / NPVScrollViewController.swift's
 /// `collectionView()` — confirmed by NowPlayingScrollPrivateService
 /// ImplementationHook in NowPlayingScrollViewControllerInstanceHook.x.swift,
 /// which is what actually populates the `nowPlayingScrollViewController`/
 /// `npvScrollViewController` globals this file reads), not a stack of
 /// separately-lifecycled per-page view controllers — so there's no single
-/// "page appeared" callback to hook here in the first place. Checking
-/// whether that already-tracked collection view currently has a non-nil
-/// `.window` is a simple, reliable stand-in: it's true exactly when the
-/// Now Playing screen (in any of its swiped-to pages) is actually on
-/// screen, false otherwise, and it reuses infrastructure
+/// "page appeared" callback to hook for THAT screen. Checking whether that
+/// already-tracked collection view currently has a non-nil `.window` is a
+/// simple, reliable stand-in: it's true exactly when the Now Playing
+/// screen (in any of its swiped-to pages) is actually on screen, false
+/// otherwise, and it reuses infrastructure
 /// (`nowPlayingScrollViewController`/`npvScrollViewController`) that's
 /// already proven to populate reliably elsewhere in this codebase.
+///
+/// Spotify's separate native Lyrics *fullscreen* screen (a distinct pushed/
+/// presented view controller, not one of the swiped-to pages above) is the
+/// one exception: KaraokeButtonOverlayLyricsScreenHook watches that
+/// screen's own appear/disappear and force-hides this button while it's
+/// up, since the button belongs on the page where the music plays, not
+/// the Lyrics page.
 ///
 /// Implemented as a separate UIWindow (rather than injecting a UIView
 /// into Spotify's own Encore view hierarchy, the way
@@ -52,14 +57,15 @@ final class KaraokeButtonOverlay {
     private var pollTimer: Timer?
 
     // Set by KaraokeButtonOverlayLyricsScreenHook (viewDidAppear/
-    // viewWillDisappear on the native Lyrics fullscreen screen). That
-    // screen isn't necessarily reflected by nowPlayingScrollViewController/
-    // npvScrollViewController's collectionView().window check below (it's
-    // a separate pushed/presented screen, not one of the swiped-to pages
-    // inside the Now Playing scroll container) — so this is an additional,
-    // more immediate signal, OR'd in alongside the existing poll-based one
-    // rather than replacing it.
-    private var isLyricsScreenVisible = false
+    // viewWillDisappear on Spotify's native Lyrics fullscreen screen). This
+    // button belongs on the page where the music plays, not the Lyrics
+    // page — so this is a force-hide override, not a force-show. The
+    // Lyrics fullscreen screen is a separate pushed/presented screen, not
+    // one of the swiped-to pages inside the Now Playing scroll container
+    // tracked by nowPlayingScrollViewController/npvScrollViewController
+    // below, so without this the poll-based check alone wouldn't catch it
+    // and the button would incorrectly linger on top of it.
+    private var isOnNativeLyricsScreen = false
 
     private init() {
         // Timer setup needs the main run loop; init() can in principle be
@@ -84,22 +90,23 @@ final class KaraokeButtonOverlay {
     }
 
     /// Called by KaraokeButtonOverlayLyricsScreenHook's viewDidAppear.
-    /// Triggers an immediate refresh rather than waiting up to 0.5s for
-    /// the next poll tick, so the button appears right as the Lyrics
-    /// screen finishes presenting.
-    func show() {
-        isLyricsScreenVisible = true
+    /// Force-hides the button immediately (rather than waiting up to 0.5s
+    /// for the next poll tick) as soon as Spotify's native Lyrics
+    /// fullscreen screen finishes presenting.
+    func hideForLyricsScreen() {
+        isOnNativeLyricsScreen = true
         DispatchQueue.main.async { [weak self] in
             self?.refresh()
         }
     }
 
     /// Called by KaraokeButtonOverlayLyricsScreenHook's viewWillDisappear.
-    /// Same immediacy reasoning as show() — don't let the button linger
-    /// for up to 0.5s after the Lyrics screen has already started
-    /// dismissing.
-    func hide() {
-        isLyricsScreenVisible = false
+    /// Clears the override immediately so the button can reappear as soon
+    /// as the Lyrics screen has started dismissing, without waiting for
+    /// the next poll tick — normal poll-driven visibility (Now Playing
+    /// page) takes back over from here.
+    func showAfterLeavingLyricsScreen() {
+        isOnNativeLyricsScreen = false
         DispatchQueue.main.async { [weak self] in
             self?.refresh()
         }
@@ -107,9 +114,9 @@ final class KaraokeButtonOverlay {
 
     private func refresh() {
         let isNowPlayingScreenVisible =
-            isLyricsScreenVisible ||
-            (nowPlayingScrollViewController?.collectionView().window != nil) ||
-            (npvScrollViewController?.collectionView().window != nil)
+            !isOnNativeLyricsScreen &&
+            ((nowPlayingScrollViewController?.collectionView().window != nil) ||
+             (npvScrollViewController?.collectionView().window != nil))
         let hasKaraokeData = KaraokeOverlayPresenter.isAvailableForCurrentTrack()
         // !isPresented: while the karaoke view itself is open (full-screen,
         // on top of everything, including this overlay window's level),

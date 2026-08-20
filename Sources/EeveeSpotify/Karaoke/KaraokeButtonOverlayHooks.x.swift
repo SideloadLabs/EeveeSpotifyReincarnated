@@ -1,10 +1,11 @@
 import Orion
 import UIKit
 
-/// Shows the floating "Word-Synced Lyrics" button (KaraokeButtonOverlay)
-/// whenever Spotify's native Lyrics fullscreen screen is on screen, and
-/// hides it as soon as that screen goes away — so the button never lingers
-/// on top of some other unrelated screen.
+/// Force-hides the floating "Word-Synced Lyrics" button whenever Spotify's
+/// native Lyrics fullscreen screen is on screen, and clears that override
+/// as soon as the screen goes away — the button belongs on the page where
+/// the music plays (Now Playing), not the Lyrics page, so this is the
+/// screen it must NOT appear on top of.
 ///
 /// Targets the same view controller as LyricsFullscreenViewControllerHook
 /// in CustomLyrics+DisableReportButton.x.swift (same targetName switch,
@@ -29,12 +30,13 @@ class KaraokeButtonOverlayLyricsScreenHook: ClassHook<UIViewController> {
     func viewDidAppear(_ animated: Bool) {
         orig.viewDidAppear(animated)
         guard #available(iOS 15.0, *) else { return }
-        KaraokeButtonOverlay.shared.show()
+        KaraokeButtonOverlay.shared.hideForLyricsScreen()
     }
 
     func viewWillDisappear(_ animated: Bool) {
         orig.viewWillDisappear(animated)
         guard #available(iOS 15.0, *) else { return }
-        KaraokeButtonOverlay.shared.hide()
+        KaraokeButtonOverlay.shared.showAfterLeavingLyricsScreen()
     }
 }
+

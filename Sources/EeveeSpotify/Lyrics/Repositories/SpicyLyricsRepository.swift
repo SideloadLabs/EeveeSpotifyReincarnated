@@ -33,13 +33,11 @@ class SpicyLyricsRepository: LyricsRepository {
 
     private static let apiUrl        = "https://api.spicylyrics.org"
     private static let authHeaderKey = "SpicyLyrics-WebAuth"
-    // Confirmed via github.com/Spikerko/spicy-lyrics/releases/latest (6.1.1,
-    // released 14 Jun) that this is genuinely the current shipped version —
-    // the version-mismatch theory was a dead end, not the cause of the
-    // Static-vs-Syllable discrepancy. Leaving this accurate for future-proofing
-    // (the server may still reject very stale versions eventually) but it is
-    // NOT the explanation for the current bug.
-    private static let clientVersion = "6.1.1"
+    // Bumped to match the real client's shipped ProjectVersion
+    // (project/config.ts). Version alone was a dead end for the
+    // Static/Line-vs-Syllable discrepancy — see the "X-mode" header below,
+    // added alongside this bump, which is the actual missing piece.
+    private static let clientVersion = "6.3.1"
 
     // MARK: - Token wait
     //
@@ -80,6 +78,15 @@ class SpicyLyricsRepository: LyricsRepository {
         request.httpMethod = "POST"
         request.setValue("application/json",                   forHTTPHeaderField: "Content-Type")
         request.setValue(SpicyLyricsRepository.clientVersion, forHTTPHeaderField: "SpicyLyrics-Version")
+        // Confirmed against the real client's Query.ts: every request sends
+        // this alongside SpicyLyrics-Version, unconditionally, with no
+        // branching logic elsewhere in that file — it isn't a device/UA
+        // signal, it's a flat request flag. This was missing here entirely,
+        // which is the actual explanation for the Static/Line-vs-Syllable
+        // discrepancy the sec-ch-ua/Client-Hints headers below were guessed
+        // at fixing and didn't: the server was very possibly falling back to
+        // a lower-fidelity response format without it.
+        request.setValue("2", forHTTPHeaderField: "X-mode")
 
         // Match the real desktop Spicetify request's identity headers — captured
         // via mitmproxy from an actual desktop session that returned Syllable

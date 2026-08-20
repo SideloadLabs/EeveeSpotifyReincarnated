@@ -52,7 +52,7 @@ struct KaraokeBackgroundView: View {
         Group {
             if let albumArtImage = albumArtImage,
                albumArtImage.size.width > 1, albumArtImage.size.height > 1,
-               MTLCreateSystemDefaultDevice() != nil {
+               KaraokeBackgroundView.metalRendererSupported {
                 KaraokeMetalBackgroundView(albumArt: albumArtImage)
                     .ignoresSafeArea()
             } else {
