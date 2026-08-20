@@ -9,7 +9,7 @@ struct KaraokeCreditsFooterView: View {
     private static let providerMap: [String: String] = [
         "spt": "Spotify",
         "aml": "Apple Music",
-        "spl": "nontitled",
+        "spl": "Spicy Lyrics",
         "ldb": "Local DB",
     ]
 

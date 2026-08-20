@@ -56,7 +56,63 @@ class SpicyLyricsRepository: LyricsRepository {
 
     // MARK: - Network
 
+    // Real client behavior (fetchLyrics.ts / LyricsQueueRetry.ts): a 503 means
+    // the server accepted the request but the track's lyrics are still being
+    // generated — it's queued, not missing. The real client shows a "hang
+    // tight" loader and keeps polling indefinitely with backoff
+    // (base=2000ms, factor=1.5x per attempt, capped at 10s) until it
+    // resolves or the track changes. This was previously funneled into
+    // `default` below, which threw .noSuchSong immediately on 503 — that's
+    // what fell straight through to Genius/Musixmatch/Lrclib fallback
+    // (lower-fidelity Line/Static/plain data) instead of getting the real
+    // Syllable data a few seconds later, explaining songs that "sometimes"
+    // come back word-synced and sometimes don't.
+    //
+    // Mirrors the real formula (2000 * 1.5^attempt, capped 10s) but bounded
+    // to 5 retries (~26s total) rather than running indefinitely — this call
+    // is synchronous and blocks the calling background thread, so it can't
+    // loop forever the way the real client's independent setTimeout-driven
+    // controller can. If the track is still queued after that, fall back
+    // like before rather than hanging.
+    private static let queuedRetryDelays: [TimeInterval] = {
+        (0 ..< 5).map { attempt in min(10.0, 2.0 * pow(1.5, Double(attempt))) }
+    }()
+
     private func performQuery(trackId: String) throws -> Data {
+        for (attempt, delay) in ([0.0] + SpicyLyricsRepository.queuedRetryDelays).enumerated() {
+            if delay > 0 {
+                writeDebugLog("[SpicyLyrics] Track \(trackId) queued (503) — retrying in \(delay)s (attempt \(attempt + 1))")
+                Thread.sleep(forTimeInterval: delay)
+            }
+            let (data, httpStatus) = try performQueryOnce(trackId: trackId)
+            if httpStatus != 503 { return data }
+        }
+        writeDebugLog("[SpicyLyrics] Track \(trackId) still queued after all retries — giving up")
+        throw LyricsError.noSuchSong
+    }
+
+    /// Single request attempt. Returns the raw envelope bytes alongside the
+    /// query's own httpStatus (peeked out of the envelope here, ahead of
+    /// parseLyricsData's own real parse of it) purely so performQuery can
+    /// decide whether to retry — parseLyricsData still does the real
+    /// envelope parsing and status handling on whichever attempt succeeds.
+    private func performQueryOnce(trackId: String) throws -> (Data, Int) {
+        let data = try performRequest(trackId: trackId)
+        guard
+            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let queriesRaw = json["queries"] as? [[String: Any]],
+            let matchedQuery = queriesRaw.first(where: { $0["operationId"] as? String == "0" }),
+            let result = matchedQuery["result"] as? [String: Any]
+        else {
+            // Malformed envelope — let parseLyricsData handle (and log) this
+            // properly rather than duplicating that error path here.
+            return (data, 0)
+        }
+        let httpStatus = result["httpStatus"] as? Int ?? 0
+        return (data, httpStatus)
+    }
+
+    private func performRequest(trackId: String) throws -> Data {
         guard let url = URL(string: "\(SpicyLyricsRepository.apiUrl)/query") else {
             throw LyricsError.decodingError
         }
@@ -88,12 +144,15 @@ class SpicyLyricsRepository: LyricsRepository {
         // a lower-fidelity response format without it.
         request.setValue("2", forHTTPHeaderField: "X-mode")
 
-        // Match the real desktop Spicetify request's identity headers — captured
-        // via mitmproxy from an actual desktop session that returned Syllable
-        // (word-synced) data. Origin/Referer/User-Agent alone got us from Static
-        // to Line — these additional Client Hints / Sec-Fetch headers are the
-        // remaining gap to close, in case the server uses sec-ch-ua-mobile or
-        // sec-ch-ua-platform to decide whether to serve full Syllable data.
+        // Spoofed browser identity headers (Origin/Referer/User-Agent/Client
+        // Hints/Sec-Fetch), captured via mitmproxy from a real desktop
+        // session. These aren't things the extension's own JS sets — inside
+        // Spotify's actual Chromium runtime the browser sets them
+        // automatically from the page context — so a native URLSession
+        // needs to fake them to look like that same environment. Confirmed
+        // via the real client's Query.ts that they play no role in the
+        // Static/Line-vs-Syllable discrepancy specifically (that was
+        // X-mode, above); kept here for general request realism.
         request.setValue("https://xpui.app.spotify.com",  forHTTPHeaderField: "Origin")
         request.setValue("https://xpui.app.spotify.com/", forHTTPHeaderField: "Referer")
         request.setValue(
