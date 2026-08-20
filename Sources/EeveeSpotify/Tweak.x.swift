@@ -199,8 +199,8 @@ func eeveeEnvFlag(_ name: String) -> Bool {
 }
 
 struct EeveeSpotify: Tweak {
-    static let version = "6.6.7"
-    static let buildNumber = "2"
+    static let version = "6.6.8"
+    static let buildNumber = "1"
     static let repoSlug = GeneratedConfig.repoSlug
     
     static var hookTarget: VersionHookTarget {
@@ -269,10 +269,6 @@ struct EeveeSpotify: Tweak {
             NSLog("[EeveeSpotify] AdBlockerGroup activated")
         }
 
-        // Force native iOS 26 Liquid Glass for Spotify's standard UIKit/SwiftUI chrome.
-        // Independent of hookTarget/patchType gating below - applies to every version.
-        activateLiquidGlass()
-
         // activateEeveeFlexGesture()
 
         // Global kill-switch for debugging “instant crash / no logs”.
@@ -281,6 +277,12 @@ struct EeveeSpotify: Tweak {
             eeveeBreadcrumb("EEVEE_DISABLE_ALL=1 -> returning without hooks")
             return
         }
+
+        // Clean Share Links: swizzle the concrete class of UIPasteboard.general in
+        // addition to the ClassHook<UIPasteboard> hooks — the general pasteboard is a
+        // private subclass whose overridden setters would otherwise bypass base-class
+        // swizzles. Installed unconditionally; cleaning is gated per-call by the toggle.
+        PasteboardConcreteSwizzler.install()
 
         // Activate session logout protection first.
         // NOTE: On some Spotify 9.1.x builds, Orion can still crash even if a selector exists

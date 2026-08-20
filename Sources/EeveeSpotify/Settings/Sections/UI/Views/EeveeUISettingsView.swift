@@ -57,18 +57,6 @@ struct EeveeUISettingsView: View {
                     )
                 )
             }
-
-            Section(
-                footer: Text("force_liquid_glass_description".localized)
-            ) {
-                Toggle(
-                    "force_liquid_glass".localized,
-                    isOn: Binding<Bool>(
-                        get: { UserDefaults.forceLiquidGlass },
-                        set: { UserDefaults.forceLiquidGlass = $0 }
-                    )
-                )
-            }
             
             SpacerView()
         }

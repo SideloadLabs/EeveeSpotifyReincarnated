@@ -83,8 +83,6 @@ static_color = "Static Color";
 
 color_normalization_factor = "Color Normalization Factor";
 dark_popups = "Dark PopUps";
-force_liquid_glass = "Force Liquid Glass";
-force_liquid_glass_description = "Overrides Spotify's Info.plist flag that opts out of iOS 26's Liquid Glass redesign, so native UIKit/SwiftUI chrome (nav bars, tab bars, toolbars, alerts) uses the new glass material. Requires iOS 26+. Doesn't affect Spotify's own custom glass components elsewhere in the app.";
 
 // Experiments
 
@@ -93,6 +91,9 @@ show_instagram_destination_description = "Always show the Instagram share destin
 
 livecontainer_sharing = "Share to LiveContainer";
 livecontainer_sharing_description = "Share to LiveContainer and copy the URL if the selected destination is not supported.";
+
+disable_feelings_for_elsa = "Disable feelings for Elsa";
+disable_feelings_for_elsa_description = "Warning: This toggle is permanent. You have been warned.";
 
 // Miscellaneous
 

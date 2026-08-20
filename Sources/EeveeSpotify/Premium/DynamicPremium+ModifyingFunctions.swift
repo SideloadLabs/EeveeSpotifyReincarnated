@@ -19,6 +19,12 @@ private let propertyReplacements = [
     EeveePropertyReplacement(name: "crossfade_enabled", scope: "ios-feature-settings", modification: .forceBool(true)),
     EeveePropertyReplacement(name: "automix_enabled", scope: "ios-feature-settings", modification: .forceBool(true)),
 
+    // ios featue only draws the row, the player core gates the fade on its own scope
+    EeveePropertyReplacement(name: "crossfade_enabled", scope: "core-playback-setup", modification: .forceBool(true)),
+
+    EeveePropertyReplacement(name: "use_playback_settings_crossfade", scope: "ios-feature-settings", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "use_playback_settings_gapless", scope: "ios-feature-settings", modification: .forceBool(false)),
+
     // capping
     EeveePropertyReplacement(name: "enable_common_capping", modification: .remove),
     EeveePropertyReplacement(name: "enable_pns_common_capping", modification: .remove),
