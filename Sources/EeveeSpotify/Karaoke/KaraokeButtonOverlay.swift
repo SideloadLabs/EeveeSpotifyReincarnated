@@ -51,6 +51,16 @@ final class KaraokeButtonOverlay {
     private var window: UIWindow?
     private var pollTimer: Timer?
 
+    // Set by KaraokeButtonOverlayLyricsScreenHook (viewDidAppear/
+    // viewWillDisappear on the native Lyrics fullscreen screen). That
+    // screen isn't necessarily reflected by nowPlayingScrollViewController/
+    // npvScrollViewController's collectionView().window check below (it's
+    // a separate pushed/presented screen, not one of the swiped-to pages
+    // inside the Now Playing scroll container) — so this is an additional,
+    // more immediate signal, OR'd in alongside the existing poll-based one
+    // rather than replacing it.
+    private var isLyricsScreenVisible = false
+
     private init() {
         // Timer setup needs the main run loop; init() can in principle be
         // triggered from any thread the first time .shared is touched, so
@@ -73,8 +83,31 @@ final class KaraokeButtonOverlay {
         refresh()
     }
 
+    /// Called by KaraokeButtonOverlayLyricsScreenHook's viewDidAppear.
+    /// Triggers an immediate refresh rather than waiting up to 0.5s for
+    /// the next poll tick, so the button appears right as the Lyrics
+    /// screen finishes presenting.
+    func show() {
+        isLyricsScreenVisible = true
+        DispatchQueue.main.async { [weak self] in
+            self?.refresh()
+        }
+    }
+
+    /// Called by KaraokeButtonOverlayLyricsScreenHook's viewWillDisappear.
+    /// Same immediacy reasoning as show() — don't let the button linger
+    /// for up to 0.5s after the Lyrics screen has already started
+    /// dismissing.
+    func hide() {
+        isLyricsScreenVisible = false
+        DispatchQueue.main.async { [weak self] in
+            self?.refresh()
+        }
+    }
+
     private func refresh() {
         let isNowPlayingScreenVisible =
+            isLyricsScreenVisible ||
             (nowPlayingScrollViewController?.collectionView().window != nil) ||
             (npvScrollViewController?.collectionView().window != nil)
         let hasKaraokeData = KaraokeOverlayPresenter.isAvailableForCurrentTrack()
