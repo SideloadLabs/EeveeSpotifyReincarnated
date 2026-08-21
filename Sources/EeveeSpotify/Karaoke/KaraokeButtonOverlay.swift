@@ -1,6 +1,5 @@
 import SwiftUI
 import UIKit
-import Orion
 
 /// A small floating button shown on top of the Now Playing screen
 /// whenever word-synced (karaoke) data is available for the current
@@ -151,14 +150,12 @@ final class KaraokeButtonOverlay {
     // factory method that used to capture a reference to them broke. So
     // instead of depending on that capture, this looks for a live instance
     // directly in the current view-controller hierarchy by runtime class
-    // name every poll tick, then reads `.collectionView()` off it via the
-    // same `@objc` protocol duck-typing (NowPlayingScrollViewController.swift
-    // / NPVScrollViewController.swift under Lyrics/Models/Headers) the
-    // broken hook used — which works on any object satisfying the
-    // protocol's selectors, regardless of how the reference was obtained.
-    // This is more resilient to Spotify's internal DI wiring changing again
-    // in the future, at the cost of a per-tick hierarchy walk (bounded
-    // depth, only every 0.5s, matching this class's existing poll cadence).
+    // name every poll tick, then checks its own `.view.window` (see the
+    // crash note on isNowPlayingScreenCurrentlyVisible below for why this
+    // deliberately does NOT go through `.collectionView()`). This is more
+    // resilient to Spotify's internal DI wiring changing again in the
+    // future, at the cost of a per-tick hierarchy walk (bounded depth, only
+    // every 0.5s, matching this class's existing poll cadence).
     private static let liveScrollViewControllerClassNames: Set<String> = [
         "NowPlaying_ScrollImpl.NowPlayingScrollViewController",
         "NowPlaying_ScrollImpl.NPVScrollViewController",
@@ -167,15 +164,32 @@ final class KaraokeButtonOverlay {
     private static func isNowPlayingScreenCurrentlyVisible() -> Bool {
         // Old hook-populated path first, in case a future Spotify build
         // restores the factory method (or this runs on a build where it
-        // still works) — cheaper than the walk below when it's available.
+        // still works).
         if (nowPlayingScrollViewController?.collectionView().window != nil) ||
            (npvScrollViewController?.collectionView().window != nil) {
             return true
         }
 
+        // Deliberately does NOT call .collectionView() on whatever's found
+        // below. An earlier version did, via Dynamic.convert(_, to:
+        // NowPlayingScrollViewController.self) — which force-dispatches the
+        // selector with no existence check — and that crashed in production
+        // with "-[NowPlaying_ScrollImpl.NPVScrollViewController
+        // collectionView]: unrecognized selector sent to instance". The
+        // class name still matches (confirmed via binary inspection, hence
+        // this path finding it at all), but this build's instance doesn't
+        // actually expose a `collectionView` selector to the ObjC runtime —
+        // Spotify evidently reworked that accessor too, not just the
+        // provideScrollViewControllerWithDependencies: factory method that
+        // broke `nowPlayingScrollViewController`/`npvScrollViewController`
+        // in the first place. Rather than chase yet another moving-target
+        // selector name (or guard every call with responds(to:), which
+        // still leaves this fragile to the *next* internal rename), just
+        // check whether the view controller's own `.view` is on screen —
+        // that's plain UIViewController/UIView API, not a Spotify-internal
+        // accessor, so there's nothing here for Spotify to break.
         guard let liveVC = findLiveNowPlayingScrollViewController() else { return false }
-        let collectionView = Dynamic.convert(liveVC, to: NowPlayingScrollViewController.self).collectionView()
-        return collectionView.window != nil
+        return liveVC.view.window != nil
     }
 
     /// Walks the live view-controller hierarchy — root(s) + children
