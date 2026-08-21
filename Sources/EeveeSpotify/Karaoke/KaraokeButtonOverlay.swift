@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import Orion
 
 /// A small floating button shown on top of the Now Playing screen
 /// whenever word-synced (karaoke) data is available for the current
@@ -113,10 +114,7 @@ final class KaraokeButtonOverlay {
     }
 
     private func refresh() {
-        let isNowPlayingScreenVisible =
-            !isOnNativeLyricsScreen &&
-            ((nowPlayingScrollViewController?.collectionView().window != nil) ||
-             (npvScrollViewController?.collectionView().window != nil))
+        let isNowPlayingScreenVisible = !isOnNativeLyricsScreen && KaraokeButtonOverlay.isNowPlayingScreenCurrentlyVisible()
         let hasKaraokeData = KaraokeOverlayPresenter.isAvailableForCurrentTrack()
         // !isPresented: while the karaoke view itself is open (full-screen,
         // on top of everything, including this overlay window's level),
@@ -131,6 +129,84 @@ final class KaraokeButtonOverlay {
         } else {
             window?.isHidden = true
         }
+    }
+
+    // Verified against a real 9.1.74 IPA (binary string/ObjC-selector
+    // inspection): the `provideScrollViewControllerWithDependencies:`
+    // selector that NowPlayingScrollPrivateServiceImplementationHook hooks
+    // (in NowPlayingScrollViewControllerInstanceHook.x.swift) no longer
+    // exists anywhere in that build's ObjC method-name table at all —
+    // Spotify restructured that DI factory method. That hook can never
+    // attach on this build, so `nowPlayingScrollViewController`/
+    // `npvScrollViewController` stay permanently nil — which is what made
+    // this button (and, since it's the only reachable trigger for the
+    // custom word-synced view on modern iOS, effectively the whole karaoke
+    // feature) permanently invisible, independent of whether karaoke data
+    // was actually available.
+    //
+    // The view controller CLASSES the old hook used to hand us a reference
+    // to (NowPlayingScrollViewController / NPVScrollViewController, both
+    // still present in the NowPlaying_ScrollImpl module per the same binary
+    // inspection) are still real and still on screen — only the specific
+    // factory method that used to capture a reference to them broke. So
+    // instead of depending on that capture, this looks for a live instance
+    // directly in the current view-controller hierarchy by runtime class
+    // name every poll tick, then reads `.collectionView()` off it via the
+    // same `@objc` protocol duck-typing (NowPlayingScrollViewController.swift
+    // / NPVScrollViewController.swift under Lyrics/Models/Headers) the
+    // broken hook used — which works on any object satisfying the
+    // protocol's selectors, regardless of how the reference was obtained.
+    // This is more resilient to Spotify's internal DI wiring changing again
+    // in the future, at the cost of a per-tick hierarchy walk (bounded
+    // depth, only every 0.5s, matching this class's existing poll cadence).
+    private static let liveScrollViewControllerClassNames: Set<String> = [
+        "NowPlaying_ScrollImpl.NowPlayingScrollViewController",
+        "NowPlaying_ScrollImpl.NPVScrollViewController",
+    ]
+
+    private static func isNowPlayingScreenCurrentlyVisible() -> Bool {
+        // Old hook-populated path first, in case a future Spotify build
+        // restores the factory method (or this runs on a build where it
+        // still works) — cheaper than the walk below when it's available.
+        if (nowPlayingScrollViewController?.collectionView().window != nil) ||
+           (npvScrollViewController?.collectionView().window != nil) {
+            return true
+        }
+
+        guard let liveVC = findLiveNowPlayingScrollViewController() else { return false }
+        let collectionView = Dynamic.convert(liveVC, to: NowPlayingScrollViewController.self).collectionView()
+        return collectionView.window != nil
+    }
+
+    /// Walks the live view-controller hierarchy — root(s) + children
+    /// (generically covers UINavigationController/UITabBarController/
+    /// UISplitViewController stacks, which all surface their contents via
+    /// their own `.children`) + presentedViewController, recursively —
+    /// looking for an instance whose runtime class matches one of
+    /// `liveScrollViewControllerClassNames`.
+    private static func findLiveNowPlayingScrollViewController() -> UIViewController? {
+        let roots = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap { $0.windows }
+            .compactMap { $0.rootViewController }
+
+        func walk(_ vc: UIViewController) -> UIViewController? {
+            if liveScrollViewControllerClassNames.contains(NSStringFromClass(type(of: vc))) {
+                return vc
+            }
+            if let presented = vc.presentedViewController, let found = walk(presented) {
+                return found
+            }
+            for child in vc.children {
+                if let found = walk(child) { return found }
+            }
+            return nil
+        }
+
+        for root in roots {
+            if let found = walk(root) { return found }
+        }
+        return nil
     }
 
     private func ensureWindowExists() {
