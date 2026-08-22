@@ -40,15 +40,18 @@ import UIKit
 /// CustomLyrics+ShowAttributes.x.swift does for the credits footer) so it
 /// doesn't depend on Now Playing's internal layout at all. The window's
 /// frame is sized to just the button's own corner — NOT the full screen —
-/// positioned top-right. A UIWindow only ever receives touches that land
-/// within its own frame, so this is what lets every tap *outside* that
-/// corner reach Spotify's window untouched, with no custom hitTest logic
-/// needed at all. (An earlier version made this window full-screen and
-/// tried to manually pass non-button touches through via a hitTest
-/// override — that didn't work, because SwiftUI's hosting view does its
-/// own internal touch routing and hands back *itself* as the hit-test
-/// result for essentially any point inside it, so the "is this actually
-/// empty space, or a real button" check could never tell the difference.)
+/// positioned near the bottom action row (best-effort proximity to
+/// Spotify's own share button; see the comment above ensureWindowExists
+/// for why this isn't a true anchor to it). A UIWindow only ever receives
+/// touches that land within its own frame, so this is what lets every tap
+/// *outside* that corner reach Spotify's window untouched, with no custom
+/// hitTest logic needed at all. (An earlier version made this window
+/// full-screen and tried to manually pass non-button touches through via
+/// a hitTest override — that didn't work, because SwiftUI's hosting view
+/// does its own internal touch routing and hands back *itself* as the
+/// hit-test result for essentially any point inside it, so the "is this
+/// actually empty space, or a real button" check could never tell the
+/// difference.)
 @available(iOS 15.0, *)
 final class KaraokeButtonOverlay {
     static let shared = KaraokeButtonOverlay()
@@ -230,8 +233,8 @@ final class KaraokeButtonOverlay {
             .first(where: { $0.activationState == .foregroundActive }) else { return }
 
         let screenBounds = scene.screen.bounds
-        let safeAreaTop = scene.windows
-            .first(where: { $0.isKeyWindow })?.safeAreaInsets.top ?? 44
+        let safeAreaBottom = scene.windows
+            .first(where: { $0.isKeyWindow })?.safeAreaInsets.bottom ?? 34
 
         // Generous-but-tight size for the single button — wide enough for
         // longer translated copy once other languages get this key
@@ -239,19 +242,40 @@ final class KaraokeButtonOverlay {
         // (including its padding) is never clipped by the window edge.
         let areaWidth: CGFloat = 180
         let areaHeight: CGFloat = 56
-        let topInset: CGFloat = 8
+        let bottomInset: CGFloat = 96
         let trailingInset: CGFloat = 8
 
+        // Best-effort placement near where Spotify's own action row (share/
+        // add-to-playlist/etc.) sits on the Now Playing screen, rather than
+        // the previous top-right corner. This is a fixed offset, not a true
+        // anchor to the real share button's frame — I looked for a stable,
+        // safely-hookable reference to it (ActionBarView/actionBarContainer)
+        // and couldn't confirm one from static binary inspection alone
+        // (unlike the plain UIView-subclass targets elsewhere in this file,
+        // it didn't resolve to a verifiable Module.ClassName, which reading
+        // ivars or subviews off blind would risk another
+        // "unrecognized selector"-style crash). If you can get me a rough
+        // screenshot or the exact frame of the share button, this offset can
+        // be tightened up considerably.
         let frame = CGRect(
             x: screenBounds.width - areaWidth - trailingInset,
-            y: safeAreaTop + topInset,
+            y: screenBounds.height - safeAreaBottom - bottomInset - areaHeight,
             width: areaWidth,
             height: areaHeight
         )
 
         let overlayWindow = UIWindow(windowScene: scene)
         overlayWindow.frame = frame
-        overlayWindow.windowLevel = .alert - 1
+        // Screen-visibility gating (isNowPlayingScreenCurrentlyVisible) already
+        // limits *when* this shows to the Now Playing screen. This level
+        // controls *stacking*, separately: .alert - 1 (the previous value)
+        // sits just below system alerts — meaning above sheets, toasts,
+        // snackbars, the volume HUD, and any other transient UI Spotify
+        // shows while the user is still on the Now Playing screen, which is
+        // what "overlays over everything" actually referred to (visibility
+        // timing was never the only problem). .normal + 1 sits just above
+        // the app's own main content but still below all of that.
+        overlayWindow.windowLevel = .normal + 1
         overlayWindow.backgroundColor = .clear
         overlayWindow.isHidden = true // refresh() unhides it when appropriate
 
