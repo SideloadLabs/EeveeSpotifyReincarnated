@@ -92,6 +92,16 @@ show_instagram_destination_description = "Zawsze pokazuje opcję wstawienia pios
 livecontainer_sharing = "Udostępnij do LiveContainer";
 livecontainer_sharing_description = "Umożliwia udostępniane do LiveContainer i skopiuje URL, jeśli wybrane miejsce nie jest obsługiwane.";
 
+disable_feelings_for_elsa = "Wyłącz uczucia do Elsy";
+disable_feelings_for_elsa_description = "Ostrzeżenie: ten przełącznik jest nieodwracalny. Ostrzegaliśmy.";
+
+// Miscellaneous
+
+miscellaneous = "Pozostałe";
+
+clean_share_links = "Oczyść udostępniane linki";
+clean_share_links_description = "Usuwa parametr śledzący \"si\" z udostępnianych linków Spotify, aby nie ujawniały, z jakiego urządzenia lub konta pochodzi link.";
+
 /* MARK: Premium PopUps */
 
 have_premium_popup = "Wygląda na to, że masz aktywną subskrypcję Premium, więc modyfikacja nie będzie zmieniać danych ani ograniczać korzystania z funkcji Premium po stronie serwera. Możesz to zmienić w ustawieniach EeveeSpotify";
