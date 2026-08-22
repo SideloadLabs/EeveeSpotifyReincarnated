@@ -116,20 +116,24 @@ final class KaraokeButtonOverlay {
     }
 
     private func refresh() {
-        let isNowPlayingScreenVisible = !isOnNativeLyricsScreen && KaraokeButtonOverlay.isNowPlayingScreenCurrentlyVisible()
+        let liveVC = !isOnNativeLyricsScreen ? KaraokeButtonOverlay.findLiveNowPlayingScrollViewController() : nil
+        let isNowPlayingScreenVisible = !isOnNativeLyricsScreen && KaraokeButtonOverlay.isNowPlayingScreenCurrentlyVisible(liveVC: liveVC)
+        let isMinimized = KaraokeButtonOverlay.isNowPlayingScreenMinimized(liveVC: liveVC)
         let hasKaraokeData = KaraokeOverlayPresenter.isAvailableForCurrentTrack()
         // !isPresented: while the karaoke view itself is open (full-screen,
         // on top of everything, including this overlay window's level),
         // there's nothing for this button to do, and leaving the window
         // visible there risks it swallowing taps meant for the karaoke
         // view's own close button if their corners ever overlap.
-        let shouldShow = isNowPlayingScreenVisible && hasKaraokeData && !KaraokeOverlayPresenter.isPresented
+        let shouldShow = isNowPlayingScreenVisible && !isMinimized && hasKaraokeData && !KaraokeOverlayPresenter.isPresented
 
         if shouldShow {
             ensureWindowExists()
+            trackScrolling(of: liveVC)
             window?.isHidden = false
         } else {
             window?.isHidden = true
+            stopTrackingScrolling()
         }
     }
 
@@ -164,7 +168,7 @@ final class KaraokeButtonOverlay {
         "NowPlaying_ScrollImpl.NPVScrollViewController",
     ]
 
-    private static func isNowPlayingScreenCurrentlyVisible() -> Bool {
+    private static func isNowPlayingScreenCurrentlyVisible(liveVC: UIViewController?) -> Bool {
         // Old hook-populated path first, in case a future Spotify build
         // restores the factory method (or this runs on a build where it
         // still works).
@@ -191,8 +195,29 @@ final class KaraokeButtonOverlay {
         // check whether the view controller's own `.view` is on screen —
         // that's plain UIViewController/UIView API, not a Spotify-internal
         // accessor, so there's nothing here for Spotify to break.
-        guard let liveVC = findLiveNowPlayingScrollViewController() else { return false }
+        guard let liveVC = liveVC else { return false }
         return liveVC.view.window != nil
+    }
+
+    // Heuristic for "Now Playing is minimized to the mini-player bar rather
+    // than fully expanded". Spotify doesn't expose a stable, safely-callable
+    // selector for this that I could confirm from the IPA (same situation as
+    // the broken collectionView() accessor above), so rather than guess at
+    // another private accessor, this compares the live Now Playing view's
+    // on-screen height against the screen height: full-screen presentation
+    // is close to the whole screen; the collapsed mini-player bar is a thin
+    // strip at the bottom. 40% is a starting guess, not a measured value —
+    // if this over- or under-fires (button disappearing too early/late as
+    // you collapse it), let me know how far off it looks and I can tighten
+    // the threshold.
+    private static let minimizedHeightFraction: CGFloat = 0.4
+
+    private static func isNowPlayingScreenMinimized(liveVC: UIViewController?) -> Bool {
+        guard let liveVC = liveVC, let window = liveVC.view.window else { return false }
+        let visibleHeight = liveVC.view.convert(liveVC.view.bounds, to: window).height
+        let screenHeight = window.bounds.height
+        guard screenHeight > 0 else { return false }
+        return (visibleHeight / screenHeight) < minimizedHeightFraction
     }
 
     /// Walks the live view-controller hierarchy — root(s) + children
@@ -222,6 +247,98 @@ final class KaraokeButtonOverlay {
 
         for root in roots {
             if let found = walk(root) { return found }
+        }
+        return nil
+    }
+
+    // MARK: - Scroll tracking
+    //
+    // Moves the button window's Y position to follow the Now Playing
+    // screen's own scroll offset, so it stays visually attached to the
+    // content instead of sitting at a fixed screen position while the user
+    // scrolls Now Playing's content underneath it.
+    //
+    // Crash-safety note: this deliberately locates the scroll view by
+    // *type* (`as? UIScrollView` — a plain Swift type check, not a runtime
+    // selector dispatch) rather than by calling the broken
+    // `collectionView()` accessor used elsewhere in this file. Walking
+    // `.subviews` and `NSKeyValueObservation` on `contentOffset` are both
+    // public, stable UIKit API — there's nothing Spotify-internal here for
+    // a future build to break.
+
+    private weak var trackedScrollView: UIScrollView?
+    private var scrollObservation: NSKeyValueObservation?
+    private var baseWindowY: CGFloat?
+    private var baseContentOffsetY: CGFloat?
+
+    private func trackScrolling(of liveVC: UIViewController?) {
+        guard let liveVC = liveVC else {
+            stopTrackingScrolling()
+            return
+        }
+
+        let scrollView = KaraokeButtonOverlay.findFirstScrollView(in: liveVC.view)
+
+        if scrollView !== trackedScrollView {
+            stopTrackingScrolling()
+            guard let scrollView = scrollView else { return }
+            trackedScrollView = scrollView
+            baseContentOffsetY = scrollView.contentOffset.y
+            baseWindowY = window?.frame.origin.y
+            scrollObservation = scrollView.observe(\.contentOffset, options: [.new]) { [weak self] _, change in
+                guard let self = self, let newOffset = change.newValue else { return }
+                DispatchQueue.main.async {
+                    self.applyScrollOffset(newOffset.y)
+                }
+            }
+        }
+    }
+
+    private func stopTrackingScrolling() {
+        scrollObservation?.invalidate()
+        scrollObservation = nil
+        trackedScrollView = nil
+        baseWindowY = nil
+        baseContentOffsetY = nil
+    }
+
+    private func applyScrollOffset(_ currentOffsetY: CGFloat) {
+        guard let window = window,
+              let baseWindowY = baseWindowY,
+              let baseContentOffsetY = baseContentOffsetY else { return }
+
+        // Content scrolling up (offset increasing) should move the button up
+        // with it, same direction Spotify's own content moves — hence
+        // subtracting the delta rather than adding it.
+        let delta = currentOffsetY - baseContentOffsetY
+        var newFrame = window.frame
+        newFrame.origin.y = baseWindowY - delta
+
+        // Keep it fully on screen rather than letting it scroll away
+        // entirely — this is a small persistent trigger button, not part of
+        // the scrolled content itself, so it should stay reachable even if
+        // Now Playing's content scrolls a long way.
+        if let screenHeight = window.windowScene?.screen.bounds.height {
+            let minY: CGFloat = 8
+            let maxY = screenHeight - newFrame.height - 8
+            newFrame.origin.y = min(max(newFrame.origin.y, minY), maxY)
+        }
+
+        window.frame = newFrame
+    }
+
+    /// Walks `.subviews` (breadth-first) looking for the first UIScrollView
+    /// (UICollectionView included, since it's a UIScrollView subclass).
+    /// Pure type-checking, no selector calls — see the crash-safety note
+    /// above trackScrolling.
+    private static func findFirstScrollView(in root: UIView) -> UIScrollView? {
+        var queue: [UIView] = [root]
+        while !queue.isEmpty {
+            let view = queue.removeFirst()
+            if let scrollView = view as? UIScrollView {
+                return scrollView
+            }
+            queue.append(contentsOf: view.subviews)
         }
         return nil
     }
