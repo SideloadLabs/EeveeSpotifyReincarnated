@@ -84,7 +84,6 @@ static_color = "Static Color";
 color_normalization_factor = "Color Normalization Factor";
 dark_popups = "Dark PopUps";
 amoled_theme = "AMOLED Black Theme";
-amoled_theme_description = "Replaces Spotify's flat dark-gray backgrounds with true black. Colored Now Playing backgrounds and gradients are preserved. Restart the app after changing this setting.";
 
 // Experiments
 

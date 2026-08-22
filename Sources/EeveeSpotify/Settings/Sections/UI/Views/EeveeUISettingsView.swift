@@ -59,7 +59,7 @@ struct EeveeUISettingsView: View {
             }
 
             Section(
-                footer: Text("amoled_theme_description".localized)
+                footer: Text("restart_is_required_description".localized)
             ) {
                 Toggle(
                     "amoled_theme".localized,

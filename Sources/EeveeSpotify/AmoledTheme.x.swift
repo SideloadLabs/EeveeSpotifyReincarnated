@@ -45,7 +45,7 @@ enum AmoledTheme {
 }
 
 /// `UIView.backgroundColor` is a stable UIKit boundary across Spotify builds,
-/// including the UIKit hosting views used by Spotify 9.1.74's SwiftUI screens.
+/// including the UIKit hosting views used by Spotify 9.1.x SwiftUI screens.
 /// Keeping the hook on the setter avoids globally changing UIColor instances
 /// that may also be used for text, icons, shadows, or artwork.
 class UIViewAmoledThemeHook: ClassHook<UIView> {
