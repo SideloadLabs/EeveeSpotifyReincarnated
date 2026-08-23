@@ -4,6 +4,16 @@ import UIKit
 struct AmoledThemeGroup: HookGroup { }
 
 enum AmoledTheme {
+    private static let darkTrait = UITraitCollection(userInterfaceStyle: .dark)
+    private static let black = UIColor.black
+    private static let clear = UIColor.clear
+
+    private static let colorCache: NSCache<UIColor, UIColor> = {
+        let cache = NSCache<UIColor, UIColor>()
+        cache.countLimit = 64
+        return cache
+    }()
+
     /// Spotify 9.1.x uses several almost-neutral dark grays for its flat
     /// surfaces. Only replace opaque, neutral background colors so album-art
     /// tints, gradients, text, separators, and translucent materials keep their
@@ -11,9 +21,15 @@ enum AmoledTheme {
     static func backgroundColor(replacing color: UIColor?) -> UIColor? {
         guard let color = color else { return nil }
 
-        let resolved = color.resolvedColor(
-            with: UITraitCollection(userInterfaceStyle: .dark)
-        )
+        if color === black || color === clear {
+            return color
+        }
+
+        if let cached = colorCache.object(forKey: color) {
+            return cached
+        }
+
+        let resolved = color.resolvedColor(with: darkTrait)
 
         var red: CGFloat = 0
         var green: CGFloat = 0
@@ -26,21 +42,23 @@ enum AmoledTheme {
             blue: &blue,
             alpha: &alpha
         ) else {
+            colorCache.setObject(color, forKey: color)
             return color
         }
-
-        // Skip clear/translucent colors and true black, and keep colored dark
-        // surfaces such as the Now Playing artwork-derived background intact.
-        guard alpha >= 0.95 else { return color }
 
         let brightestComponent = max(red, max(green, blue))
         let darkestComponent = min(red, min(green, blue))
         let isNeutral = brightestComponent - darkestComponent <= 0.025
         let isDarkSurface = brightestComponent >= 0.035 && brightestComponent <= 0.22
 
-        guard isNeutral && isDarkSurface else { return color }
+        guard alpha >= 0.95, isNeutral, isDarkSurface else {
+            colorCache.setObject(color, forKey: color)
+            return color
+        }
 
-        return UIColor(white: 0, alpha: alpha)
+        let result = alpha >= 1.0 ? black : UIColor(white: 0, alpha: alpha)
+        colorCache.setObject(result, forKey: color)
+        return result
     }
 }
 
