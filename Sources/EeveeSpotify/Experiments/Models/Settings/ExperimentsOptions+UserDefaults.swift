@@ -5,8 +5,7 @@ extension UserDefaults {
         key: "experimentsOptions",
         defaultValue: ExperimentsOptions(
             showInstagramDestination: false,
-            liveContainerSharing: true,
-            disableFeelingsForElsa: true
+            liveContainerSharing: true
         )
     )
     static var experimentsOptions

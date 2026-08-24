@@ -92,8 +92,6 @@ show_instagram_destination_description = "Zawsze pokazuje opcję wstawienia pios
 livecontainer_sharing = "Udostępnij do LiveContainer";
 livecontainer_sharing_description = "Umożliwia udostępniane do LiveContainer i skopiuje URL, jeśli wybrane miejsce nie jest obsługiwane.";
 
-disable_feelings_for_elsa = "Wyłącz uczucia do Elsy";
-disable_feelings_for_elsa_description = "Ostrzeżenie: ten przełącznik jest nieodwracalny. Ostrzegaliśmy.";
 
 // Miscellaneous
 

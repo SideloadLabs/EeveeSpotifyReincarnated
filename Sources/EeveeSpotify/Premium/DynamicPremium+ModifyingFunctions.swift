@@ -1,17 +1,36 @@
 import Foundation
 import UIKit
 
+private let liveMessagingAssignmentKeys = Set([
+    "ios-campfire-properties-impl.campfire_feature_enabled",
+    "ios-feature-sidedrawer-platform.is_list_page_enabled"
+])
+
 func modifyRemoteConfiguration(_ configuration: inout UcsResponse) {
     modifyAttributes(&configuration.attributes.accountAttributes)
-    
-    // IMPORTANT:
-    // Always apply our assignedValues patching. Some accounts receive different remote configs,
-    // and using a static bundled resolve config alone can regress back to Free tier.
-    modifyAssignedValues(&configuration.assignedValues)
 
-    if UserDefaults.overwriteConfiguration {
+    let overwriteRequested = UserDefaults.overwriteConfiguration
+    if ServerSidedFeaturePolicy.shouldOverwriteResolvedConfiguration(
+        requested: overwriteRequested
+    ) {
+        // Messaging availability is assigned to the current account. A bundled
+        // Premium snapshot can otherwise hide the chat UI for a different cohort.
+        let liveMessagingAssignments = configuration.assignedValues.filter {
+            liveMessagingAssignmentKeys.contains("\($0.propertyID.scope).\($0.propertyID.name)")
+        }
+
         configuration.resolve.configuration = try! BundleHelper.shared.resolveConfiguration()
+
+        configuration.assignedValues.removeAll {
+            liveMessagingAssignmentKeys.contains("\($0.propertyID.scope).\($0.propertyID.name)")
+        }
+        configuration.assignedValues.append(contentsOf: liveMessagingAssignments)
     }
+
+    // Apply targeted changes after an optional full overwrite. Doing it
+    // before replacement discarded every ad/upsell fix along with Spotify's
+    // current feature assignments.
+    modifyAssignedValues(&configuration.assignedValues)
 }
 
 private let propertyReplacements = [
@@ -72,6 +91,29 @@ private let propertyReplacements = [
     EeveePropertyReplacement(name: "enable_home_sponsored_ad", modification: .setBool(false)),
     EeveePropertyReplacement(name: "enable_home_sponsored_ads", modification: .setBool(false)),
     EeveePropertyReplacement(name: "enable_home_upsell", modification: .setBool(false)),
+
+    // Spotify 9.1.66+ moved the most visible free-tier prompts into dedicated
+    // Swift services. Seed these scoped values even when the account's UCS
+    // response omits them; setBool-only replacements cannot do that.
+    EeveePropertyReplacement(name: "is_enabled_pt2", scope: "ios-feature-shuffletoggleupsell", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "linear_upsell_new_style_experiment_enabled", scope: "ios-feature-shuffletoggleupsell", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "play_modes_upsell_new_style_experiment_enabled", scope: "ios-feature-shuffletoggleupsell", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "free_user_shuffle_upsell_sheet_enabled", scope: "ios-jam-freeusershuffleupsellsheetpage-impl", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "free_user_skip_upsell_sheet_enabled", scope: "ios-jam-freeuserskipupsellpage-impl", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "free_hosted_jams_upsell_enabled", scope: "ios-jam-freehostedjamsupsell-impl", modification: .forceBool(false)),
+    EeveePropertyReplacement(
+        name: ServerSidedFeaturePolicy.premiumGatedJamEntryPoint.name,
+        scope: ServerSidedFeaturePolicy.premiumGatedJamEntryPoint.scope,
+        modification: .forceBool(false)
+    ),
+    EeveePropertyReplacement(name: "is_promo_cta_enabled", scope: "ios-reinventfree-contextualupsellpremiumpromo-impl", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "show_time_cap_upsell_with_premium_badge", scope: "ios-reinventfree-contextualupsellpremiumpromo-impl", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "enable_video_time_cap_upsell", scope: "ios-reinventfree-controllerui-impl", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "enable_video_time_cap_upsell_on_search", scope: "ios-reinventfree-controllerui-impl", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "music_video_upsell_enabled", scope: "ios-reinventfree-timecappivot-impl", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "is_gbb_upsell_enabled", scope: "ios-settings-mediaqualitypageplugin-impl", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "should_show_pigeon_upsell", scope: "ios-settings-mediaqualitypageplugin-impl", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "preview_ended_upsell_enabled", scope: "ios-system-listeningparties", modification: .forceBool(false)),
     EeveePropertyReplacement(name: "enable_now_playing_ad", modification: .setBool(false)),
     EeveePropertyReplacement(name: "enable_now_playing_ads", modification: .setBool(false)),
     EeveePropertyReplacement(name: "enable_now_playing_banner_ad", modification: .setBool(false)),
@@ -212,6 +254,18 @@ private let propertyReplacements = [
     // Modern RemoteConfig scope for Leave Behind ads (confirmed in binary as 'ios-feature-leavebehindadsbase').
     EeveePropertyReplacement(scope: "ios-feature-leavebehindadsbase", modification: .remove),
 
+    // Unified leave-behind cards are delivered into the Now Playing scroll
+    // independently of the older EmbeddedNPV switches. These are the flags
+    // used by Spotify 9.1.76 for the ad shown in issue #104.
+    EeveePropertyReplacement(name: "unified_leavebehind_npv_scroll_music_enabled", scope: "ios-nowplaying-scroll-impl", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "unified_leavebehind_npv_scroll_podcast_enabled", scope: "ios-nowplaying-scroll-impl", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "use_unified_leavebehind_fetch", scope: "ios-feature-embeddedplaylist", modification: .forceBool(false)),
+
+    // Keep the older EmbeddedNPV renderer dormant as a second line of defence.
+    EeveePropertyReplacement(name: "foreground_enabled", scope: "ios-adsnowplaying-embeddednpv-impl", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "music_track_change_enabled", scope: "ios-adsnowplaying-embeddednpv-impl", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "enable_ads_on_podcast", scope: "ios-adsnowplaying-embeddednpv-impl", modification: .forceBool(false)),
+
     // ─────────────────────────────────────────────────────────────────────
     // In-stream / audio / video stream ads
     // ─────────────────────────────────────────────────────────────────────
@@ -243,7 +297,7 @@ private let propertyReplacements = [
     // ─────────────────────────────────────────────────────────────────────
     // Now Playing video ads
     // ─────────────────────────────────────────────────────────────────────
-    EeveePropertyReplacement(name: "embedded_npv_video_show_with_canvas", scope: "ios-feature-adsnowplayingui", modification: .setBool(false)),
+    EeveePropertyReplacement(name: "embedded_npv_video_show_with_canvas", scope: "ios-feature-adsnowplayingui", modification: .forceBool(false)),
 
     // ─────────────────────────────────────────────────────────────────────
     // Sponsored context (sponsored playlists in Now Playing bar)
@@ -373,6 +427,11 @@ private func modifyAssignedValues(_ values: inout [AssignedValue]) {
 }
 
 private func modifyAttributes(_ attributes: inout [String: AccountAttribute]) {
+    let serverAuthoritativeAttributes = Dictionary(
+        uniqueKeysWithValues: ServerSidedFeaturePolicy.serverAuthoritativeAccountAttributes
+            .compactMap { name in attributes[name].map { (name, $0) } }
+    )
+
     let oneYearFromNow = Calendar.current.date(byAdding: .year, value: 1, to: Date())!
     
     let formatter = ISO8601DateFormatter()
@@ -426,10 +485,6 @@ private func modifyAttributes(_ attributes: inout [String: AccountAttribute]) {
         $0.stringValue = "1"
     }
 
-    attributes["offline"] = AccountAttribute.with {
-        $0.boolValue = true // allow downloading
-    }
-
     attributes["on-demand"] = AccountAttribute.with {
         $0.boolValue = true
     }
@@ -452,14 +507,6 @@ private func modifyAttributes(_ attributes: inout [String: AccountAttribute]) {
 
     attributes["shuffle-eligible"] = AccountAttribute.with {
         $0.boolValue = true
-    }
-
-    attributes["social-session"] = AccountAttribute.with {
-        $0.boolValue = true
-    }
-
-    attributes["social-session-free-tier"] = AccountAttribute.with {
-        $0.boolValue = false
     }
 
     attributes["streaming-rules"] = AccountAttribute.with {
@@ -493,20 +540,8 @@ private func modifyAttributes(_ attributes: inout [String: AccountAttribute]) {
         $0.boolValue = false
     }
 
-    attributes["offline-backup"] = AccountAttribute.with {
-        $0.stringValue = "UNRESTRICTED"
-    }
-
-    attributes["lyrics-offline"] = AccountAttribute.with {
-        $0.boolValue = true
-    }
-
     attributes["mixing-tools"] = AccountAttribute.with {
         $0.stringValue = "EDIT"
-    }
-
-    attributes["jam-social-session"] = AccountAttribute.with {
-        $0.stringValue = "EXPANDED"
     }
 
     attributes["your-library-tags"] = AccountAttribute.with {
@@ -547,4 +582,14 @@ private func modifyAttributes(_ attributes: inout [String: AccountAttribute]) {
         attributes.removeValue(forKey: "is-premium-eligible-v\(i)")
     }
     attributes.removeValue(forKey: "is-premium-eligible")
+
+    // Restore the real account entitlements after all client-side Premium
+    // mutations. Missing values remain missing instead of being synthesized.
+    for name in ServerSidedFeaturePolicy.serverAuthoritativeAccountAttributes {
+        if let original = serverAuthoritativeAttributes[name] {
+            attributes[name] = original
+        } else {
+            attributes.removeValue(forKey: name)
+        }
+    }
 }

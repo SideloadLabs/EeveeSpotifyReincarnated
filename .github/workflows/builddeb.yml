@@ -66,6 +66,30 @@ jobs:
       - name: Build EeveeSwiftProtobuf.framework
         run: make build-eeveeswiftprotobuf
 
+      - name: Test ad and Premium banner filtering
+        run: |
+          swiftc \
+            Sources/EeveeSpotify/Premium/Helpers/BrowsitaSectionStripper.swift \
+            Tests/BrowsitaSectionStripper/main.swift \
+            -o "$RUNNER_TEMP/browsita-section-stripper-tests"
+          "$RUNNER_TEMP/browsita-section-stripper-tests"
+          swiftc \
+            Sources/EeveeSpotify/Shared/Models/Extensions/URL+Extension.swift \
+            Tests/URLAdClassification/main.swift \
+            -o "$RUNNER_TEMP/url-ad-classification-tests"
+          "$RUNNER_TEMP/url-ad-classification-tests"
+          swiftc \
+            Sources/EeveeSpotify/Premium/Helpers/ServerSidedFeaturePolicy.swift \
+            Tests/ServerSidedFeaturePolicy/main.swift \
+            -o "$RUNNER_TEMP/server-sided-feature-policy-tests"
+          "$RUNNER_TEMP/server-sided-feature-policy-tests"
+          swiftc \
+            Sources/EeveeSpotify/Premium/Helpers/BundledConfigurationPolicy.swift \
+            Tests/BundledConfigurationPolicy/main.swift \
+            -o "$RUNNER_TEMP/bundled-configuration-policy-tests"
+          "$RUNNER_TEMP/bundled-configuration-policy-tests"
+          python3 Tests/ResolveConfigurationSnapshot/test.py
+
       - name: Build ${{ matrix.label }} .deb
         env:
           REPO_SLUG: ${{ github.repository }}
@@ -91,6 +115,28 @@ jobs:
           DEB_PATH="$(find Outputs/DEBS -name '*.deb' -type f | head -n 1)"
           dpkg-deb --info "$DEB_PATH"
           dpkg-deb --contents "$DEB_PATH"
+          EXTRACT_DIR="$RUNNER_TEMP/eevee-deb-${{ matrix.scheme }}"
+          dpkg-deb -x "$DEB_PATH" "$EXTRACT_DIR"
+          DYLIB_PATH="$(find "$EXTRACT_DIR" -name 'EeveeSpotify.dylib' -type f | head -n 1)"
+          [ -n "$DYLIB_PATH" ] || { echo "EeveeSpotify.dylib missing" >&2; exit 1; }
+          for marker in \
+            AdsSponsoredContextServiceImpl \
+            AdsSponsoredContextNPBAttachmentServiceImpl \
+            AdsSponsoredPlaylistHeaderServiceImpl \
+            SelfLoadingUpsellBannerUIView \
+            ReferralsUpsellCardElementServiceImpl \
+            DownloadUpsellService \
+            FreeHostedJamsUpsellServiceImpl \
+            FreeUserSkipUpsellPageService \
+            FreeUserShuffleUpsellSheetPageService \
+            premium_gated_start_jam_buttons_enabled \
+            playlist_downloading_popup \
+            downloadToggledWithCurrentAvailability:addAction:removeAction:pageIdentifier:pageURI:interactionID:; do
+            strings "$DYLIB_PATH" | grep -Fq "$marker" || {
+              echo "Compiled banner blocker marker missing: $marker" >&2
+              exit 1
+            }
+          done
           if [ "${{ matrix.scheme }}" = "roothide" ]; then
             [ "$(dpkg-deb -f "$DEB_PATH" Architecture)" = "iphoneos-arm64e" ]
           fi
@@ -120,6 +166,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ inputs.tag }}
+          target_commitish: ${{ github.sha }}
           name: ${{ inputs.release_name != '' && inputs.release_name || inputs.tag }}
           draft: true
           prerelease: ${{ inputs.prerelease == 'true' }}

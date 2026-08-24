@@ -106,6 +106,8 @@ Thanks for all of the community's support, also, thanks to all the devs who work
 
 [whoeevee](https://github.com/whoeevee) 
 
+- This project is a fork of [Meeep1/EeveeSpotifyRevivedPublic](https://github.com/Meeep1/EeveeSpotifyRevivedPublic).
+
 ## Disclaimer
 
 This project is an **independent modification (tweak)** for the Spotify app. We are **not affiliated, associated, authorized, endorsed by, or in any way officially connected with Spotify**, or any of its subsidiaries or affiliates. 

@@ -8,6 +8,7 @@ struct EeveeSettingsView: View {
     @State private var hasShownCommonIssuesTip = UserDefaults.hasShownCommonIssuesTip
     @State private var isClearingData = false
 
+
     private func confirmDestructive(
         title: String,
         message: String,
@@ -248,7 +249,7 @@ struct EeveeSettingsView: View {
         
         .animation(.default, value: isClearingData)
         .animation(.default, value: hasShownCommonIssuesTip)
-        
+
         .onAppear {
             WindowHelper.shared.overrideUserInterfaceStyle(.dark)
         }

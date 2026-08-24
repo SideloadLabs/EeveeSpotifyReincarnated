@@ -3,6 +3,7 @@ import UIKit
 
 class EeveeSettingsViewController: SPTPageViewController {
     let settingsView: AnyView
+    private var hasShownSpecialLicense = false
     
     init(_ frame: CGRect, settingsView: AnyView, navigationTitle: String) {
         self.settingsView = settingsView
@@ -32,6 +33,28 @@ class EeveeSettingsViewController: SPTPageViewController {
             hostingController.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             hostingController.view.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
+    }
+    
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        // Become first responder so we can receive motion events
+        becomeFirstResponder()
+    }
+    
+    override var canBecomeFirstResponder: Bool { true }
+    
+    override func motionEnded(_ motion: UIEvent.EventSubtype, with event: UIEvent?) {
+        super.motionEnded(motion, with: event)
+        guard motion == .motionShake, !hasShownSpecialLicense else { return }
+        hasShownSpecialLicense = true
+        
+        let alert = UIAlertController(
+            title: "Special License Detected",
+            message: "Subscribed to Elsa by Hysan since 2026.",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "Prayers for Hysan 🙏", style: .default))
+        WindowHelper.shared.present(alert)
     }
     
     @objc func openRepositoryUrl(_ sender: UIButton) {
