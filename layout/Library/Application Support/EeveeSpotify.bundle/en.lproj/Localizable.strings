@@ -92,8 +92,6 @@ show_instagram_destination_description = "Always show the Instagram share destin
 livecontainer_sharing = "Share to LiveContainer";
 livecontainer_sharing_description = "Share to LiveContainer and copy the URL if the selected destination is not supported.";
 
-disable_feelings_for_elsa = "Disable feelings for Elsa";
-disable_feelings_for_elsa_description = "Warning: This toggle is permanent. You have been warned.";
 
 // Miscellaneous
 

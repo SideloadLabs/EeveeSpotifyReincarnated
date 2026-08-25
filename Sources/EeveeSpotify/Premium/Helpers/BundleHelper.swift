@@ -62,10 +62,17 @@ class BundleHelper {
     }
     
     func resolveConfiguration() throws -> ResolveConfiguration {
+        let spotifyVersion = Bundle.main.object(
+            forInfoDictionaryKey: "CFBundleShortVersionString"
+        ) as? String ?? ""
+        let resourceName = BundledConfigurationPolicy.resourceName(for: spotifyVersion)
+
         guard let bundle = self.bundle,
-              let url = bundle.url(forResource: "resolveconfiguration", withExtension: "bnk") else {
+              let url = bundle.url(forResource: resourceName, withExtension: "bnk") else {
             throw NSError(domain: "EeveeSpotify", code: 404, userInfo: [NSLocalizedDescriptionKey: "Configuration not found"])
         }
+
+        writeDebugLog("[CONFIG] Using \(resourceName).bnk for Spotify \(spotifyVersion)")
         
         return try ResolveConfiguration(
             serializedBytes: try Data(contentsOf: url)

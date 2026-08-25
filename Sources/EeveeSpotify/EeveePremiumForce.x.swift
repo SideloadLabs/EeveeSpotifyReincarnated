@@ -28,8 +28,6 @@ private func forcedPremiumString(forKey key: String) -> String? {
     case "on-demand":                              return "1"
     case "unrestricted":                           return "1"
     case "shuffle-eligible":                       return "1"
-    case "social-session":                         return "1"
-    case "social-session-free-tier":               return "0"
     case "social-connect":                         return "1"
     case "tracks-in-collection-enabled":           return "1"
     case "is-eligible-premium-unboxing":           return "1"
@@ -40,17 +38,9 @@ private func forcedPremiumString(forKey key: String) -> String? {
     case "streaming-rules":                        return ""
     case "previous-streaming-rules":               return ""
     case "high-bitrate":                           return "1"
-    case "very-high-bitrate":                      return "1"
-    case "audio-quality":                          return "very_high"
     case "shuffle":                                return "0"
     case "shuffle-mode":                           return "0"
     case "pick-and-shuffle":                       return "0"
-
-    case "offline":                                return "1"
-    case "can-use-offline":                        return "1"
-    case "has-offline-state":                      return "1"
-    case "max-offline-downloads-per-device":       return "10000"
-    case "max-offline-tracks":                     return "10000"
 
     case "subscription-enddate":                   return oneYearFromNowISO
     case "product-expiry":                         return oneYearFromNowISO

@@ -33,21 +33,34 @@ class HubsAdBlocker: ClassHook<NSObject> {
 
     // Bare "ad"/"ads" intentionally absent: as substrings they hit real shelf ids
     // (made-for-you, release-radar). Matched only against structural fields, never titles.
-    private static let adKeywords: [String] = [
-        "sponsored", "upsell", "campaign", "promoted", "premium-upsell", "merch",
-        "ticket", "billboard", "banner", "interstitial", "overlay", "marquee",
+    private static let hardAdKeywords: [String] = [
+        "sponsored", "upsell", "campaign", "promoted", "premium-upsell",
+        "billboard", "interstitial", "marquee",
         "leavebehind", "leave-behind", "displayad", "display-ad", "fullbleed",
-        "full-bleed", "leaderboard", "advertisement", "sponsor", "promo", "native-ad",
+        "full-bleed", "leaderboard", "advertisement", "sponsor", "native-ad",
         "mobile-ads", "on-surface", "onsurface", "search-ad", "home-ad",
         "sponsored-content", "sponsored-ad", "ad-card", "native-ad-home-shelf",
         "sponsored-shelf", "sponsored-row", "ad-shelf", "ad-row", "sponsored-item",
-        "ad-item", "merchandising", "upgrade-component", "offer", "marketing",
+        "ad-item", "upgrade-component",
         "mobile-display-ad-card", "mobile-ads-display-ad-element"
+    ]
+
+    private static let promotionalIntentKeywords: [String] = [
+        "premium", "upgrade", "offer", "marketing", "promo", "promotion",
+        "subscribe", "subscription",
+    ]
+
+    private static let promotionalSurfaceKeywords: [String] = [
+        "banner", "card", "popup", "pop-up", "sheet", "overlay", "component",
+        "message",
     ]
 
     private static func containsAdKeyword(_ str: String) -> Bool {
         let lower = str.lowercased()
-        return adKeywords.contains { lower.contains($0) }
+        if hardAdKeywords.contains(where: { lower.contains($0) }) { return true }
+        let hasPromotionalIntent = promotionalIntentKeywords.contains { lower.contains($0) }
+        let hasPromotionalSurface = promotionalSurfaceKeywords.contains { lower.contains($0) }
+        return hasPromotionalIntent && hasPromotionalSurface
     }
 
     private func isAdComponent(_ component: [String: Any]) -> Bool {

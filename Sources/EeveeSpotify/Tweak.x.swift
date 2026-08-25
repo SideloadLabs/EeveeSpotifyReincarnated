@@ -58,6 +58,25 @@ struct IOS14And15PremiumPatchingGroup: HookGroup { }
 struct V91PremiumPatchingGroup: HookGroup { } // For Spotify 9.1.x versions
 struct LatestPremiumPatchingGroup: HookGroup { }
 
+// Spotify 9.1.x originally removed the offline helper, so this version family
+// skipped the reminder hook entirely. Newer 9.1 builds expose the modern helper
+// again. Activate only that hook when its exact Objective-C entry point exists.
+func activateV91ServerSidedReminderIfAvailable() {
+    let className = ContentOffliningUIHelperImplementationModernHook.targetName
+    let selector = Selector((
+        "downloadToggledWithCurrentAvailability:addAction:removeAction:pageIdentifier:pageURI:interactionID:"
+    ))
+
+    guard let cls = NSClassFromString(className),
+          class_getInstanceMethod(cls, selector) != nil else {
+        writeDebugLog("[INIT] Server-sided download reminder unavailable on this 9.1.x build")
+        return
+    }
+
+    LatestPremiumPatchingGroup().activate()
+    writeDebugLog("[INIT] Activated server-sided download reminder for 9.1.x")
+}
+
 func activatePremiumPatchingGroup() {
     BasePremiumPatchingGroup().activate()
     
@@ -249,8 +268,15 @@ struct EeveeSpotify: Tweak {
         // Otherwise Spotify can get stuck on splash because bootstrap is cancelled.
         UserDefaults.hasPatchedBootstrap = false
 
-        // Local-only premium force. Activated FIRST and unconditionally, before
-        // any version gating or kill-switch. Independent of patchType / bootstrap
+        // Recovery path for private-class changes: this must run before every
+        // manual hook activation, including ad and Premium banner blockers.
+        if eeveeEnvFlag("EEVEE_DISABLE_ALL") {
+            eeveeBreadcrumb("EEVEE_DISABLE_ALL=1 -> returning without hooks")
+            return
+        }
+
+        // Local-only premium force. Activated first after the recovery kill-switch,
+        // before version gating. Independent of patchType / bootstrap
         // patching / network interception. Keeps premium UI/state even if every
         // other Eevee path is disabled.
         activateEeveePremiumForce()
@@ -263,6 +289,10 @@ struct EeveeSpotify: Tweak {
         // Block premium upsell / "Like listening without limits?" popups.
         activateUpsellPopupBlocker()
 
+        // Block the newer Swift service-backed Premium sheets/cards used by
+        // Spotify 9.1.x. Each target is runtime-gated for minor-version safety.
+        activateUpsellServiceBlocker()
+
         // Block upsell components injected into Hub/home JSON (e.g. upgrade banners).
         if NSClassFromString("HUBViewModelBuilderImplementation") != nil {
             AdBlockerGroup().activate()
@@ -270,13 +300,6 @@ struct EeveeSpotify: Tweak {
         }
 
         // activateEeveeFlexGesture()
-
-        // Global kill-switch for debugging “instant crash / no logs”.
-        // If setting this makes Spotify launch, the crash is definitely in one of our hook activations.
-        if eeveeEnvFlag("EEVEE_DISABLE_ALL") {
-            eeveeBreadcrumb("EEVEE_DISABLE_ALL=1 -> returning without hooks")
-            return
-        }
 
         // Clean Share Links: swizzle the concrete class of UIPasteboard.general in
         // addition to the ClassHook<UIPasteboard> hooks — the general pasteboard is a
@@ -309,6 +332,9 @@ struct EeveeSpotify: Tweak {
 
         // CarPlay crash fix (Issue #16) — safe-gated
         activateCarPlayCrashFix()
+
+        // Hysan's Elsa Recovery Fund: tappable donation toast on 5th launch
+        Donation.activate()
 
         // Verify critical hook targets exist
         let hookTargets: [(String, String)] = [
@@ -348,6 +374,8 @@ struct EeveeSpotify: Tweak {
                 } else {
                     writeDebugLog("[INIT] Skipped PremiumUIHooksGroup (missing HUBViewModelBuilderImplementation/addJSONDictionary:)")
                 }
+
+                activateV91ServerSidedReminderIfAvailable()
             }
 
             let lyricsEnabled = UserDefaults.lyricsSource.isReplacingLyrics

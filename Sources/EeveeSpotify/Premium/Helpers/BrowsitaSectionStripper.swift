@@ -1,12 +1,26 @@
 import Foundation
 
-// Strips brand-ad sections from /casita/ and /browsita/ protobuf responses.
+// Strips ad and upsell sections from home/browse/Now Playing feed protobufs.
 
 enum BrowsitaSectionStripper {
 
-    private static let adMarkers: [[UInt8]] = [
+    private static let hardAdMarkers: [[UInt8]] = [
         "spotify:ad:", "ad-formats", "advertisement", "brand-ad",
         "sponsored", "marquee", "promoted", "home-ads", "adsproduct",
+        "leavebehind", "leave-behind", "premium-upsell", "premium_upsell",
+        "premiumupsell", "referralsupsellcard",
+    ].map { Array($0.utf8) }
+
+    // Generic "upsell" metadata is not enough to delete a whole section. It
+    // must describe a visible promotional surface too.
+    private static let promotionalIntentMarkers: [[UInt8]] = [
+        "upsell", "upgrade", "subscribe", "premium", "promo", "promotion",
+        "marketing", "offer",
+    ].map { Array($0.utf8) }
+
+    private static let promotionalSurfaceMarkers: [[UInt8]] = [
+        "banner", "card", "popup", "pop-up", "sheet", "interstitial",
+        "promotion", "promo",
     ].map { Array($0.utf8) }
 
     private static let keepMarkers: [[UInt8]] = [
@@ -20,6 +34,7 @@ enum BrowsitaSectionStripper {
         // /casita/v1/feeds is flat tab-chip list, parser would mis-walk it.
         if p.hasSuffix("/casita/v1/feeds") || p.contains("/casita/v1/feeds/") { return false }
         return p.contains("/browsita/") || p.contains("/casita/")
+            || p.contains("/scrollsita/")
     }
 
     static func strip(_ data: Data, url: URL? = nil) -> Data? {
@@ -76,11 +91,22 @@ enum BrowsitaSectionStripper {
     private static func adHits(_ data: Data, start: Int, end: Int) -> [String]? {
         guard end > start, end <= data.count else { return nil }
         let slice = data[start..<end]
-        for keep in keepMarkers where containsBytes(slice, needle: keep) { return nil }
-        let hits = adMarkers.compactMap {
-            containsBytes(slice, needle: $0) ? String(decoding: $0, as: UTF8.self) : nil
+        let hardHits = hardAdMarkers.compactMap {
+            containsASCIIInsensitive(slice, needle: $0) ? String(decoding: $0, as: UTF8.self) : nil
         }
-        return hits.isEmpty ? nil : hits
+        if !hardHits.isEmpty { return hardHits }
+
+        for keep in keepMarkers where containsASCIIInsensitive(slice, needle: keep) { return nil }
+
+        let intentHits = promotionalIntentMarkers.compactMap {
+            containsASCIIInsensitive(slice, needle: $0) ? String(decoding: $0, as: UTF8.self) : nil
+        }
+        guard !intentHits.isEmpty else { return nil }
+
+        let surfaceHits = promotionalSurfaceMarkers.compactMap {
+            containsASCIIInsensitive(slice, needle: $0) ? String(decoding: $0, as: UTF8.self) : nil
+        }
+        return surfaceHits.isEmpty ? nil : intentHits + surfaceHits
     }
 
     private static func bail(_ path: String, _ reason: String) -> Data? {
@@ -88,19 +114,26 @@ enum BrowsitaSectionStripper {
         return nil
     }
 
-    private static func containsBytes(_ haystack: Data.SubSequence, needle: [UInt8]) -> Bool {
+    private static func containsASCIIInsensitive(_ haystack: Data.SubSequence, needle: [UInt8]) -> Bool {
         guard !needle.isEmpty, haystack.count >= needle.count else { return false }
         let last = haystack.endIndex - needle.count
         var i = haystack.startIndex
         while i <= last {
             var match = true
             for k in 0..<needle.count {
-                if haystack[i + k] != needle[k] { match = false; break }
+                if asciiLower(haystack[i + k]) != asciiLower(needle[k]) {
+                    match = false
+                    break
+                }
             }
             if match { return true }
             i += 1
         }
         return false
+    }
+
+    private static func asciiLower(_ byte: UInt8) -> UInt8 {
+        (0x41...0x5a).contains(byte) ? byte + 0x20 : byte
     }
 
     private static func readVarint(_ data: Data, at: Int) -> (UInt64, Int)? {

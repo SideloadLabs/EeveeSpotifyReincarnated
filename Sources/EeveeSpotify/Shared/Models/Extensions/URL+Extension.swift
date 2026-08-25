@@ -100,6 +100,10 @@ extension URL {
            path.contains("/sponsored/") ||
            path.contains("/promoted/") ||
            path.contains("/upsell/") ||
+           path.contains("/premium-upsell") ||
+           path.contains("/upsell-banner") ||
+           path.contains("/upsell-card") ||
+           path.contains("/referrals/upsell") ||
            path.contains("/campaign/") ||
            path.contains("/billboard/") ||
            path.contains("/banner/") ||
@@ -110,7 +114,8 @@ extension URL {
            path.contains("/search-ad/") ||
            path.contains("/home-ad/") ||
            path.contains("/marquee/") ||
-           path.contains("/leavebehind/") ||
+           path.contains("/leavebehind") ||
+           path.contains("/leave-behind") ||
            path.contains("/display-ad/") ||
            path.contains("/fullbleed/") ||
            path.contains("/leaderboard/") ||

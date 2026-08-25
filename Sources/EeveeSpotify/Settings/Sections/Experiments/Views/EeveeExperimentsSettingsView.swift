@@ -23,28 +23,6 @@ struct EeveeExperimentsSettingsView: View {
                 )
             }
 
-            Section(footer: Text("disable_feelings_for_elsa_description".localized)) {
-                Toggle(
-                    "disable_feelings_for_elsa".localized,
-                    isOn: $experimentsOptions.disableFeelingsForElsa
-                )
-                .onChange(of: experimentsOptions.disableFeelingsForElsa) { newValue in
-                    if !newValue {
-                        // User tried to turn it OFF — prank time!
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            experimentsOptions.disableFeelingsForElsa = true
-
-                            let alert = UIAlertController(
-                                title: "Error 404: Emotion Not Found",
-                                message: "Nice try Hysan, but this patch cannot be uninstalled.",
-                                preferredStyle: .alert
-                            )
-                            alert.addAction(UIAlertAction(title: "OK", style: .default))
-                            WindowHelper.shared.present(alert)
-                        }
-                    }
-                }
-            }
         }
         .onChange(of: experimentsOptions) { options in
             UserDefaults.experimentsOptions = options
