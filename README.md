@@ -106,6 +106,8 @@ Thanks for all of the community's support, also, thanks to all the devs who work
 
 [whoeevee](https://github.com/whoeevee) 
 
+[Spikerko](https://github.com/Spikerko)
+
 - This project is a fork of [Meeep1/EeveeSpotifyRevivedPublic](https://github.com/Meeep1/EeveeSpotifyRevivedPublic).
 
 ## Disclaimer
