@@ -217,7 +217,20 @@ final class KaraokeButtonOverlay {
     // if this over- or under-fires (button disappearing too early/late as
     // you collapse it), let me know how far off it looks and I can tighten
     // the threshold.
-    private static let minimizedHeightFraction: CGFloat = 0.4
+    //
+    // Split per idiom because on iPad the button wasn't disappearing on
+    // minimize at all — the working theory is that iPad's expanded Now
+    // Playing presentation doesn't fill the whole window the way it does on
+    // iPhone (e.g. a fixed-size panel rather than true full-screen), so its
+    // ratio against full window height sits closer to the mini-player's
+    // ratio than to iPhone's ~1.0, and 40% never actually got crossed even
+    // once collapsed. This higher iPad value is an unverified guess in the
+    // same spirit as the original 40% — if it still doesn't disappear (or
+    // now disappears too early while still expanded), tell me which and
+    // I'll adjust it further.
+    private static var minimizedHeightFraction: CGFloat {
+        UIDevice.current.userInterfaceIdiom == .pad ? 0.65 : 0.4
+    }
 
     private static func isNowPlayingScreenMinimized(liveVC: UIViewController?) -> Bool {
         guard let liveVC = liveVC, let window = liveVC.view.window else { return false }
@@ -435,7 +448,7 @@ final class KaraokeButtonOverlay {
         // the comment below on why I couldn't verify the real button's
         // frame — so let me know if it needs further adjustment.
         let isPhone = UIDevice.current.userInterfaceIdiom == .phone
-        let bottomInset: CGFloat = isPhone ? 52 : 116
+        let bottomInset: CGFloat = isPhone ? 52 : 100
         let trailingInset: CGFloat = 8
 
         // Best-effort placement near where Spotify's own action row (share/
