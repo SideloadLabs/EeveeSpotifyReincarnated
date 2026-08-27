@@ -403,7 +403,7 @@ final class KaraokeButtonOverlay {
         // on iPhone. This is still a fixed guess, not a true anchor — see
         // the comment below on why I couldn't verify the real button's
         // frame — so let me know if it needs further adjustment.
-        let bottomInset: CGFloat = UIDevice.current.userInterfaceIdiom == .phone ? 56 : 96
+        let bottomInset: CGFloat = UIDevice.current.userInterfaceIdiom == .phone ? 76 : 116
         let trailingInset: CGFloat = 8
 
         // Best-effort placement near where Spotify's own action row (share/
