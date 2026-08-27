@@ -125,12 +125,19 @@ final class KaraokeButtonOverlay {
         // there's nothing for this button to do, and leaving the window
         // visible there risks it swallowing taps meant for the karaoke
         // view's own close button if their corners ever overlap.
-        let shouldShow = isNowPlayingScreenVisible && !isMinimized && hasKaraokeData && !KaraokeOverlayPresenter.isPresented
+        //
+        // Deliberately does NOT factor in isScrolledOffScreen here —
+        // that's handled separately below, without tearing down scroll
+        // tracking, so scrolling back into view is still noticed. If this
+        // is false, the button isn't eligible to show at all regardless of
+        // scroll position, and tracking is torn down for real.
+        let shouldShow = isNowPlayingScreenVisible && !isMinimized && hasKaraokeData
+            && !KaraokeOverlayPresenter.isPresented
 
         if shouldShow {
             ensureWindowExists()
             trackScrolling(of: liveVC)
-            window?.isHidden = false
+            window?.isHidden = isScrolledOffScreen
         } else {
             window?.isHidden = true
             stopTrackingScrolling()
@@ -270,6 +277,11 @@ final class KaraokeButtonOverlay {
     private var scrollObservation: NSKeyValueObservation?
     private var baseWindowY: CGFloat?
     private var baseContentOffsetY: CGFloat?
+    // Set by applyScrollOffset once the button's tracked position has
+    // scrolled fully out of the visible screen area; cleared again once it
+    // scrolls back. refresh() folds this into shouldShow so a poll tick
+    // doesn't undo it before the user scrolls back.
+    private var isScrolledOffScreen = false
 
     private func trackScrolling(of liveVC: UIViewController?) {
         guard let liveVC = liveVC else {
@@ -300,6 +312,7 @@ final class KaraokeButtonOverlay {
         trackedScrollView = nil
         baseWindowY = nil
         baseContentOffsetY = nil
+        isScrolledOffScreen = false
     }
 
     private func applyScrollOffset(_ currentOffsetY: CGFloat) {
@@ -313,18 +326,23 @@ final class KaraokeButtonOverlay {
         let delta = currentOffsetY - baseContentOffsetY
         var newFrame = window.frame
         newFrame.origin.y = baseWindowY - delta
-
-        // Keep it fully on screen rather than letting it scroll away
-        // entirely — this is a small persistent trigger button, not part of
-        // the scrolled content itself, so it should stay reachable even if
-        // Now Playing's content scrolls a long way.
-        if let screenHeight = window.windowScene?.screen.bounds.height {
-            let minY: CGFloat = 8
-            let maxY = screenHeight - newFrame.height - 8
-            newFrame.origin.y = min(max(newFrame.origin.y, minY), maxY)
-        }
-
         window.frame = newFrame
+
+        // Deliberately NOT clamped to stay on screen (an earlier version
+        // did) — the button should actually leave with the area it's
+        // anchored near rather than getting stuck pinned at the screen
+        // edge once that area scrolls away. Track whether it's still
+        // within the visible screen bounds and toggle isHidden directly
+        // here (rather than routing through refresh(), whose "not
+        // eligible to show" branch also tears down scroll tracking — doing
+        // that here would stop noticing if the user scrolls back into
+        // view). refresh()'s own conditions (Now Playing visible,
+        // karaoke data, etc.) are re-checked independently on the next
+        // poll tick as usual.
+        let screenHeight = window.windowScene?.screen.bounds.height ?? UIScreen.main.bounds.height
+        let isOffScreen = newFrame.maxY <= 0 || newFrame.origin.y >= screenHeight
+        isScrolledOffScreen = isOffScreen
+        window.isHidden = isOffScreen
     }
 
     /// Walks `.subviews` (breadth-first) looking for the first UIScrollView
