@@ -277,6 +277,10 @@ final class KaraokeButtonOverlay {
     private var scrollObservation: NSKeyValueObservation?
     private var baseWindowY: CGFloat?
     private var baseContentOffsetY: CGFloat?
+    // Set by applyScrollOffset once the button's tracked position has
+    // scrolled fully out of the visible screen area; cleared again once it
+    // scrolls back. refresh() folds this into shouldShow so a poll tick
+    // doesn't undo it before the user scrolls back.
     private var isScrolledOffScreen = false
 
     private func trackScrolling(of liveVC: UIViewController?) {
@@ -335,8 +339,20 @@ final class KaraokeButtonOverlay {
         // view). refresh()'s own conditions (Now Playing visible,
         // karaoke data, etc.) are re-checked independently on the next
         // poll tick as usual.
+        //
+        // The boundary is the safe area, not the literal screen edge —
+        // using maxY <= 0 let the button linger clipped into the status
+        // bar/notch strip at the top (or the home-indicator strip at the
+        // bottom) while still counting as "on screen" by that check, since
+        // part of its frame was still within [0, screenHeight]. Using the
+        // safe area's top/bottom insets as the cutoff instead means it
+        // disappears as soon as it reaches that strip, matching where
+        // Spotify's own content stops being visible too.
+        let keyWindow = window.windowScene?.windows.first(where: { $0.isKeyWindow })
+        let safeAreaTop = keyWindow?.safeAreaInsets.top ?? 0
+        let safeAreaBottom = keyWindow?.safeAreaInsets.bottom ?? 0
         let screenHeight = window.windowScene?.screen.bounds.height ?? UIScreen.main.bounds.height
-        let isOffScreen = newFrame.maxY <= 0 || newFrame.origin.y >= screenHeight
+        let isOffScreen = newFrame.maxY <= safeAreaTop || newFrame.origin.y >= screenHeight - safeAreaBottom
         isScrolledOffScreen = isOffScreen
         window.isHidden = isOffScreen
     }
