@@ -277,10 +277,6 @@ final class KaraokeButtonOverlay {
     private var scrollObservation: NSKeyValueObservation?
     private var baseWindowY: CGFloat?
     private var baseContentOffsetY: CGFloat?
-    // Set by applyScrollOffset once the button's tracked position has
-    // scrolled fully out of the visible screen area; cleared again once it
-    // scrolls back. refresh() folds this into shouldShow so a poll tick
-    // doesn't undo it before the user scrolls back.
     private var isScrolledOffScreen = false
 
     private func trackScrolling(of liveVC: UIViewController?) {
