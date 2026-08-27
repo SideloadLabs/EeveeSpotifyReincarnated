@@ -336,19 +336,26 @@ final class KaraokeButtonOverlay {
         // karaoke data, etc.) are re-checked independently on the next
         // poll tick as usual.
         //
-        // The boundary is the safe area, not the literal screen edge —
-        // using maxY <= 0 let the button linger clipped into the status
-        // bar/notch strip at the top (or the home-indicator strip at the
-        // bottom) while still counting as "on screen" by that check, since
-        // part of its frame was still within [0, screenHeight]. Using the
-        // safe area's top/bottom insets as the cutoff instead means it
-        // disappears as soon as it reaches that strip, matching where
-        // Spotify's own content stops being visible too.
-        let keyWindow = window.windowScene?.windows.first(where: { $0.isKeyWindow })
-        let safeAreaTop = keyWindow?.safeAreaInsets.top ?? 0
-        let safeAreaBottom = keyWindow?.safeAreaInsets.bottom ?? 0
-        let screenHeight = window.windowScene?.screen.bounds.height ?? UIScreen.main.bounds.height
-        let isOffScreen = newFrame.maxY <= safeAreaTop || newFrame.origin.y >= screenHeight - safeAreaBottom
+        // The boundary is the safe area, not the literal screen edge — using
+        // the near edge of the button against that boundary (origin.y for
+        // the top, maxY for the bottom) hides it as soon as it starts
+        // crossing in, not only once the whole button has passed through.
+        //
+        // Uses the same foregroundActive-scene lookup as ensureWindowExists,
+        // rather than searching for `isKeyWindow` — on iPad's multi-pane/
+        // multi-window layouts (like Split View) `isKeyWindow` can fail to
+        // match the window actually on screen, silently defaulting
+        // safeAreaTop to 0 and making the button need to reach the literal
+        // physical edge (i.e., look like it required *full* entry into the
+        // status bar) rather than the safe-area boundary just inside it.
+        let scene = window.windowScene ?? UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first(where: { $0.activationState == .foregroundActive })
+        let referenceWindow = scene?.windows.first(where: { $0 !== window }) ?? scene?.windows.first
+        let safeAreaTop = referenceWindow?.safeAreaInsets.top ?? 20
+        let safeAreaBottom = referenceWindow?.safeAreaInsets.bottom ?? 20
+        let screenHeight = scene?.screen.bounds.height ?? UIScreen.main.bounds.height
+        let isOffScreen = newFrame.origin.y <= safeAreaTop || newFrame.maxY >= screenHeight - safeAreaBottom
         isScrolledOffScreen = isOffScreen
         window.isHidden = isOffScreen
     }
@@ -385,7 +392,14 @@ final class KaraokeButtonOverlay {
         // (including its padding) is never clipped by the window edge.
         let areaWidth: CGFloat = 180
         let areaHeight: CGFloat = 56
-        let bottomInset: CGFloat = 96
+        // Lower on iPhone specifically — iPhone's Now Playing layout puts
+        // the action row closer to the bottom of the screen than iPad's
+        // does (iPad has more vertical space above the mini-player/controls
+        // area), so the same inset that looked right on iPad sat too high
+        // on iPhone. This is still a fixed guess, not a true anchor — see
+        // the comment below on why I couldn't verify the real button's
+        // frame — so let me know if it needs further adjustment.
+        let bottomInset: CGFloat = UIDevice.current.userInterfaceIdiom == .phone ? 56 : 96
         let trailingInset: CGFloat = 8
 
         // Best-effort placement near where Spotify's own action row (share/
