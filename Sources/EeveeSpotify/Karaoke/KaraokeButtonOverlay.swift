@@ -299,9 +299,18 @@ final class KaraokeButtonOverlay {
             baseWindowY = window?.frame.origin.y
             scrollObservation = scrollView.observe(\.contentOffset, options: [.new]) { [weak self] _, change in
                 guard let self = self, let newOffset = change.newValue else { return }
-                DispatchQueue.main.async {
-                    self.applyScrollOffset(newOffset.y)
-                }
+                // UIScrollView's contentOffset KVO already fires on the main
+                // thread (scrolling is driven by the main run loop), and it
+                // fires far more often per visible frame than this window's
+                // own screen refresh does. Deferring to a fresh
+                // DispatchQueue.main.async block here queued each update a
+                // full run-loop turn behind the content it was supposed to
+                // track — with updates arriving that rapidly, that lag was
+                // enough for the button's position to visibly overshoot and
+                // correct itself against the content scrolling underneath
+                // it, which is what read as jiggling. Calling straight
+                // through keeps it exactly in phase.
+                self.applyScrollOffset(newOffset.y)
             }
         }
     }
@@ -325,8 +334,30 @@ final class KaraokeButtonOverlay {
         // subtracting the delta rather than adding it.
         let delta = currentOffsetY - baseContentOffsetY
         var newFrame = window.frame
-        newFrame.origin.y = baseWindowY - delta
+        // Rounded to a whole point: contentOffset itself is sub-pixel, so
+        // without rounding, newFrame.origin.y inherits that sub-pixel value
+        // on every single update. A UIWindow (unlike an ordinary view inside
+        // a scroll view, where the system already snaps this for you) has
+        // nothing upstream doing that snapping, so the capsule's border and
+        // text were being re-rasterized at a slightly different fractional
+        // offset on practically every frame during a scroll — that
+        // sub-pixel-to-sub-pixel shimmer is what read as jiggling, distinct
+        // from the actual (correct) whole-pixel translation.
+        newFrame.origin.y = (baseWindowY - delta).rounded()
+        // CATransaction here (rather than relying on window.frame's own
+        // setter) explicitly disables implicit layer actions for this
+        // change. UIWindow.frame doesn't normally animate on its own, but
+        // this write happens from a KVO callback that can fire while
+        // UIScrollView's own deceleration/bounce is mid-animation-block on
+        // the same run loop turn — leaving this unguarded risked silently
+        // inheriting that surrounding transaction's animation curve/duration
+        // instead of applying instantly, which would show up as the button
+        // easing toward each new position rather than tracking it directly,
+        // i.e. more jiggle.
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
         window.frame = newFrame
+        CATransaction.commit()
 
         // Deliberately NOT clamped to stay on screen (an earlier version
         // did) — the button should actually leave with the area it's
@@ -404,7 +435,7 @@ final class KaraokeButtonOverlay {
         // the comment below on why I couldn't verify the real button's
         // frame — so let me know if it needs further adjustment.
         let isPhone = UIDevice.current.userInterfaceIdiom == .phone
-        let bottomInset: CGFloat = isPhone ? 40 : 116
+        let bottomInset: CGFloat = isPhone ? 52 : 116
         let trailingInset: CGFloat = 8
 
         // Best-effort placement near where Spotify's own action row (share/
