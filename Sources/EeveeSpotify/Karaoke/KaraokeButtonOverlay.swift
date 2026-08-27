@@ -404,10 +404,7 @@ final class KaraokeButtonOverlay {
         // the comment below on why I couldn't verify the real button's
         // frame — so let me know if it needs further adjustment.
         let isPhone = UIDevice.current.userInterfaceIdiom == .phone
-        // A little lower on iPhone than the previous inset (76pt), per
-        // feedback that the button sat a touch too high above the action
-        // row on iPhone's Now Playing layout.
-        let bottomInset: CGFloat = isPhone ? 92 : 116
+        let bottomInset: CGFloat = isPhone ? 40 : 116
         let trailingInset: CGFloat = 8
 
         // Best-effort placement near where Spotify's own action row (share/
@@ -423,10 +420,9 @@ final class KaraokeButtonOverlay {
         // screenshot or the exact frame of the share button, this offset can
         // be tightened up considerably.
         //
-        // On iPhone the button is centered horizontally instead of hugging
-        // the trailing edge — iPhone's narrower action row reads better with
-        // the button centered under it; iPad keeps the original trailing
-        // placement since its action row has more room to the side.
+        // iPhone only: centered horizontally instead of trailing-aligned,
+        // and sat lower (smaller bottomInset) than iPad — see the matching
+        // idiom check in KaraokeButtonOverlayView's alignment below.
         let originX = isPhone
             ? (screenBounds.width - areaWidth) / 2
             : screenBounds.width - areaWidth - trailingInset
@@ -478,13 +474,11 @@ private struct KaraokeButtonOverlayView: View {
             .shadow(color: .black.opacity(0.3), radius: 8, y: 2)
         }
         .buttonStyle(.plain)
-        // Alignment within the window's own frame mirrors how that frame
-        // is positioned in ensureWindowExists(): centered on iPhone (where
-        // the window itself is now centered horizontally), trailing on
-        // iPad (where the window still hugs the right edge). Keeping the
-        // window sized to just the button rather than spanning the full
-        // screen is what lets this stay simple alignment logic instead of
-        // manual frame math here too.
+        // Alignment within the window's own frame mirrors the window's
+        // origin logic in ensureWindowExists: centered on iPhone, trailing
+        // on iPad. The window itself doesn't span the full screen, so this
+        // just needs to match how much of the window's own width is empty
+        // space around the button on each idiom.
         .frame(
             maxWidth: .infinity,
             maxHeight: .infinity,
