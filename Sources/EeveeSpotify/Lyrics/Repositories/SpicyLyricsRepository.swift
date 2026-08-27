@@ -37,7 +37,7 @@ class SpicyLyricsRepository: LyricsRepository {
     // (project/config.ts). Version alone was a dead end for the
     // Static/Line-vs-Syllable discrepancy — see the "X-mode" header below,
     // added alongside this bump, which is the actual missing piece.
-    private static let clientVersion = "6.3.1"
+    private static let clientVersion = "6.3.10"
 
     // MARK: - Token wait
     //
