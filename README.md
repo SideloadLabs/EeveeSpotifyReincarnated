@@ -94,7 +94,9 @@ For sideloaded IPAs, we recommend using **SideStore** or certificate-based signi
 To open Spotify links in sideloaded app, use [OpenSpotifySafariExtension](https://github.com/BillyCurtis/OpenSpotifySafariExtension). Remember to activate it and allow access in Settings > Safari > Extensions.
 
 ## Credits
-Thanks for all of the community's support, also, thanks to all the devs who worked along with me to revive this project Go check the other dev's out:
+Thanks for all of the community's support, also, thanks to all the devs who worked along with us to revive this project Go check the other dev's out:
+
+[jaydenjcpy](https://github.com/jaydenjcpy)
 
 [Ryuk](https://github.com/faroukbmiled) 
 
