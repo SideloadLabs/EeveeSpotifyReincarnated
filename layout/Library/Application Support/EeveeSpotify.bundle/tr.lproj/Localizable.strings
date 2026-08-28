@@ -1,75 +1,80 @@
 /* MARK: Settings */
 
-patching = "Yamalama";
+patching = "Yama";
 lyrics = "Şarkı Sözleri";
-customization = "Özelleştirme";
+customization = "Kişiselleştirme";
 experiments = "Deneysel Özellikler";
+sponsorblock = "SponsorBlock (BETA)";
+appIcon = "Uygulama Simgesi";
 
 common_issues_tip_title = "Sorun mu Yaşıyorsunuz?";
 
-common_issues_tip_message = "Bir sorunla karşılaşıyorsanız, örneğin şarkılar oynamıyorsa, buraya göz atın";
-common_issues_tip_button = "Ortak Sorunlar";
+common_issues_tip_message = "Şarkıların çalmaması gibi bir sorunla karşılaşıyorsanız şuraya göz atın:";
+common_issues_tip_button = "Sıkça Karşılaşılan Sorunlar";
 
 reset_data = "Verileri Sıfırla";
-reset_data_description = "Önbelleğe alınan verileri temizleyin ve uygulamayı yeniden başlatın.";
+reset_data_description = "Önbelleğe alınan verileri temizler ve uygulamayı yeniden başlatır.";
 
 checking_for_update = "Güncelleme Kontrol Ediliyor...";
 update_available = "Güncelleme Mevcut";
 
-restart_is_required_description = "Değişiklikten sonra uygulamanın yeniden başlatılması gerekiyor.";
+restart_is_required_description = "Değişikliklerin etkili olması için uygulamanın yeniden başlatılması gerekir.";
 
 // Patching
 
-do_not_patch_premium = "Premium için olan Yamayı Yapma";
-patching_description = "Yama, kullanıcı verilerini yüklemek için yapılan istekleri keser, serileştirilen verileri açar ve parametreleri gerçek zamanlı olarak değiştirir.
+do_not_patch_premium = "Premium'u Yamama";
+patching_description = "EeveeSpotify, kullanıcı verilerini yükleme isteklerini yakalar, ayrıştırır ve parametreleri gerçek zamanlı olarak değiştirir.
 
-Aktif bir Premium aboneliğiniz varsa, Premium'u Yama Yapma seçeneğini açabilirsiniz. Yama, verileri yamalamaz veya Premium sunucu tarafı özelliklerinin kullanımını kısıtlamaz. Değişiklikten sonra uygulamanın yeniden başlatılması gerekir.
+Aktif bir Premium aboneliğiniz varsa \"Premium'u Yamama\" seçeneğini açabilirsiniz. Tweak verileri yamamaz ve sunucu taraflı Premium özelliklerinin kullanımını kısıtlamaz.
 
 %@";
 
-overwrite_configuration = "Yapılandırmayı Üzerine Yaz";
-overwrite_configuration_description = "Uzaktan yapılandırmayı Premium ile değiştirilmiş yapılandırma ile değiştirin. Bu yapılandırma çoğu UI/UX parametresini tanımlar ve yararlı olabilir, ancak sorunlara yol açabilir.";
+overwrite_configuration = "Yapılandırmanın Üzerine Yaz";
+overwrite_configuration_description = "Uzak yapılandırmayı dökümü alınmış Premium yapılandırmasıyla değiştirir. Bu yapılandırma çoğu UI/UX parametresini belirler ve yararlı olabilir, ancak sorunlara da yol açabilir.";
+
+true_shuffle = "Gerçek Karıştırma";
+true_shuffle_dec = "Spotify'ın ücretsiz sürümündeki Akıllı Karıştırma özelliğinin sıranıza önerilen şarkıları eklemesini engeller. Karıştırma yalnızca çalma listesinin içinde kalır.";
 
 // Lyrics
 
-do_not_replace_lyrics = "Şarkı Sözlerini Değiştirmeyin";
+do_not_replace_lyrics = "Şarkı Sözlerini Değiştirme";
 lyrics_source = "Şarkı Sözü Kaynağı";
 lyrics_source_description = "Tercih ettiğiniz şarkı sözü kaynağını seçebilirsiniz.
 
-Genius: En iyi kaliteli şarkı sözlerini sunar, en fazla şarkıyı sağlar ve şarkı sözlerini en hızlı şekilde günceller. Zamanla senkronize edilmez ve asla edilmeyecek.
+Genius: En kaliteli şarkı sözlerini sunar, en fazla şarkıyı barındırır ve sözleri en hızlı günceller. Zaman senkronizasyonu yoktur ve asla olmayacaktır.
 
-LRCLIB: Zamanla senkronize edilmiş şarkı sözleri sunan en açık kaynak hizmettir. Ancak, birçok şarkının sözleri eksiktir.
+LRCLIB: Zaman senkronizeli şarkı sözleri sunan en açık servistir. Ancak birçok şarkı için sözleri eksiktir.
 
-Musixmatch: Spotify'ın kullandığı hizmettir. Birçok şarkı için zamanla senkronize edilmiş şarkı sözleri sağlar, ancak bu kaynağı kullanmak için bir kullanıcı tokenine(kullanıcıya özel etiket) ihtiyacınız var.";
-lyrics_additional_info = "Eğer yama bir şarkıyı bulamazsa veya şarkı sözlerini işleyemezse, \"Bu şarkı için şarkı sözleri yüklenemedi\" mesajı görürsünüz. Genius kullanırken, şarkı arama şekli nedeniyle bazı şarkılar için şarkı sözleri yanlış olabilir. Çoğu durumda çalışmasını sağladım.";
-petitlyrics_description = "PetitLyrics: Birçok zamanla senkronize Japonca ve bazı uluslararası şarkı sözleri sunar.";
+Musixmatch: Spotify'ın kullandığı servistir. Birçok şarkı için zaman senkronizeli sözler sağlar, ancak bu kaynağı kullanmak için bir kullanıcı jetonuna ihtiyacınız vardır.";
+lyrics_additional_info = "EeveeSpotify bir şarkıyı bulamazsa veya sözleri işleyemezse \"Bu şarkı için şarkı sözleri yüklenemedi\" mesajını görürsünüz. Genius kullanılırken tweak'in şarkı arama yöntemi nedeniyle bazı şarkıların sözleri yanlış olabilir. Çoğu durumda çalışacak şekilde ayarlanmıştır.";
+petitlyrics_description = "PetitLyrics: Bol miktarda zaman senkronizeli Japonca ve bazı uluslararası şarkı sözleri sunar.";
 
-musixmatch_user_token = "Musixmatch Kullanıcı Tokeni";
-user_token_placeholder = "Kullanıcı Tokeni Girin veya Hata Ayıklama Bilgilerini Yapıştırın";
+musixmatch_user_token = "Musixmatch Kullanıcı Jetonu";
+user_token_placeholder = "Kullanıcı Jetonunu Girin veya Hata Ayıklama Bilgisini Yapıştırın";
 
-enter_user_token = "Kullanıcı Tokeni Girin";
-enter_user_token_message = "Musixmatch'i kullanmak için, kullanıcı tokeninizi resmi uygulamadan almanız gerekir. App Store'dan Musixmatch'i indirin, kaydolun, ardından Ayarlar > Yardım Al > Hata Ayıklama Bilgilerini Kopyala seçeneğine gidin ve buraya yapıştırın. Tokeni ayrıca MITM kullanarak da çıkarabilirsiniz.";
+enter_user_token = "Kullanıcı Jetonunu Girin";
+enter_user_token_message = "Musixmatch kullanabilmek için resmi uygulamadan kullanıcı jetonunuzu almanız gerekir. App Store'dan Musixmatch'i indirin, kaydolun, ardından Ayarlar > Yardım Al > Hata Ayıklama Bilgisini Kopyala yolunu izleyin ve buraya yapıştırın. Jetonu MITM kullanarak da çıkarabilirsiniz.";
 
-genius_fallback = "Genius'a Geri çekilme";
-genius_fallback_description = "Bir sorun olduğunda %@ üzerinden şarkı sözlerini Genius'tan yükleyin.";
+genius_fallback = "Genius Alternatifi";
+genius_fallback_description = "%@ ile ilgili bir sorun olduğunda şarkı sözlerini Genius'tan yükler.";
 
-show_fallback_reasons = "Geri çekilme Nedenlerini Göster";
+show_fallback_reasons = "Alternatif Kullanma Nedenlerini Göster";
 
-hide_lyrics_on_error = "Hata durumunda gizle";
-hide_lyrics_on_error_description = "Şarkı sözleri yüklenmezse şarkı sözleri bileşenini kaldır.";
+hide_lyrics_on_error = "Hata Durumunda Gizle";
+hide_lyrics_on_error_description = "Şarkı sözleri yüklenemezse şarkı sözü bileşenini kaldırır.";
 
-romanized_lyrics = "Romanize(Latin Alfabesine çevirme) Edilmiş Şarkı Sözleri";
-romanized_lyrics_description = "Japonca, Korece ve Çince şarkılar için romanize edilmiş şarkı sözlerini göster.";
+romanized_lyrics = "Okunuş Sözleri (Romanized)";
+romanized_lyrics_description = "Japonca, Korece ve Çince için Latin alfabesiyle okunuş sözlerini gösterir.";
 
 musixmatch_language = "Musixmatch Şarkı Sözü Dili";
-musixmatch_language_description = "Musixmatch dil kodunu girerek, mevcutsa Musixmatch'te çevrilmiş şarkı sözlerini görebilirsiniz.";
+musixmatch_language_description = "2 harfli bir Musixmatch dil kodu girerek varsa Musixmatch üzerindeki çevrilmiş şarkı sözlerini görebilirsiniz.";
 
 // UI
 
 lyrics_background_color_section = "Şarkı Sözleri Arka Plan Rengi";
-lyrics_background_color_section_description = "Orijinal Renkleri Göster'i açarsanız, şarkı sözleri, onları içeren parçalar için orijinal Spotify renklerinde görünecektir.
+lyrics_background_color_section_description = "\"Orijinal Renkleri Göster\" seçeneğini açarsanız, şarkı sözleri orijinal Spotify renklerine sahip parçalar için kendi renginde görünür.
 
-Sabit bir renk ayarlayabilir veya parçanın kapak renginden çıkarılan bir normalizasyon faktörü belirleyebilirsiniz. Bu faktör, koyu renklerin ne kadar açılacağını ve açık renklerin ne kadar karartılacağını belirler. Genel olarak, daha yüksek bir normalizasyon faktörüyle daha açık renkler görürsünüz.";
+Sabit bir renk veya çıkarılan parça kapağının rengine dayalı bir normalleştirme faktörü ayarlayabilirsiniz. Bu faktör, koyu renklerin ne kadar açılacağını ve açık renklerin ne kadar koyulaşacağını belirler. Genellikle daha yüksek bir normalleştirme faktörü ile daha açık renkler görürsünüz.";
 
 display_original_colors = "Orijinal Renkleri Göster";
 
@@ -81,18 +86,26 @@ dark_popups = "Koyu Açılır Pencereler";
 
 // Experiments
 
-show_instagram_destination = "Instagram'da paylaşı göster";
-show_instagram_destination_description = "Instagram'da paylaşı her zaman göster. %@";
+show_instagram_destination = "Instagram Paylaşımını Göster";
+show_instagram_destination_description = "Instagram paylaşım hedefini her zaman gösterir. %@";
 
-livecontainer_sharing = "LiveContainer ile paylaş";
-livecontainer_sharing_description = "LiveContainer ile paylaşın ve seçilen hedef desteklenmiyorsa URL'yi kopyalayın.";
+livecontainer_sharing = "LiveContainer'a Paylaş";
+livecontainer_sharing_description = "Seçilen hedef desteklenmiyorsa LiveContainer'a paylaşır ve URL'yi kopyalar.";
+
+
+// Miscellaneous
+
+miscellaneous = "Çeşitli";
+
+clean_share_links = "Paylaşım Bağlantılarını Temizle";
+clean_share_links_description = "Paylaşılan Spotify bağlantılarından \"si\" takip parametresini kaldırır, böylece bağlantının hangi cihazdan veya hesaptan geldiği görünmez.";
 
 /* MARK: Premium PopUps */
 
-have_premium_popup = "Aktif bir Premium aboneliğiniz var gibi görünüyor, bu yüzden yama, verileri yamalamayacak veya Premium sunucu tarafı özelliklerinin kullanımını kısıtlamayacaktır. Bunu EeveeSpotify ayarlarında yönetebilirsiniz.";
+have_premium_popup = "Aktif bir Premium aboneliğiniz var gibi görünüyor, bu nedenle tweak verileri yamamayacak veya sunucu taraflı Premium özelliklerinin kullanımını kısıtlamayacaktır. Bunu EeveeSpotify ayarlarından yönetebilirsiniz.";
 
-high_audio_quality_popup = "Çok yüksek ses kalitesi sunucu taraflıdır ve bu yamayla mevcut değildir.";
-playlist_downloading_popup = "Uygulama içi çalma listesi indirme sunucu taraflıdır ve bu yamayla mevcut değildir. Ancak podcast bölümlerini indirebilirsiniz.";
+high_audio_quality_popup = "Çok yüksek ses kalitesi sunucu taraflıdır ve bu tweak ile kullanılamaz.";
+playlist_downloading_popup = "Çalma listesi indirme sunucu taraflıdır ve bu tweak ile kullanılamaz. Ancak podcast bölümlerini ve yerel çalma listelerini indirebilirsiniz.";
 download_local_playlist = "Yerel çalma listesini indir";
 
 //
@@ -101,33 +114,185 @@ could_not_share_popup = "Seçilen hedefe veya LiveContainer'a paylaşılamadı. 
 
 /* MARK: Lyrics */
 
-fallback_attribute = "Geri çekilme";
-romanized_attribute = "Romanize Edilmiş";
+fallback_attribute = "Alternatif";
+romanized_attribute = "Okunuş";
 
-musixmatch_unauthorized_popup = "Yama, Musixmatch'ten şarkı sözlerini Yetkisiz hata nedeniyle yükleyemiyor. Lütfen Musixmatch tokeninizi kontrol edin veya güncelleyin. Bir iPad kullanıyorsanız, tokeni iPad için Musixmatch uygulamasından almalısınız.";
-musixmatch_restricted_popup = "Yama, Musixmatch'ten şarkı sözlerini yükleyemiyor çünkü bu sözler kısıtlı. Muhtemelen ABD IP adresi nedeniyle bir telif hakkı sorunu, bu yüzden ABD'deyseniz IP adresinizi değiştirmeniz veya bir VPN kullanmanız gerekir.";
+musixmatch_unauthorized_popup = "Yetkisiz Erişim (Unauthorized) hatası nedeniyle tweak Musixmatch'ten şarkı sözlerini yükleyemiyor. Lütfen Musixmatch jetonunuzu kontrol edin veya güncelleyin. iPad kullanıyorsanız jetonu iPad için Musixmatch uygulamasından almalısınız.";
+musixmatch_restricted_popup = "Tweak, kısıtlanmış olmaları nedeniyle Musixmatch'ten şarkı sözlerini yükleyemiyor. Bu durum muhtemelen ABD IP adresinden kaynaklanan bir telif hakkı sorunudur; ABD'deyseniz veya VPN kullanıyorsanız değiştirmelisiniz.";
 
 // Errors Titles
 
 no_such_song = "Şarkı Bulunamadı";
-musixmatch_restricted = "Kısıtlı";
+musixmatch_restricted = "Kısıtlanmış";
 invalid_musixmatch_token = "Yetkisiz";
 decoding_error = "Kod Çözme Hatası";
-no_current_track = "Mevcut Parça Yok";
+no_current_track = "Aktif Parça Yok";
 unknown_error = "Bilinmeyen Hata";
 
 // Instrumental Titles
 
 song_is_instrumental = "Bu şarkı enstrümantaldir.";
-let_the_music_play = "Müzik çalmaya devam etsin...";
+let_the_music_play = "Bırak müzik çalsın...";
 
 // liked songs title, should match official spotify loc
 
 liked_songs = "Beğenilen Şarkılar";
 
-contributors = "Katkıda bulunanlar";
+contributors = "Katkıda Bulunanlar";
 
-request_anonymous_token = "Anonim Token Talep Et";
-request_anonymous_token_description = "Yetkilendirme olmadan Musixmatch'ten bir token talep etmek için \"Anonim Token Talep Et\"e dokun.";
+request_anonymous_token = "Anonim Jeton İste";
+request_anonymous_token_description = "Musixmatch'ten yetkilendirme olmadan jeton istemek için \"Anonim Jeton İste\" seçeneğine dokunun.";
 
 lrclib_api = "Sunucu Adresi";
+
+// Snapshot of your benefits, should match official spotify loc
+
+ad_free_music_listening = "Reklamsız müzik dinleme";
+play_songs_in_any_order = "Şarkıları istediğin sırayla çal";
+organize_listening_queue = "Dinleme sırasını düzenle";
+
+payment_notice = "EeveeSpotify, bazı Premium özelliklerin kilidini açmak için yamalar uygular. Ücretsizdir.";
+
+// Debug
+
+debug_title = "Hata Ayıklama";
+export_debug_log = "Hata Günlüğünü Dışa Aktar";
+clear_debug_log = "Hata Günlüğünü Temizle";
+debug_log_cleared = "Hata günlüğü temizlendi.";
+debug_log_cleared_ok = "Tamam";
+no_debug_log_found = "Hata günlüğü bulunamadı. Günlük, uygulama başlatıldığında kaydetmeye başlar.";
+no_debug_log_found_ok = "Tamam";
+debug_section_footer = "Hata günlüğünü dışa aktarın veya temizleyin.";
+
+// Full reset
+resetButtonTitle = "Tam Sıfırlama";
+resetSubtitle = "Spotify keychain kayıtlarını, sandbox dizinlerini ve app-group kapsayıcılarını temizler. Yeniden giriş yapmaya zorlar. İşlem bittiğinde uygulama kapanır.";
+resetFooter = "Yeniden giriş yapmaya zorlar. Spotify keychain girdilerini, sandbox dizinlerini ve app-group kapsayıcılarını temizler. Haricen yüklenen diğer uygulamalara dokunulmaz. İşlem bittiğinde uygulama kapanır.";
+
+// Settings Bar
+eevee_inline_subtitle_text = "Yama, şarkı sözleri, kişiselleştirme ve deneyler";
+
+// App Icon Chooser
+appIconTitle = "Simge Seç";
+appIconSubtitle = "iOS ilk seferde bir onay gösterir. Ana ekranın yenilenmesi birkaç saniye sürebilir.";
+iconSelected = "Seçildi";
+iconTapToApply = "Uygulamak için dokunun";
+prettifyIconNames = "Simge İsimlerini Güzelleştir";
+prettifyIconNamesDescription = "Alt çizgileri, tireleri ve deveTabanını (camelCase) boşluğa dönüştürür";
+
+// SponsorBlock
+categoryOneFooter = "Podcast bölümlerinde topluluk tarafından işaretlenen bölümleri atlar.";
+enableSponsorblock = "SponsorBlock'u Etkinleştir";
+showColoredOverlay = "İlerleme çubuğunda renkli katmanı göster";
+showToast = "Atlama sırasında bildirim göster";
+skipToast = "Atlama bildirimi eylem butonları (oy ver / geri al / gizle)";
+respectManualSeek = "Manuel sarmaya saygı duy (tekrar atlama)";
+categoriesHeader = "Kategoriler";
+categoriesFooter = "Kapalı · Göster · Manuel · Otomatik. Değiştirmek için renkli daireye dokunun.";
+
+sponsor_category = "Sponsor";
+selfpromo_category = "Ücretsiz/Kendi Tanıtımı";
+interaction_category = "Etkileşim Hatırlatıcısı";
+intro_category = "Ara/Giriş (Intro)";
+outro_category = "Bitiş (Outro)/Emeği Geçenler";
+preview_category = "Önizleme/Özet";
+hook_category = "Kanca/Selamlama";
+filler_category = "Gereksiz/Laf Kalabalığı";
+exclusive_access_category = "Özel Erişim";
+
+action_disabled = "Kapalı";
+action_show = "Göster";
+action_manual = "Manuel";
+action_auto = "Otomatik";
+
+draftsTitle = "Raporlama ve taslaklar";
+errorNoPodcats = "Şu anda hiçbir podcast çalınmıyor.";
+markSegment = "Mevcut bölüm için segmenti işaretle";
+advancedTitle = "Gelişmiş";
+howToUseTitle = "Nasıl kullanılır";
+creditsTitle = "Emeği Geçenler";
+creditsSubtitle = "SponsorBlock topluluğundan segment verileri (sponsor.ajay.app). Entegrasyon Spot-SponsorBlock tarafından Spot-SponsorBlock-Extension'dan aktarılmıştır.";
+linkButtonTitle = "GitHub'da Spot-SponsorBlock-Extension";
+
+// SponsorBlock reports
+sponsorblock_reports_title = "SponsorBlock Raporları";
+sponsorblockIDTitle = "SponsorBlock Kimliğiniz";
+sponsorblockIDFooter = "Gönderilerinizi ve oylarınızı ilişkilendirmek için kullanılır. Özel bir parola gibi davranın — paylaşmayın.";
+user_id_copied = "Kullanıcı kimliği kopyalandı";
+copyButton = "Kopyala";
+regenerateButton = "Yeniden Üret";
+draftsTitleSB = "Taslaklar";
+draftsEmpty = "Taslak yok. Bir segmenti işaretlemeye başlamak için podcast ilerleme çubuğuna uzun basın.";
+draftsEpisodeLoc = "Bölüm %@";
+hidden_locally_header = "Yerel olarak gizlendi (%@)";
+hiddenFooter = "Buradaki segmentler bu cihazda asla otomatik atlanmaz. SponsorBlock sunucusunda bulunmaya devam ederler.";
+hiddenSegmentsEmpty = "Gizlenmiş segment yok.";
+unhideButton = "Gizlemeyi Kaldır";
+
+popUpRegenerateTitle = "Kullanıcı kimliği yeniden üretilsin mi?";
+popUpRegenerateSubtitle = "Mevcut gönderileriniz ve oylarınız artık sizinle ilişkilendirilmeyecek.";
+popUpClearAllButton = "Tümünü temizle";
+popUpClearAllTitle = "Gizlenen tüm segmentler temizlensin mi?";
+popUpClearAllSubtitle = "Kategori kurallarınıza göre tekrar atlanacaklar.";
+
+readyButton = "Hazır";
+incompleteButton = "Tamamlanmadı";
+editSubmit = "Düzenle / Gönder";
+discardButton = "Vazgeç";
+
+// SponsorBlock Advanced
+skipBehaviourTitle = "Atlama davranışı";
+autoSkipSubmissionsTitle = "Kendi gönderilerimi otomatik atla";
+logOnlyToggle = "Yalnızca günlükle (gerçekte sarma)";
+serverHeader = "Sunucu";
+urlText = "URL";
+
+tuningTitle = "Ayarla";
+minSegmentDuration = "Min segment süresi: %.1fs";
+toastDuration = "Bildirim süresi: %.1fs";
+
+trackLogSubtitle = "Her yeni parçada podcast parça meta verilerini (URI, isPodcast, isVideo vb.) hata ayıklama günlüğüne döker. Yalnızca SponsorBlock beklediğiniz bir podcast'i algılamadığında etkinleştirin.";
+trackLogToggle = "Teşhis parça günlüğü";
+resetButtonTrackLog = "Sıfırla…";
+
+// SponsorBlock Reset Options Advanced
+resetTitle = "Ne sıfırlansın?";
+resetSubtitle = "Her biri bağımsızdır.";
+allResetSB = "Her şey (yukarıdakilerin tümü)";
+regenerateIDSB = "Kullanıcı kimliğini yeniden üret";
+localSubmissionsSB = "Yerel gönderilerim (%@)";
+votedRecordsSB = "Oylanan kayıtlar (%@)";
+hiddenSegmentsSB = "Gizlenen segmentler (%@)";
+draftsCountSB = "Taslak (%@)";
+settingsResetSB = "Ayarlar (anahtarlar + kategoriler + renkler)";
+
+// SponsorBlock How To Use
+playerGesturesTitle = "Oynatıcı üzerindeki hareketler";
+gesturesTitle1 = "İlerleme çubuğuna uzun basın";
+gesturesDeps1 = "Segment başlangıcını işaretleyin. BİTİŞ'i ayarlamak ve gönderim formunu açmak için segmentin sonunda tekrar uzun basın.";
+gesturesTitle2 = "Çubuktaki bir segmente dokunun";
+gesturesDeps2 = "Yalnızca bu cihazda oy verin, kategoriyi değiştirin veya bir segmenti gizleyin.";
+
+submittingTitle = "Gönderiliyor";
+submittingSectionTitle1 = "Gönderim formu";
+submittingSectionDeps1 = "Kaydırıcılar + ince ayar butonları başlangıç/bitiş ayarını hassaslaştırır. Bir kategori seçin. Gönder butonu sponsor.ajay.app adresine yayınlar.";
+submittingSectionTitle2 = "Yerel gönderileriniz";
+submittingSectionDeps2 = "Bu cihazda hemen otomatik olarak atlanır. Sunucu bunları yayınladıktan sonra oylama açılır. 'BENİM' rozeti bunları işaretler.";
+
+skipToastTitle = "Atlama bildirimi";
+skipToastSectionTitle1 = "Geri Al";
+skipToastSectionDeps1 = "Segment başlangıcına geri sarar. Segment bir kez sonuna kadar çalar. İleri + geri yapmak sıfırlar, böylece tekrar atlar.";
+skipToastSectionTitle2 = "Olumlu Oy / Olumsuz Oy";
+skipToastSectionDeps2 = "👍 oyunuzu sunucuya kaydeder. 👎 olumsuz oy vermek, yerel olarak gizlemek veya kategoriyi değiştirmek için bir menü açar.";
+skipToastSectionTitle3 = "Tam segment menüsü";
+skipToastSectionDeps3 = "İlerleme çubuğundaki segmente dokunmakla aynı seçenekler.";
+
+managingSegmentsTitle = "Segmentleri yönetme";
+managingSegmentsSectionTitle1 = "Segmentleri yönet…";
+managingSegmentsSectionDeps1 = "Çubuğa uzun basın → 'Segmentleri yönet' mevcut bölüm için her segmenti listeler. Oy verin, gizleyin, kategoriyi değiştirin veya oynatıcıyı atlatmak için bir satıra dokunun.";
+managingSegmentsSectionTitle2 = "Raporlama ve taslaklar";
+managingSegmentsSectionDeps2 = "Ayarlar → 'Raporlama ve taslaklar' devam eden taslaklarınızı (bitmemiş işaretler) ve gizli segmentlerinizi tutar. Taslaklar uygulama kapansa da kalır.";
+
+categoriesTitle = "Kategoriler";
+categoriesSectionTitle1 = "Kategori bazlı eylemler";
+categoriesSectionDeps1 = "Kapalı = yok say. Göster = yalnızca çubuk üzerine çiz. Manuel = atlamadan önce sor. Otomatik = sessizce atla.";
