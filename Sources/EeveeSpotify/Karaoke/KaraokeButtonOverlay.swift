@@ -57,6 +57,11 @@ final class KaraokeButtonOverlay {
     static let shared = KaraokeButtonOverlay()
 
     private var window: UIWindow?
+    // The frame computed in ensureWindowExists — the button's true "resting"
+    // position for the current screen/idiom. Recorded once at creation and
+    // never touched by applyScrollOffset, specifically so trackScrolling can
+    // reset to it below.
+    private var restFrame: CGRect?
     private var pollTimer: Timer?
 
     // Set by KaraokeButtonOverlayLyricsScreenHook (viewDidAppear/
@@ -81,7 +86,14 @@ final class KaraokeButtonOverlay {
 
     private func startPolling() {
         pollTimer?.invalidate()
-        let timer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
+        // Was 0.5s; a noticeable delay was reported between minimizing Now
+        // Playing on iPhone and the button actually disappearing. This walk
+        // is a bounded, shallow view-controller/view-hierarchy traversal —
+        // cheap enough to afford running well more often than that — so
+        // this trades a bit more CPU time for a much shorter worst-case
+        // delay on any of this class's poll-driven visibility changes, not
+        // just the iPhone-minimize one specifically.
+        let timer = Timer(timeInterval: 0.15, repeats: true) { [weak self] _ in
             self?.refresh()
         }
         // .common (not .default) so this keeps firing even while the user
@@ -93,8 +105,8 @@ final class KaraokeButtonOverlay {
     }
 
     /// Called by KaraokeButtonOverlayLyricsScreenHook's viewDidAppear.
-    /// Force-hides the button immediately (rather than waiting up to 0.5s
-    /// for the next poll tick) as soon as Spotify's native Lyrics
+    /// Force-hides the button immediately (rather than waiting up to one
+    /// poll tick — see startPolling for the current interval) as soon as Spotify's native Lyrics
     /// fullscreen screen finishes presenting.
     func hideForLyricsScreen() {
         isOnNativeLyricsScreen = true
@@ -169,10 +181,28 @@ final class KaraokeButtonOverlay {
     // deliberately does NOT go through `.collectionView()`). This is more
     // resilient to Spotify's internal DI wiring changing again in the
     // future, at the cost of a per-tick hierarchy walk (bounded depth, only
-    // every 0.5s, matching this class's existing poll cadence).
+    // every 0.15s, matching this class's existing poll cadence).
     private static let liveScrollViewControllerClassNames: Set<String> = [
         "NowPlaying_ScrollImpl.NowPlayingScrollViewController",
         "NowPlaying_ScrollImpl.NPVScrollViewController",
+    ]
+
+    // Found via string inspection of the provided 9.1.78 decrypted IPA:
+    // NowPlaying_BarPageImpl.CompactNowPlayingViewController, alongside
+    // sibling types in the same module — BottomBarTransitionImpl,
+    // TouchPassthroughView, NowPlayingReducedUIModel — which reads like the
+    // actual mini-player bar's own implementation module, not merely an
+    // expand/collapse transition helper (that's the separate, differently-
+    // named NowPlayingCompactAnimator/NowPlayingRegularAnimator pair, which
+    // by their naming look tied to sheet-style/size-class presentation
+    // rather than to the resting collapsed state itself). I couldn't fully
+    // confirm this class's superclass from strings alone the way I could
+    // confirm the two names above by their selector table — like those,
+    // this is walked and checked via plain `.view.window`, so a wrong guess
+    // here just means it never matches (falls through to the height-ratio
+    // check below), not a crash.
+    private static let miniPlayerBarClassNames: Set<String> = [
+        "NowPlaying_BarPageImpl.CompactNowPlayingViewController",
     ]
 
     private static func isNowPlayingScreenCurrentlyVisible(liveVC: UIViewController?) -> Bool {
@@ -218,21 +248,24 @@ final class KaraokeButtonOverlay {
     // you collapse it), let me know how far off it looks and I can tighten
     // the threshold.
     //
-    // Split per idiom because on iPad the button wasn't disappearing on
-    // minimize at all — the working theory is that iPad's expanded Now
-    // Playing presentation doesn't fill the whole window the way it does on
-    // iPhone (e.g. a fixed-size panel rather than true full-screen), so its
-    // ratio against full window height sits closer to the mini-player's
-    // ratio than to iPhone's ~1.0, and 40% never actually got crossed even
-    // once collapsed. This higher iPad value is an unverified guess in the
-    // same spirit as the original 40% — if it still doesn't disappear (or
-    // now disappears too early while still expanded), tell me which and
-    // I'll adjust it further.
-    private static var minimizedHeightFraction: CGFloat {
-        UIDevice.current.userInterfaceIdiom == .pad ? 0.65 : 0.4
-    }
+    // This is now the FALLBACK signal, checked only when
+    // miniPlayerBarClassNames isn't found on screen (see
+    // isNowPlayingScreenMinimized below) — kept in case that class-name
+    // lookup doesn't apply on some build/flow, rather than removing the
+    // only thing that used to work on iPhone.
+    private static let minimizedHeightFraction: CGFloat = 0.4
 
     private static func isNowPlayingScreenMinimized(liveVC: UIViewController?) -> Bool {
+        // Primary signal: Spotify's own mini-player bar view controller is
+        // live and on screen. This is what should actually fix iPad, where
+        // the height-ratio fallback below apparently never crossed its
+        // threshold in either state — this check doesn't depend on iPad's
+        // expanded Now Playing filling the window at all, so it isn't
+        // sensitive to whatever layout difference was causing that.
+        if findLiveViewController(matching: miniPlayerBarClassNames)?.view.window != nil {
+            return true
+        }
+
         guard let liveVC = liveVC, let window = liveVC.view.window else { return false }
         let visibleHeight = liveVC.view.convert(liveVC.view.bounds, to: window).height
         let screenHeight = window.bounds.height
@@ -244,16 +277,21 @@ final class KaraokeButtonOverlay {
     /// (generically covers UINavigationController/UITabBarController/
     /// UISplitViewController stacks, which all surface their contents via
     /// their own `.children`) + presentedViewController, recursively —
-    /// looking for an instance whose runtime class matches one of
-    /// `liveScrollViewControllerClassNames`.
-    private static func findLiveNowPlayingScrollViewController() -> UIViewController? {
+    /// looking for an instance whose runtime class matches one of the given
+    /// names. Shared by findLiveNowPlayingScrollViewController and the
+    /// mini-player bar lookup above; only ever used to reach plain
+    /// UIViewController/UIView API (`.view.window`) on whatever it finds,
+    /// never a Spotify-internal selector, so a class name that doesn't
+    /// actually exist or doesn't match what's on screen just means "not
+    /// found" here, not a crash.
+    private static func findLiveViewController(matching classNames: Set<String>) -> UIViewController? {
         let roots = UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }
             .flatMap { $0.windows }
             .compactMap { $0.rootViewController }
 
         func walk(_ vc: UIViewController) -> UIViewController? {
-            if liveScrollViewControllerClassNames.contains(NSStringFromClass(type(of: vc))) {
+            if classNames.contains(NSStringFromClass(type(of: vc))) {
                 return vc
             }
             if let presented = vc.presentedViewController, let found = walk(presented) {
@@ -269,6 +307,10 @@ final class KaraokeButtonOverlay {
             if let found = walk(root) { return found }
         }
         return nil
+    }
+
+    private static func findLiveNowPlayingScrollViewController() -> UIViewController? {
+        findLiveViewController(matching: liveScrollViewControllerClassNames)
     }
 
     // MARK: - Scroll tracking
@@ -308,6 +350,23 @@ final class KaraokeButtonOverlay {
             stopTrackingScrolling()
             guard let scrollView = scrollView else { return }
             trackedScrollView = scrollView
+            // Reset to the canonical rest position before establishing the
+            // new anchor pair below. Without this, a fresh tracking session
+            // anchored off whatever y the window happened to be sitting at
+            // from the END of the previous session (e.g. from having
+            // scrolled Now Playing before opening the karaoke view, or
+            // before minimizing/backgrounding) — and since Now Playing's
+            // own scroll offset often resets to the top by the time you're
+            // back (reopening from the mini-player, or returning from the
+            // karaoke view), the new baseContentOffsetY captured below could
+            // land at 0 while baseWindowY still reflected that old, already
+            // -scrolled-up position. That combination pins the button at the
+            // wrong height indefinitely, which is what read as the button
+            // "rising higher" each time you left and came back rather than
+            // returning to where it started.
+            if let restFrame = restFrame {
+                window?.frame = restFrame
+            }
             baseContentOffsetY = scrollView.contentOffset.y
             baseWindowY = window?.frame.origin.y
             scrollObservation = scrollView.observe(\.contentOffset, options: [.new]) { [weak self] _, change in
@@ -408,20 +467,42 @@ final class KaraokeButtonOverlay {
         window.isHidden = isOffScreen
     }
 
-    /// Walks `.subviews` (breadth-first) looking for the first UIScrollView
-    /// (UICollectionView included, since it's a UIScrollView subclass).
-    /// Pure type-checking, no selector calls — see the crash-safety note
-    /// above trackScrolling.
+    /// Walks `.subviews` (breadth-first) looking for a UIScrollView
+    /// (UICollectionView included, since it's a UIScrollView subclass) that
+    /// fills most of `root`'s own height — i.e. the page's main content
+    /// scroll view, not a nested horizontal carousel row (also a
+    /// UIScrollView) that happens to sit closer to the root in the view
+    /// tree at the moment of this call. Falls back to the first ScrollView
+    /// found at all if nothing meets that bar, so this never returns "no
+    /// match" in a case the old plain-first-found version would have
+    /// matched.
+    ///
+    /// Added after a report of the button vanishing and only reappearing
+    /// after a long delay during fast up/down scrolling. My working theory:
+    /// scrolling fast enough churns cell reuse enough that this walk could
+    /// occasionally land on a nested carousel's small scroll view instead of
+    /// the main one at the instant it ran, latching scroll-tracking onto
+    /// something whose offset changes don't correspond to the actual
+    /// content moving underneath the button. I can't fully confirm that
+    /// mechanism from static inspection alone — if the button still
+    /// misbehaves the same way after this, that theory was wrong and I'll
+    /// need a screen recording of it happening to dig further. Pure
+    /// type-checking either way, no selector calls — see the crash-safety
+    /// note above trackScrolling.
     private static func findFirstScrollView(in root: UIView) -> UIScrollView? {
         var queue: [UIView] = [root]
+        var firstFound: UIScrollView?
         while !queue.isEmpty {
             let view = queue.removeFirst()
             if let scrollView = view as? UIScrollView {
-                return scrollView
+                if firstFound == nil { firstFound = scrollView }
+                if root.bounds.height > 0, scrollView.bounds.height >= root.bounds.height * 0.6 {
+                    return scrollView
+                }
             }
             queue.append(contentsOf: view.subviews)
         }
-        return nil
+        return firstFound
     }
 
     private func ensureWindowExists() {
@@ -434,12 +515,18 @@ final class KaraokeButtonOverlay {
         let safeAreaBottom = scene.windows
             .first(where: { $0.isKeyWindow })?.safeAreaInsets.bottom ?? 34
 
+        let isPhone = UIDevice.current.userInterfaceIdiom == .phone
         // Generous-but-tight size for the single button — wide enough for
         // longer translated copy once other languages get this key
         // translated, tall enough that the button's own tap target
         // (including its padding) is never clipped by the window edge.
-        let areaWidth: CGFloat = 180
-        let areaHeight: CGFloat = 56
+        //
+        // Smaller on iPad: the button's own content (see
+        // KaraokeButtonOverlayView below) is sized down a step there too —
+        // this just shrinks the window to match, so there isn't dead
+        // tappable space left around a now-smaller button.
+        let areaWidth: CGFloat = isPhone ? 180 : 152
+        let areaHeight: CGFloat = isPhone ? 56 : 46
         // Lower on iPhone specifically — iPhone's Now Playing layout puts
         // the action row closer to the bottom of the screen than iPad's
         // does (iPad has more vertical space above the mini-player/controls
@@ -447,7 +534,6 @@ final class KaraokeButtonOverlay {
         // on iPhone. This is still a fixed guess, not a true anchor — see
         // the comment below on why I couldn't verify the real button's
         // frame — so let me know if it needs further adjustment.
-        let isPhone = UIDevice.current.userInterfaceIdiom == .phone
         let bottomInset: CGFloat = isPhone ? 52 : 100
         let trailingInset: CGFloat = 8
 
@@ -497,22 +583,25 @@ final class KaraokeButtonOverlay {
         overlayWindow.rootViewController = hosting
 
         window = overlayWindow
+        restFrame = frame
     }
 }
 
 @available(iOS 15.0, *)
 private struct KaraokeButtonOverlayView: View {
+    private var isPhone: Bool { UIDevice.current.userInterfaceIdiom == .phone }
+
     var body: some View {
         Button(action: { KaraokeOverlayPresenter.present() }) {
             HStack(spacing: 6) {
                 Image(systemName: "text.bubble.fill")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: isPhone ? 13 : 11, weight: .semibold))
                 Text("karaoke_word_synced_button".localized)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: isPhone ? 13 : 11, weight: .semibold))
             }
             .foregroundColor(.white)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
+            .padding(.horizontal, isPhone ? 14 : 11)
+            .padding(.vertical, isPhone ? 10 : 8)
             .background(Capsule().fill(Color.white.opacity(0.18)))
             .overlay(Capsule().strokeBorder(Color.white.opacity(0.25), lineWidth: 1))
             .shadow(color: .black.opacity(0.3), radius: 8, y: 2)
@@ -526,7 +615,7 @@ private struct KaraokeButtonOverlayView: View {
         .frame(
             maxWidth: .infinity,
             maxHeight: .infinity,
-            alignment: UIDevice.current.userInterfaceIdiom == .phone ? .center : .trailing
+            alignment: isPhone ? .center : .trailing
         )
     }
 }
