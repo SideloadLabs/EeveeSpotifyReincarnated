@@ -198,9 +198,11 @@ final class KaraokeButtonOverlay {
     // rather than to the resting collapsed state itself). I couldn't fully
     // confirm this class's superclass from strings alone the way I could
     // confirm the two names above by their selector table — like those,
-    // this is walked and checked via plain `.view.window`, so a wrong guess
-    // here just means it never matches (falls through to the height-ratio
-    // check below), not a crash.
+    // this is walked and checked via plain UIView API (see
+    // isNowPlayingScreenMinimized below for exactly what's checked and why
+    // window-attachment alone wasn't enough), so a wrong guess here just
+    // means it never matches (falls through to the height-ratio check
+    // below), not a crash.
     private static let miniPlayerBarClassNames: Set<String> = [
         "NowPlaying_BarPageImpl.CompactNowPlayingViewController",
     ]
@@ -257,13 +259,34 @@ final class KaraokeButtonOverlay {
 
     private static func isNowPlayingScreenMinimized(liveVC: UIViewController?) -> Bool {
         // Primary signal: Spotify's own mini-player bar view controller is
-        // live and on screen. This is what should actually fix iPad, where
-        // the height-ratio fallback below apparently never crossed its
-        // threshold in either state — this check doesn't depend on iPad's
-        // expanded Now Playing filling the window at all, so it isn't
-        // sensitive to whatever layout difference was causing that.
-        if findLiveViewController(matching: miniPlayerBarClassNames)?.view.window != nil {
-            return true
+        // live AND actually visible on screen — not merely attached to a
+        // window. This was originally checking `.view.window != nil` alone,
+        // which turned out to be wrong: it's very plausible (and matches
+        // what broke here) that Spotify keeps this view controller mounted
+        // in the hierarchy even while the full Now Playing screen is
+        // expanded on top of it — just hidden/covered rather than removed —
+        // in which case `.view.window` stays non-nil the entire time and
+        // this unconditionally reported "minimized", hiding the button on
+        // both iPhone and iPad regardless of actual state. Checking
+        // isHidden/alpha and that it has non-trivial visible height on
+        // screen (rather than being collapsed to zero height, or covered
+        // and therefore never actually laid out with real bounds) is a
+        // closer approximation of "is this actually what the user sees
+        // right now" — plain UIView/UIViewController API throughout, so
+        // still no risk of the unrecognized-selector crash this file
+        // avoids elsewhere. Still unverified beyond static inspection,
+        // though: if the button now shows even while the mini bar visibly
+        // IS on screen, or still doesn't show when it should, tell me which
+        // and I can add a rough screen-recording-based check on the actual
+        // bar height/position instead of guessing further blind.
+        if let bar = findLiveViewController(matching: miniPlayerBarClassNames), bar.isViewLoaded {
+            let view = bar.view
+            if let window = view.window, !view.isHidden, view.alpha > 0.01 {
+                let visibleHeight = view.convert(view.bounds, to: window).height
+                if visibleHeight > 1 {
+                    return true
+                }
+            }
         }
 
         guard let liveVC = liveVC, let window = liveVC.view.window else { return false }
