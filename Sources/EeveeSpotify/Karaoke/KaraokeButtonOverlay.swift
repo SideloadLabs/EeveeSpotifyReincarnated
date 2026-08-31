@@ -279,8 +279,9 @@ final class KaraokeButtonOverlay {
         // IS on screen, or still doesn't show when it should, tell me which
         // and I can add a rough screen-recording-based check on the actual
         // bar height/position instead of guessing further blind.
-        if let bar = findLiveViewController(matching: miniPlayerBarClassNames), bar.isViewLoaded {
-            let view = bar.view
+        if let bar = findLiveViewController(matching: miniPlayerBarClassNames),
+           bar.isViewLoaded,
+           let view = bar.view {
             if let window = view.window, !view.isHidden, view.alpha > 0.01 {
                 let visibleHeight = view.convert(view.bounds, to: window).height
                 if visibleHeight > 1 {
