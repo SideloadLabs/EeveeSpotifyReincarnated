@@ -7,6 +7,7 @@ struct EeveeSettingsView: View {
     
     @State private var hasShownCommonIssuesTip = UserDefaults.hasShownCommonIssuesTip
     @State private var isClearingData = false
+    @State private var isPresentingDevNoteSheet = false
 
 
     private func confirmDestructive(
@@ -144,6 +145,20 @@ struct EeveeSettingsView: View {
             }
 
             //
+
+            Section {
+                Button {
+                    isPresentingDevNoteSheet = true
+                } label: {
+                    HStack {
+                        Image(systemName: "person.fill.questionmark")
+                        Text("\("developer_note".localized)...")
+                    }
+                }
+            }
+            .sheet(isPresented: $isPresentingDevNoteSheet) {
+                EeveeDevNoteView()
+            }
 
             Section(header: Text("debug_title".localized), footer: Text("debug_section_footer".localized)) {
                 Button {

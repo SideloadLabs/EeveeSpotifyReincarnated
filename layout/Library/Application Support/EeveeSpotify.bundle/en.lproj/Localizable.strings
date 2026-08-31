@@ -141,6 +141,7 @@ let_the_music_play = "Let the music play...";
 liked_songs = "Liked songs";
 
 contributors = "Contributors";
+developer_note = "Developer's Note";
 
 request_anonymous_token = "Request Anonymous Token";
 request_anonymous_token_description = "Tap “Request Anonymous Token” to request a token from Musixmatch without authorization.";
