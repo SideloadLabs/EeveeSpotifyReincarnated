@@ -127,6 +127,12 @@ final class KaraokeButtonOverlay {
         }
     }
 
+    // Only logs on an actual change of the summarized state (not every poll
+    // tick) — this is a 0.15s timer, logging unconditionally would flood the
+    // debug log. Format: found class name (or "none"), then each gate as
+    // visible/minimized/data/presented → shouldShow.
+    private var lastLoggedDiagnostic: String?
+
     private func refresh() {
         let liveVC = !isOnNativeLyricsScreen ? KaraokeButtonOverlay.findLiveNowPlayingScrollViewController() : nil
         let isNowPlayingScreenVisible = !isOnNativeLyricsScreen && KaraokeButtonOverlay.isNowPlayingScreenCurrentlyVisible(liveVC: liveVC)
@@ -145,6 +151,28 @@ final class KaraokeButtonOverlay {
         // scroll position, and tracking is torn down for real.
         let shouldShow = isNowPlayingScreenVisible && !isMinimized && hasKaraokeData
             && !KaraokeOverlayPresenter.isPresented
+
+        // Diagnostic only — traces every gate that feeds shouldShow, since
+        // this has been the recurring point of breakage (wrong class names,
+        // over-eager minimize detection, etc.) and guessing blind at the
+        // next fix without this has cost a few rounds already. Search the
+        // debug log for "[KaraokeButton]" — a line is written each time any
+        // of these values actually changes, not on every poll tick.
+        let foundClassName = liveVC.map { NSStringFromClass(type(of: $0)) } ?? "none"
+        // Only run the extra hierarchy sweep when needed — it's diagnostic-
+        // only overhead, no reason to pay for it once the real lookup above
+        // is already finding the right thing.
+        let nearbyClasses = liveVC == nil
+            ? KaraokeButtonOverlay.diagnosticNearbyNowPlayingClassNames()
+            : []
+        let diagnostic = "class=\(foundClassName) nearby=\(nearbyClasses) onLyricsScreen=\(isOnNativeLyricsScreen) " +
+            "visible=\(isNowPlayingScreenVisible) minimized=\(isMinimized) " +
+            "hasData=\(hasKaraokeData) karaokePresented=\(KaraokeOverlayPresenter.isPresented) " +
+            "shouldShow=\(shouldShow)"
+        if diagnostic != lastLoggedDiagnostic {
+            writeDebugLog("[KaraokeButton] \(diagnostic)")
+            lastLoggedDiagnostic = diagnostic
+        }
 
         if shouldShow {
             ensureWindowExists()
@@ -335,6 +363,36 @@ final class KaraokeButtonOverlay {
 
     private static func findLiveNowPlayingScrollViewController() -> UIViewController? {
         findLiveViewController(matching: liveScrollViewControllerClassNames)
+    }
+
+    /// Diagnostic-only, not used for any actual show/hide decision: walks
+    /// the same hierarchy as findLiveViewController but collects every
+    /// runtime class name containing "nowplaying" (case-insensitive)
+    /// instead of matching a fixed set. Only called from refresh() when the
+    /// expected class names above aren't found, specifically so the debug
+    /// log can tell apart "wrong class name for this Spotify build" (this
+    /// finds real NowPlaying-related classes that aren't in our sets) from
+    /// "right class name, but not reachable via this children/presented
+    /// walk" (this finds nothing either). Capped at 30 to keep the log
+    /// readable if something's deeply nested.
+    private static func diagnosticNearbyNowPlayingClassNames() -> [String] {
+        let roots = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap { $0.windows }
+            .compactMap { $0.rootViewController }
+
+        var found: [String] = []
+        func walk(_ vc: UIViewController) {
+            guard found.count < 30 else { return }
+            let name = NSStringFromClass(type(of: vc))
+            if name.lowercased().contains("nowplaying") {
+                found.append(name)
+            }
+            if let presented = vc.presentedViewController { walk(presented) }
+            for child in vc.children { walk(child) }
+        }
+        for root in roots { walk(root) }
+        return found
     }
 
     // MARK: - Scroll tracking
