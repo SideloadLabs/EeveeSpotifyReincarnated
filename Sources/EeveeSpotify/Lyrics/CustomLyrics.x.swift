@@ -390,6 +390,13 @@ func getLyricsDataForCurrentTrack(_ originalPath: String, originalLyrics: Lyrics
         throw LyricsError.noCurrentTrack
     }
 
+    // See the comment on updateTrackIdFromLyricsFetch itself for why this is
+    // here: on builds where KaraokePlaybackTracker's usual player-observer
+    // registration fails, this is the only reliable source it has for the
+    // current track ID, and this call site fires on every real track change
+    // regardless of that.
+    KaraokePlaybackTracker.shared.updateTrackIdFromLyricsFetch(trackIdentifier)
+
     if capturedTrackId != trackIdentifier {
         capturedTrackTitle = nil
         capturedArtistName = nil
