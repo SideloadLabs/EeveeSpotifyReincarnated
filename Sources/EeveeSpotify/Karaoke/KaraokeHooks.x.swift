@@ -1,6 +1,7 @@
 import Foundation
 import Orion
 import UIKit
+import ObjectiveC.runtime
 
 private var karaokeObserverRegistered = false
 private let karaokeObserver = EeveeKaraokeObserver()
@@ -80,11 +81,25 @@ func activateKaraokeHooks() {
     // a hook that then attaches fine).
     let legacyName = "SPTPlayerServiceImplementation"
     let mangledName = "_TtC17Player_CommonImpl30SPTPlayerServiceImplementation"
-    let resolvedName: String? = NSClassFromString(legacyName) != nil ? legacyName
-        : (NSClassFromString(mangledName) != nil ? mangledName : nil)
+    let resolvedClass: AnyClass? = NSClassFromString(legacyName) ?? NSClassFromString(mangledName)
+    let resolvedName = resolvedClass.map { NSStringFromClass($0) }
     writeDebugLog("[Karaoke] activate: class=\(resolvedName ?? "<missing>")")
     KaraokeGroup().activate()
     writeDebugLog("[Karaoke] hook group activated")
+
+    // -addPlayerObserver: exists on this class (Orion found it enough to
+    // report a hook failure rather than a missing-target error — see
+    // KaraokePlayerServiceObserverHook's comment) but doesn't actually
+    // attach, which most likely means the real observer-registration API
+    // has moved elsewhere (possibly the generic SPTObserverManager<Protocol>
+    // pattern also seen in this binary) rather than living on this class in
+    // the shape Orion expects. This dumps the class's real, complete method
+    // table — no live instance needed, `class_copyMethodList` works
+    // directly on the Class — so the next debug log shows exactly what IS
+    // callable here instead of guessing at another selector blind.
+    if let resolvedClass = resolvedClass {
+        karaokeDumpClassMethods("PlayerService(\(resolvedName ?? "?"))", ofClass: resolvedClass)
+    }
 
     // Just referencing .shared is enough to trigger KaraokeButtonOverlay's
     // lazy init, which kicks off its own Now-Playing-visibility polling
