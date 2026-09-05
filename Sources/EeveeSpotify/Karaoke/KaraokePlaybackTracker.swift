@@ -55,6 +55,40 @@ final class KaraokePlaybackTracker {
         }
     }
 
+    /// Track-ID-only update, independent of processStateChange above.
+    ///
+    /// Added because on the 9.1.78 IPA I was given to inspect, the
+    /// -addPlayerObserver: registration this class otherwise depends on
+    /// fails to hook at all (Spotify appears to have moved that API to a
+    /// generic SPTObserverManager<Protocol> pattern — a much deeper native
+    /// change than a simple rename, not something to guess at blind) —
+    /// meaning processStateChange above is never actually called on that
+    /// build, and currentTrackId() would stay nil forever, which is exactly
+    /// what was keeping the Word-Synced button permanently hidden even with
+    /// syllable lyrics confirmed fetched.
+    ///
+    /// CustomLyrics.x.swift's getLyricsDataForCurrentTrack already reliably
+    /// learns the current track ID a different way on this build — by
+    /// reading it straight off the path of Spotify's own native
+    /// /color-lyrics/v2/track/{trackId} request, which fires on every real
+    /// track change regardless of the observer issue above (confirmed via
+    /// the debug log: lyrics were being fetched correctly for each track in
+    /// sequence throughout). Feeding that same value in here as soon as it's
+    /// known — instead of only via the broken observer — is what should get
+    /// the button showing correctly again.
+    ///
+    /// This does NOT restore position/playbackSpeed/isPlaying tracking —
+    /// those still depend on the broken observer, so the karaoke lyrics
+    /// view's own line-by-line highlighting timing may still be affected
+    /// until that's fixed for real. This only unblocks the button's own
+    /// "is there data for this track" check, which is all it needs.
+    func updateTrackIdFromLyricsFetch(_ trackId: String) {
+        guard !trackId.isEmpty else { return }
+        queue.async {
+            self.lastTrackId = trackId
+        }
+    }
+
     /// Estimated current playback position in milliseconds, interpolated
     /// between actual state-change callbacks the same way SponsorBlockSkipper
     /// does — needed because callbacks don't fire every frame, but the
