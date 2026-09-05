@@ -449,8 +449,22 @@ final class KaraokeButtonOverlay {
             if let restFrame = restFrame {
                 window?.frame = restFrame
             }
-            baseContentOffsetY = scrollView.contentOffset.y
-            baseWindowY = window?.frame.origin.y
+            // Anchored to true content-top (0), not scrollView.contentOffset.y
+            // read live at this moment. That was the actual bug behind
+            // "button drops into the lyrics area after opening/closing
+            // karaoke, then looks right again the next time": if the user
+            // wasn't scrolled all the way back to the top of Now Playing
+            // exactly when this session (re)started, that non-zero offset
+            // got treated as if it WERE the rest position — so scrolling
+            // back up afterward moved the button below restFrame rather
+            // than back to it, and it only looked "fixed" on some later
+            // cycle if the scroll position happened to be back near 0 right
+            // when tracking restarted that time. Anchoring to a fixed 0
+            // makes "scrolled to the top" always map to restFrame's exact
+            // position, regardless of where the scroll offset was sitting
+            // at the moment tracking (re)began.
+            baseContentOffsetY = 0
+            baseWindowY = restFrame?.origin.y
             scrollObservation = scrollView.observe(\.contentOffset, options: [.new]) { [weak self] _, change in
                 guard let self = self, let newOffset = change.newValue else { return }
                 // UIScrollView's contentOffset KVO already fires on the main
