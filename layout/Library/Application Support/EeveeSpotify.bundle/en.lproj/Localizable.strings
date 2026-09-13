@@ -103,6 +103,12 @@ miscellaneous = "Miscellaneous";
 clean_share_links = "Clean Share Links";
 clean_share_links_description = "Removes the \"si\" tracking parameter from shared Spotify links, so they don't reveal which device or account the link came from.";
 
+hide_jam_from_menu = "Hide Jam from Menu";
+hide_jam_from_menu_description = "Removes \"Start a Jam\" from track/playlist context menus, the device picker, and the queue.";
+
+block_rating_dialogs = "Block App Rating Dialogs";
+block_rating_dialogs_description = "Suppresses App Store star rating prompts and in-app review requests.";
+
 /* MARK: Premium PopUps */
 
 have_premium_popup = "It looks like you have an active Premium subscription, so the tweak won't patch the data or restrict the use of Premium server-sided features. You can manage this in the EeveeSpotify settings.";

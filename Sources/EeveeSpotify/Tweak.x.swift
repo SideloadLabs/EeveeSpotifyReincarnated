@@ -293,6 +293,12 @@ struct EeveeSpotify: Tweak {
         // Spotify 9.1.x. Each target is runtime-gated for minor-version safety.
         activateUpsellServiceBlocker()
 
+        // Block app star rating dialogs and in-app review requests.
+        activateRatingDialogBlocker()
+
+        // Hide Jam from menus, device picker, and queue.
+        activateHideJamFromMenu()
+
         // Block upsell components injected into Hub/home JSON (e.g. upgrade banners).
         if NSClassFromString("HUBViewModelBuilderImplementation") != nil {
             AdBlockerGroup().activate()
