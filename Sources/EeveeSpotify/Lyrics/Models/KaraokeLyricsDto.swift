@@ -52,6 +52,32 @@ struct KaraokeLineDto {
         }
         return text
     }
+
+    /// True if this line's text is a right-to-left script (Arabic, Hebrew,
+    /// etc.) — checked via the first "strong" directional character found,
+    /// the same principle the Unicode Bidi Algorithm itself uses to decide
+    /// a paragraph's base direction. Used to flip the karaoke fill
+    /// gradient's sweep direction and word layout order for RTL lyrics —
+    /// see the environment(\.layoutDirection:) call in KaraokeLineView.
+    var isRTL: Bool {
+        for scalar in plainText.unicodeScalars {
+            switch scalar.value {
+            case 0x0590...0x05FF,  // Hebrew
+                 0x0600...0x06FF,  // Arabic
+                 0x0750...0x077F,  // Arabic Supplement
+                 0x08A0...0x08FF,  // Arabic Extended-A
+                 0xFB1D...0xFB4F,  // Hebrew presentation forms
+                 0xFB50...0xFDFF,  // Arabic presentation forms A
+                 0xFE70...0xFEFF:  // Arabic presentation forms B
+                return true
+            case 0x0041...0x005A, 0x0061...0x007A:  // basic Latin letters
+                return false
+            default:
+                continue
+            }
+        }
+        return false
+    }
 }
 
 /// Full karaoke-ready lyrics for one track. Only produced when the

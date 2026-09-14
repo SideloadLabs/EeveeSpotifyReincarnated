@@ -37,7 +37,7 @@ class SpicyLyricsRepository: LyricsRepository {
     // (project/config.ts). Version alone was a dead end for the
     // Static/Line-vs-Syllable discrepancy — see the "X-mode" header below,
     // added alongside this bump, which is the actual missing piece.
-    private static let clientVersion = "6.3.15"
+    private static let clientVersion = "6.3.10"
 
     // MARK: - Token wait
     //
@@ -372,11 +372,12 @@ class SpicyLyricsRepository: LyricsRepository {
                 query: query,
                 options: options
             )
+            let normalizedKaraokeLines = SpicyLyricsRepository.normalizeMonotonicTiming(filledKaraokeLines)
 
             KaraokeLyricsStore.shared.set(
                 trackId: trackId,
                 lyrics: KaraokeLyricsDto(
-                    lines: filledKaraokeLines,
+                    lines: normalizedKaraokeLines,
                     songWriters: songWriters,
                     providerCode: providerCode,
                     providerDisplayName: providerDisplayName
@@ -386,6 +387,42 @@ class SpicyLyricsRepository: LyricsRepository {
         }
 
         return LyricsDto(lines: lines, timeSynced: true, romanization: romanization)
+    }
+
+    /// Some SpicyLyrics syllable timing has slight overlaps between
+    /// consecutive syllables — observed across a line boundary, where a
+    /// later word's startMs lands earlier than an earlier word's endMs. This
+    /// is a data quality quirk in the source's algorithmically-derived
+    /// timing, not something this parsing step introduces. Left as-is, an
+    /// overlap lets a LATER word's highlight progress reach further than an
+    /// EARLIER word's at the same playback instant, which reads as the
+    /// highlight jumping ahead on one word while lagging behind on another
+    /// right next to it — reported as the highlight looking "broken" mid-
+    /// line.
+    ///
+    /// Clamping each syllable's startMs to be at least the previous
+    /// syllable's endMs — walked across the ENTIRE track in sung order,
+    /// across line boundaries too, not just within one line — guarantees
+    /// monotonic progress: a later syllable's window can never start before
+    /// an earlier one's has finished, so highlight progress can't visually
+    /// jump out of order anymore.
+    private static func normalizeMonotonicTiming(_ lines: [KaraokeLineDto]) -> [KaraokeLineDto] {
+        var result = lines
+        var previousEndMs = Int.min
+        for lineIndex in result.indices {
+            for syllableIndex in result[lineIndex].syllables.indices {
+                var syllable = result[lineIndex].syllables[syllableIndex]
+                if syllable.startMs < previousEndMs {
+                    syllable.startMs = previousEndMs
+                }
+                if syllable.endMs < syllable.startMs {
+                    syllable.endMs = syllable.startMs
+                }
+                previousEndMs = syllable.endMs
+                result[lineIndex].syllables[syllableIndex] = syllable
+            }
+        }
+        return result
     }
 
     // MARK: Line lyrics

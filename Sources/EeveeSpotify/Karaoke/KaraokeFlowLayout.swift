@@ -3,9 +3,9 @@ import SwiftUI
 /// Wraps child views onto multiple rows when they don't fit the available
 /// width — needed so karaoke lines wrap naturally at the screen edge like
 /// real running text, rather than being clipped or forced onto one line —
-/// and centers each wrapped row horizontally, matching Spotify's own
-/// centered lyrics view (and Spicetify's) rather than ragged left-aligned
-/// text.
+/// and positions each wrapped row per `alignment` (centered by default,
+/// matching Spotify's own lyrics view and Spicetify's, rather than ragged
+/// left-aligned text; configurable via the left/center/right setting).
 ///
 /// SwiftUI's Layout protocol (the clean way to do this) is iOS 16+. This
 /// project's only existing @available check gates at iOS 15, so on iOS 15
@@ -16,18 +16,19 @@ import SwiftUI
 /// manual-wrapping fallback.
 struct KaraokeFlowLayout<Content: View>: View {
     let spacing: CGFloat
+    var alignment: HorizontalAlignment = .center
     @ViewBuilder let content: () -> Content
 
     var body: some View {
         if #available(iOS 16.0, *) {
-            KaraokeFlowLayoutImpl(spacing: spacing) {
+            KaraokeFlowLayoutImpl(spacing: spacing, alignment: alignment) {
                 content()
             }
         } else {
             HStack(spacing: spacing) {
                 content()
             }
-            .frame(maxWidth: .infinity, alignment: .center)
+            .frame(maxWidth: .infinity, alignment: Alignment(horizontal: alignment, vertical: .center))
         }
     }
 }
@@ -35,6 +36,7 @@ struct KaraokeFlowLayout<Content: View>: View {
 @available(iOS 16.0, *)
 private struct KaraokeFlowLayoutImpl: Layout {
     let spacing: CGFloat
+    var alignment: HorizontalAlignment = .center
 
     /// One wrapped row: which subview indices it contains, their
     /// individually-measured sizes, and the row's total content width
@@ -87,12 +89,20 @@ private struct KaraokeFlowLayoutImpl: Layout {
         var y = bounds.minY
 
         for row in rows {
-            // Center this row's total content width within the available
-            // width — this, plus the matching VStack(alignment: .center)
-            // change in KaraokeScrollingLines, is what makes lyrics read
-            // centered like Spotify's own lyrics view instead of
-            // left-aligned.
-            var x = bounds.minX + (bounds.width - row.width) / 2
+            // Position this row's total content width within the available
+            // width per `alignment` — centering (the default) is what makes
+            // lyrics read centered like Spotify's own lyrics view instead of
+            // ragged left-aligned text; leading/trailing support the
+            // left/right alignment setting.
+            var x: CGFloat
+            switch alignment {
+            case .leading:
+                x = bounds.minX
+            case .trailing:
+                x = bounds.maxX - row.width
+            default:
+                x = bounds.minX + (bounds.width - row.width) / 2
+            }
 
             for (offset, index) in row.indices.enumerated() {
                 let size = row.sizes[offset]

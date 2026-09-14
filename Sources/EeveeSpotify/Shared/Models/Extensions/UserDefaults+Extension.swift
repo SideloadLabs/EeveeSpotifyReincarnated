@@ -14,6 +14,8 @@ extension UserDefaults {
     private static let hasPatchedBootstrapKey = "eeveeHasPatchedBootstrap"
     private static let iconNamePrettifyKey = "iconNamePrettify"
     private static let cleanShareLinksKey = "cleanShareLinks"
+    private static let hideJamFromMenuKey = "hideJamFromMenu"
+    private static let blockRatingDialogsKey = "blockRatingDialogs"
 
     static var musixmatchToken: String {
         get {
@@ -98,6 +100,26 @@ extension UserDefaults {
         }
         set (cleanShareLinks) {
             container.set(cleanShareLinks, forKey: cleanShareLinksKey)
+        }
+    }
+
+    /// When true, "Start a Jam" is removed from context menus, device picker, and queue.
+    static var hideJamFromMenu: Bool {
+        get {
+            container.object(forKey: hideJamFromMenuKey) as? Bool ?? true
+        }
+        set (hideJamFromMenu) {
+            container.set(hideJamFromMenu, forKey: hideJamFromMenuKey)
+        }
+    }
+
+    /// When true, App Store review dialogs and in-app rating prompts are suppressed.
+    static var blockRatingDialogs: Bool {
+        get {
+            container.object(forKey: blockRatingDialogsKey) as? Bool ?? true
+        }
+        set (blockRatingDialogs) {
+            container.set(blockRatingDialogs, forKey: blockRatingDialogsKey)
         }
     }
 }

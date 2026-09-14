@@ -2,7 +2,14 @@ import SwiftUI
 
 struct EeveeLyricsSettingsView: View {
     @StateObject var viewModel = EeveeLyricsSettingsViewModel()
-    
+    // Local mirror of UserDefaults.karaokeOptions — that's a plain computed
+    // static var (backed by the @UserDefault property wrapper), not
+    // @Published, so it can't be bound directly with $viewModel-style
+    // syntax. Mirroring it into @State and writing back via onChange is the
+    // standard way to give a plain UserDefaults-backed value SwiftUI
+    // binding support without changing how @UserDefault itself works.
+    @State private var karaokeOptions: KaraokeOptions = UserDefaults.karaokeOptions
+
     var body: some View {
         List {
             lyricsSourceSection()
@@ -18,6 +25,10 @@ struct EeveeLyricsSettingsView: View {
                 if viewModel.lyricsSource == .musixmatch {
                     musixmatchLanguageSection()
                 }
+
+                if viewModel.lyricsSource == .spicylyrics {
+                    karaokeAppearanceSection()
+                }
             }
 
             SpacerView()
@@ -28,6 +39,26 @@ struct EeveeLyricsSettingsView: View {
         .listStyle(GroupedListStyle())
         .disabled(viewModel.isRequestingMusixmatchToken)
         .animation(.default, value: viewModel.animationValues)
+        .onChange(of: karaokeOptions) { UserDefaults.karaokeOptions = $0 }
+    }
+
+    @ViewBuilder private func karaokeAppearanceSection() -> some View {
+        Section {
+            Picker("Lyrics alignment", selection: $karaokeOptions.textAlignment) {
+                ForEach(KaraokeTextAlignment.allCases, id: \.self) { alignment in
+                    Text(alignment.displayName).tag(alignment)
+                }
+            }
+
+            Toggle(
+                "Reversed direction",
+                isOn: $karaokeOptions.reversedDirection
+            )
+        } header: {
+            Text("Word-Synced Lyrics")
+        } footer: {
+            Text("Reversed direction flows lines bottom-to-top instead of top-to-bottom, with the active line lower on screen.")
+        }
     }
     
     @ViewBuilder private func geniusFallbackSection() -> some View {

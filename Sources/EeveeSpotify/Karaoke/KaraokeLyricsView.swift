@@ -7,26 +7,28 @@ import SwiftUI
 /// with KaraokeLineView — auto-scrolling so the active line stays
 /// vertically centered, matching Spicetify's lyrics panel behavior.
 ///
-/// Lyrics text itself is horizontally centered (VStack(alignment: .center)
-/// below, plus the matching per-row centering inside KaraokeFlowLayout) —
-/// matching Spotify's own lyrics view and Spicetify's, rather than ragged
-/// left-aligned text. The screen width is read explicitly via
-/// GeometryReader and threaded all the way down to KaraokeLineView as a
-/// concrete `availableWidth`, rather than relying on `.frame(maxWidth:
-/// .infinity)` to implicitly pass a usable width to the custom
-/// Layout-conforming KaraokeFlowLayoutImpl. That implicit approach is
-/// what an earlier version of this file used, and it doesn't actually
-/// work for a custom Layout: `.frame(maxWidth: .infinity)` expands the
-/// *outer* container to fill available space, but during the sizing
-/// query it can still propose a nil/unspecified width to the *child* —
-/// and KaraokeFlowLayoutImpl's sizeThatFits falls back to `proposal.width
-/// ?? .infinity` when that happens, meaning no wrapping decision gets
-/// made at all: the whole line renders as one long unwrapped row at its
-/// natural width, which then gets positioned (not centered the way a
-/// plain Text would be) within the expanded frame — reading as left-
-/// aligned/overflowing rather than centered. Giving KaraokeLineView a
-/// concrete, non-nil width to apply via `.frame(width:)` (a fixed
-/// constraint, not a flexible one) removes that ambiguity entirely.
+/// Lyrics text alignment (left/center/right, UserDefaults.karaokeOptions.
+/// textAlignment) drives both the VStack's own alignment below and the
+/// matching per-row alignment inside KaraokeFlowLayout — centered by
+/// default, matching Spotify's own lyrics view and Spicetify's, rather
+/// than ragged left-aligned text, but configurable via Settings. The
+/// screen width is read explicitly via GeometryReader and threaded all
+/// the way down to KaraokeLineView as a concrete `availableWidth`, rather
+/// than relying on `.frame(maxWidth: .infinity)` to implicitly pass a
+/// usable width to the custom Layout-conforming KaraokeFlowLayoutImpl.
+/// That implicit approach is what an earlier version of this file used,
+/// and it doesn't actually work for a custom Layout: `.frame(maxWidth:
+/// .infinity)` expands the *outer* container to fill available space, but
+/// during the sizing query it can still propose a nil/unspecified width
+/// to the *child* — and KaraokeFlowLayoutImpl's sizeThatFits falls back
+/// to `proposal.width ?? .infinity` when that happens, meaning no
+/// wrapping decision gets made at all: the whole line renders as one long
+/// unwrapped row at its natural width, which then gets positioned (not
+/// centered the way a plain Text would be) within the expanded frame —
+/// reading as left-aligned/overflowing rather than centered. Giving
+/// KaraokeLineView a concrete, non-nil width to apply via `.frame(width:)`
+/// (a fixed constraint, not a flexible one) removes that ambiguity
+/// entirely.
 @available(iOS 15.0, *)
 struct KaraokeLyricsView: View {
     let lyrics: KaraokeLyricsDto
@@ -100,11 +102,20 @@ private struct KaraokeScrollingLines: View {
     let screenWidth: CGFloat
 
     private let horizontalPadding: CGFloat = 24
+    private var options: KaraokeOptions { UserDefaults.karaokeOptions }
+
+    private var vstackAlignment: HorizontalAlignment {
+        switch options.textAlignment {
+        case .leading: return .leading
+        case .center: return .center
+        case .trailing: return .trailing
+        }
+    }
 
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(showsIndicators: false) {
-                VStack(alignment: .center, spacing: 28) {
+                VStack(alignment: vstackAlignment, spacing: 28) {
                     Spacer().frame(height: 80)
 
                     ForEach(Array(lyrics.lines.enumerated()), id: \.offset) { index, line in
@@ -116,9 +127,14 @@ private struct KaraokeScrollingLines: View {
                         )
                         .id(index)
                         .padding(.horizontal, horizontalPadding)
+                        // Counter-flip each row — see the note on the outer
+                        // ScrollView's own flip below for why this needs to
+                        // happen twice.
+                        .scaleEffect(x: 1, y: options.reversedDirection ? -1 : 1)
                     }
 
                     KaraokeCreditsFooterView(lyrics: lyrics)
+                        .scaleEffect(x: 1, y: options.reversedDirection ? -1 : 1)
 
                     Spacer().frame(height: 200)
                 }
@@ -146,6 +162,19 @@ private struct KaraokeScrollingLines: View {
                     proxy.scrollTo(newIndex, anchor: .center)
                 }
             }
+            // Standard "inverted list" technique (the same one chat apps
+            // use to keep newest content pinned near the bottom, growing
+            // upward): flip the WHOLE scroll content vertically here, then
+            // counter-flip each individual row above so ITS OWN text still
+            // reads right-side-up. The net effect is that line order reads
+            // bottom-to-top instead of top-to-bottom — what would normally
+            // render at the top now renders at the bottom and vice versa —
+            // while each line's own text stays upright. Using scaleEffect
+            // (y-axis only), not a 180° rotation, specifically so this
+            // doesn't ALSO mirror left/right — that would fight the
+            // leading/trailing alignment setting above, flipping which
+            // side "leading"/"trailing" ends up on.
+            .scaleEffect(x: 1, y: options.reversedDirection ? -1 : 1)
         }
     }
 }

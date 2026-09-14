@@ -106,6 +106,35 @@ private let propertyReplacements = [
         scope: ServerSidedFeaturePolicy.premiumGatedJamEntryPoint.scope,
         modification: .forceBool(false)
     ),
+
+    // Jam suppression (menu, queue, device picker entry points)
+    EeveePropertyReplacement(name: "jam_queue_button_enabled", scope: "ios-feature-nowplaying", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "referrals_jam_queue_enabled", scope: "ios-referrals-jamqueueentrypointimpl", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "enable_guest_controls_queue_header_entry_point", scope: "ios-jam-queueintegrationimpl", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "enable_group_session_attachment", scope: "ios-sociallistening-attachments-impl", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "enable_phone_speaker_host_approval", scope: "ios-feature-sociallisteningconnectentitylogic", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "enable_host_approval_flow", scope: "ios-feature-sociallisteningconnectentitylogic", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "enable_host_approval_flow", scope: "ios-feature-jamdevicepickerintegration", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "show_nearby_jam_nudge", scope: "ios-feature-sociallisteningconnectentitylogic", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "nearby_session_invitation_enabled", scope: "ios-feature-sociallisteningconnectentitylogic", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "nearby_session_enable_visibility_filter", scope: "ios-feature-sociallisteningconnectentitylogic", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "jam_deeplink_handler_enabled", scope: "ios-sociallistening-joingroupsession-impl", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "is_nearby_jam_invite_deeplink_enabled", scope: "ios-sociallistening-joingroupsession-impl", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "enable_deeplink_flow", scope: "ios-feature-jamuiimpl", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "enable_connect_backend_sync", scope: "ios-feature-jam-platformimpl", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "enable_broadcasting", scope: "ios-sociallistening-localnetworkbroadcasting", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "enable_discovery_v2", scope: "ios-sociallistening-localnetworksessionfinder", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "is_active_based_on_session_attribute", scope: "core-social-listening-feature", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "enable_guest_controls_sheet", scope: "ios-jam-participantsettingspageimpl", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "enable_invites_learn_more_sheet", scope: "ios-jam-learnmoresheet", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "enable_pending_request_sheet", scope: "ios-jam-pendingrequestssheet", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "enable_cancel_join_jam_request_sheet", scope: "ios-jam-canceljoinrequestsheet", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "enable_host_approval_loop", scope: "ios-jam-hostapprovalimpl", modification: .forceBool(false)),
+
+    // Rating and review prompt suppression
+    EeveePropertyReplacement(name: "is_course_review_prompting_enabled", scope: "ios-learning-course-page-impl", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "is_course_review_enabled", scope: "ios-learning-course-page-impl", modification: .forceBool(false)),
+    EeveePropertyReplacement(name: "complex_audiobook_row_rating_enabled", scope: "ios-feature-search", modification: .forceBool(false)),
     EeveePropertyReplacement(name: "is_promo_cta_enabled", scope: "ios-reinventfree-contextualupsellpremiumpromo-impl", modification: .forceBool(false)),
     EeveePropertyReplacement(name: "show_time_cap_upsell_with_premium_badge", scope: "ios-reinventfree-contextualupsellpremiumpromo-impl", modification: .forceBool(false)),
     EeveePropertyReplacement(name: "enable_video_time_cap_upsell", scope: "ios-reinventfree-controllerui-impl", modification: .forceBool(false)),
@@ -585,7 +614,22 @@ private func modifyAttributes(_ attributes: inout [String: AccountAttribute]) {
 
     // Restore the real account entitlements after all client-side Premium
     // mutations. Missing values remain missing instead of being synthesized.
+    let jamAttributes: Set<String> = [
+        "social-session",
+        "social-session-free-tier",
+        "jam-social-session",
+    ]
+
     for name in ServerSidedFeaturePolicy.serverAuthoritativeAccountAttributes {
+        if UserDefaults.hideJamFromMenu && jamAttributes.contains(name) {
+            if name == "social-session" || name == "social-session-free-tier" {
+                attributes[name] = AccountAttribute.with { $0.boolValue = false }
+            } else {
+                attributes.removeValue(forKey: name)
+            }
+            continue
+        }
+
         if let original = serverAuthoritativeAttributes[name] {
             attributes[name] = original
         } else {
