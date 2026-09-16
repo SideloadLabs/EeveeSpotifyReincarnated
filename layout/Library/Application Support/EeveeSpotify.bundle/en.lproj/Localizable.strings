@@ -164,7 +164,7 @@ export_debug_log = "Export Debug Log";
 clear_debug_log = "Clear Debug Log";
 debug_log_cleared = "Debug log cleared.";
 debug_log_cleared_ok = "OK";
-no_debug_log_found = "No debug log found. The log starts recording when the app launches.";
+no_debug_log_found = "No debug log found. The log starts recording when the debug logging option is enabled.";
 no_debug_log_found_ok = "OK";
 debug_section_footer = "Turn on logging, then export or clear the log.";
 
