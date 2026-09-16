@@ -307,6 +307,11 @@ struct EeveeSpotify: Tweak {
         // swizzles. Installed unconditionally; cleaning is gated per-call by the toggle.
         PasteboardConcreteSwizzler.install()
 
+        // Activate before the Spotify 9.1.x-specific path, which returns early
+        // later in this initializer. The setting is read at launch because Orion
+        // hook groups cannot be deactivated safely in the running process.
+        activateAmoledTheme()
+
         // Activate session logout protection first.
         // NOTE: On some Spotify 9.1.x builds, Orion can still crash even if a selector exists
         // (e.g., method type encoding changes). Be conservative for 9.1.x.
