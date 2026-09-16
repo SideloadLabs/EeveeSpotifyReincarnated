@@ -13,16 +13,6 @@ struct EeveeMiscellaneousSettingsView: View {
                     )
                 )
             }
-
-            Section(footer: Text("debug_logging_description".localized)) {
-                Toggle(
-                    "debug_logging".localized,
-                    isOn: Binding<Bool>(
-                        get: { UserDefaults.debugLoggingEnabled },
-                        set: { UserDefaults.debugLoggingEnabled = $0 }
-                    )
-                )
-            }
         }
         .listStyle(GroupedListStyle())
     }

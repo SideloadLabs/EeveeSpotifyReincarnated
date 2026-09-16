@@ -166,7 +166,7 @@ debug_log_cleared = "Debug log cleared.";
 debug_log_cleared_ok = "OK";
 no_debug_log_found = "No debug log found. The log starts recording when the app launches.";
 no_debug_log_found_ok = "OK";
-debug_section_footer = "Export or clear the debug log.";
+debug_section_footer = "Turn on logging, then export or clear the log.";
 
 // Full reset
 resetButtonTitle = "Full Reset";
@@ -305,4 +305,3 @@ liquid_glass = "Liquid Glass";
 liquid_glass_description = "Uses the system Liquid Glass material for EeveeSpotify's own controls and panels. On iOS versions without Liquid Glass this falls back to a standard blur.";
 
 debug_logging = "Debug Logging";
-debug_logging_description = "Writes hook activity to the system console and to eeveespotify_debug.log in the app's temp directory. Off by default; turn on when troubleshooting.";

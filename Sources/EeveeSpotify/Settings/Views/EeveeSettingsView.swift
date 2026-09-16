@@ -161,6 +161,14 @@ struct EeveeSettingsView: View {
             }
 
             Section(header: Text("debug_title".localized), footer: Text("debug_section_footer".localized)) {
+                Toggle(
+                    "debug_logging".localized,
+                    isOn: Binding<Bool>(
+                        get: { UserDefaults.debugLoggingEnabled },
+                        set: { UserDefaults.debugLoggingEnabled = $0 }
+                    )
+                )
+
                 Button {
                     let logPath = NSTemporaryDirectory() + "eeveespotify_debug.log"
                     guard FileManager.default.fileExists(atPath: logPath),

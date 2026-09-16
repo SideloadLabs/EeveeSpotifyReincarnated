@@ -14,10 +14,31 @@ struct EeveeGlassNowPlayingInnerGroup: HookGroup {}
 private let searchFieldIdentifier = "SearchHeaderFind.SearchBar"
 
 private var styledFields = NSHashTable<UIView>.weakObjects()
+private var loggedFields = NSHashTable<UIView>.weakObjects()
 
 private func isSearchField(_ button: UIView) -> Bool {
     if button.accessibilityIdentifier == searchFieldIdentifier { return true }
     return EeveeViewTree.isLightColor(button.layer.backgroundColor)
+}
+
+/// Logs the reason a candidate button was or wasn't accepted, once per
+/// distinct button instance — not once per layout pass, which would be
+/// thousands of near-identical lines within seconds. This is the
+/// instrumentation activateEeveeGlass's activation-only log was missing:
+/// that log confirmed the hook installed, not that any button ever passed
+/// its guards afterward.
+private func logSearchFieldCandidate(_ button: UIView, accepted: Bool) {
+    guard UserDefaults.debugLoggingEnabled, !loggedFields.contains(button) else { return }
+    loggedFields.add(button)
+    let size = button.bounds.size
+    let bg = button.layer.backgroundColor
+    writeDebugLog("""
+        [GlassSearch] candidate size=\(Int(size.width))x\(Int(size.height)) \
+        identifier=\(button.accessibilityIdentifier ?? "nil") \
+        bg=\(bg.map(String.init(describing:)) ?? "nil") \
+        isLight=\(EeveeViewTree.isLightColor(bg) ? "Y" : "N") \
+        accepted=\(accepted ? "Y" : "N")
+        """)
 }
 
 /// Encore's glyph view bakes its colour into what it draws, so tintColor
@@ -40,12 +61,14 @@ private func styleSearchField(_ button: UIView) {
     guard EeveeGlass.isEnabled else { return }
 
     let size = button.bounds.size
-    guard size.width >= 200, size.height >= 40, size.height <= 60 else { return }
+    let alreadyStyled = styledFields.contains(button)
+    let sizeOK = size.width >= 200 && size.height >= 40 && size.height <= 60
+    let accepted = alreadyStyled || (sizeOK && isSearchField(button))
+    logSearchFieldCandidate(button, accepted: accepted)
+    guard accepted else { return }
 
     // Once a field has been styled it keeps being styled, even on a pass where
     // Spotify has already repainted it dark and isSearchField would now say no.
-    let alreadyStyled = styledFields.contains(button)
-    guard alreadyStyled || isSearchField(button) else { return }
     styledFields.add(button)
 
     button.layer.backgroundColor = nil
@@ -108,6 +131,29 @@ private func detectColoredCard(in bar: UIView) -> UIView? {
     return best
 }
 
+private var lastNowPlayingLog: Date?
+
+/// Throttled to once every 3 seconds rather than once per instance —
+/// unlike the search field, the same host view stays alive across the
+/// whole session while what's found inside it (the card) changes with
+/// every track, so a single snapshot per instance would only ever show
+/// the very first track played.
+private func logNowPlayingBar(bar: UIView, card: UIView?, frame: CGRect) {
+    guard UserDefaults.debugLoggingEnabled else { return }
+    let now = Date()
+    if let last = lastNowPlayingLog, now.timeIntervalSince(last) < 3 { return }
+    lastNowPlayingLog = now
+
+    let cardDesc = card.map {
+        "size=\(Int($0.bounds.width))x\(Int($0.bounds.height)) bg=\($0.layer.backgroundColor.map(String.init(describing:)) ?? "nil")"
+    } ?? "none found"
+    writeDebugLog("""
+        [GlassBar] bar=\(Int(bar.bounds.width))x\(Int(bar.bounds.height)) \
+        card=\(cardDesc) \
+        finalFrame=\(Int(frame.width))x\(Int(frame.height))
+        """)
+}
+
 private func styleNowPlayingBar(_ container: UIViewController) {
     guard EeveeGlass.isEnabled else { return }
 
@@ -122,6 +168,7 @@ private func styleNowPlayingBar(_ container: UIViewController) {
 
     var frame = card.map { EeveeViewTree.frame(of: $0, in: host) } ?? bar.bounds
     frame.size.height = min(frame.size.height, 80)
+    logNowPlayingBar(bar: bar, card: card, frame: frame)
     guard frame.size.height >= 30, frame.size.width >= 100 else { return }
 
     let radius = min(nowPlayingCardRadius, frame.size.height / 2)
