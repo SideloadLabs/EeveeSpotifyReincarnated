@@ -4,7 +4,13 @@ import UIKit
 import Foundation
 import ObjectiveC.runtime
 
+/// Every hook in the tweak calls through this, so the setting is checked once
+/// here rather than at each of the ~24 call sites. NSLog output still shows
+/// up in Console.app either way at effectively no cost; what the setting
+/// actually controls is the file write, which happens on every call.
 func writeDebugLog(_ message: String) {
+    guard UserDefaults.debugLoggingEnabled else { return }
+
     // Log to system console
     NSLog("[EeveeSpotify] %@", message)
 

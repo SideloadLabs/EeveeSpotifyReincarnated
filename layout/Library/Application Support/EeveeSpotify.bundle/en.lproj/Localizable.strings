@@ -300,3 +300,9 @@ managingSegmentsSectionDeps2 = "Settings → 'Reporting & drafts' holds your in-
 categoriesTitle = "Categories";
 categoriesSectionTitle1 = "Per-category actions";
 categoriesSectionDeps1 = "Off = ignore. Show = draw on the bar only. Manual = prompt before skipping. Auto = skip silently.";
+
+liquid_glass = "Liquid Glass";
+liquid_glass_description = "Uses the system Liquid Glass material for EeveeSpotify's own controls and panels. On iOS versions without Liquid Glass this falls back to a standard blur.";
+
+debug_logging = "Debug Logging";
+debug_logging_description = "Writes hook activity to the system console and to eeveespotify_debug.log in the app's temp directory. Off by default; turn on when troubleshooting.";

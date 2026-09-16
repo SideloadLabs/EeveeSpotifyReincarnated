@@ -2,7 +2,8 @@ import Orion
 import UIKit
 
 struct EeveeGlassSearchFieldGroup: HookGroup {}
-struct EeveeGlassNowPlayingGroup: HookGroup {}
+struct EeveeGlassNowPlayingContainerGroup: HookGroup {}
+struct EeveeGlassNowPlayingInnerGroup: HookGroup {}
 
 // MARK: - search field
 
@@ -92,18 +93,17 @@ class EeveeSearchFieldHook: ClassHook<UIView> {
 
 private let nowPlayingCardRadius: CGFloat = 12
 
-/// The bar's coloured card — the view Spotify tints with the album colour.
-/// Found by shape and paint rather than by class, since the class name moves
-/// between Spotify versions.
 private func detectColoredCard(in bar: UIView) -> UIView? {
     var best: UIView?
+    var bestArea: CGFloat = 0
     EeveeViewTree.forEachView(bar) { v in
-        guard best == nil else { return }
-        let color = v.layer.backgroundColor
-        guard EeveeViewTree.looksLikeCard(v, color: color),
-              !EeveeViewTree.isBaseSurface(color)
-        else { return }
-        best = v
+        if v is UIVisualEffectView || EeveeViewTree.keepsColor(v) { return }
+        guard EeveeViewTree.looksLikeCard(v, color: v.layer.backgroundColor) else { return }
+        let area = v.bounds.width * v.bounds.height
+        if area > bestArea {
+            bestArea = area
+            best = v
+        }
     }
     return best
 }
@@ -138,13 +138,27 @@ private func styleNowPlayingBar(_ container: UIViewController) {
 }
 
 class EeveeNowPlayingBarHook: ClassHook<UIViewController> {
-    typealias Group = EeveeGlassNowPlayingGroup
+    typealias Group = EeveeGlassNowPlayingContainerGroup
 
-    static let targetName = "SPTNowPlayingBarContainerViewController"
+    static let targetName = "_TtC18NowPlaying_BarImpl36NowPlayingBarContainerViewController"
 
     func viewDidLayoutSubviews() {
         orig.viewDidLayoutSubviews()
         styleNowPlayingBar(target)
+    }
+}
+
+class EeveeNowPlayingBarInnerHook: ClassHook<UIViewController> {
+    typealias Group = EeveeGlassNowPlayingInnerGroup
+
+    static let targetName = "_TtC18NowPlaying_BarImpl27NowPlayingBarViewController"
+
+    func viewDidLayoutSubviews() {
+        orig.viewDidLayoutSubviews()
+        if let parent = target.parent,
+           NSStringFromClass(type(of: parent)).contains("NowPlayingBarContainer") {
+            styleNowPlayingBar(parent)
+        }
     }
 }
 
@@ -160,18 +174,26 @@ func activateEeveeGlass() {
     }
 
     let searchFieldExists = NSClassFromString(EeveeSearchFieldHook.targetName) != nil
-    let nowPlayingBarExists = NSClassFromString(EeveeNowPlayingBarHook.targetName) != nil
+    let nowPlayingContainerExists = NSClassFromString(EeveeNowPlayingBarHook.targetName) != nil
+    let nowPlayingInnerExists = NSClassFromString(EeveeNowPlayingBarInnerHook.targetName) != nil
 
     writeDebugLog("""
         [Glass] UIGlassEffect=\(EeveeGlass.isAvailable ? "Y" : "N") \
         searchField=\(searchFieldExists ? "Y" : "N") \
-        nowPlayingBar=\(nowPlayingBarExists ? "Y" : "N")
+        nowPlayingContainer=\(nowPlayingContainerExists ? "Y" : "N") \
+        nowPlayingInner=\(nowPlayingInnerExists ? "Y" : "N")
         """)
 
+    // Each group is one class, one hook, gated on its own existence check —
+    // never combined, since Orion treats activating a group whose target
+    // class is missing as fatal and the two now-playing-bar classes can in
+    // principle drift independently across Spotify versions even though
+    // they are closely related today.
     if searchFieldExists { EeveeGlassSearchFieldGroup().activate() }
-    if nowPlayingBarExists { EeveeGlassNowPlayingGroup().activate() }
+    if nowPlayingContainerExists { EeveeGlassNowPlayingContainerGroup().activate() }
+    if nowPlayingInnerExists { EeveeGlassNowPlayingInnerGroup().activate() }
 
-    if !searchFieldExists && !nowPlayingBarExists {
+    if !searchFieldExists && !nowPlayingContainerExists && !nowPlayingInnerExists {
         writeDebugLog("[Glass] no known target classes in this build — nothing hooked")
     }
 }

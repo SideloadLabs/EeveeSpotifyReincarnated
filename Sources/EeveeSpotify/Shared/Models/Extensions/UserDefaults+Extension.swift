@@ -6,6 +6,7 @@ extension UserDefaults {
     private static let musixmatchTokenKey = "musixmatchToken"
     private static let darkPopUpsKey = "darkPopUps"
     private static let liquidGlassKey = "liquidGlass"
+    private static let debugLoggingEnabledKey = "debugLoggingEnabled"
     private static let patchTypeKey = "patchType"
     private static let trueShuffleEnabledKey = "trueShuffleEnabled"
     private static let overwriteConfigurationKey = "overwriteConfiguration"
@@ -34,15 +35,31 @@ extension UserDefaults {
         }
     }
 
-    /// Liquid Glass chrome on EeveeSpotify's own surfaces. Defaults on:
-    /// on anything below iOS 26 EeveeGlass falls back to a plain material
-    /// automatically, so leaving it on costs those devices nothing.
+    /// Liquid Glass chrome on EeveeSpotify's own surfaces. Defaults OFF:
+    /// this is new and unverified against real Spotify builds (see
+    /// EeveeGlassHooks.x.swift), so it shouldn't turn every existing
+    /// install's search field and now playing bar into an experiment nobody
+    /// opted into. On anything below iOS 26, EeveeGlass falls back to a
+    /// plain material automatically once turned on.
     static var liquidGlass: Bool {
         get {
-            container.object(forKey: liquidGlassKey) as? Bool ?? true
+            container.object(forKey: liquidGlassKey) as? Bool ?? false
         }
         set (liquidGlass) {
             container.set(liquidGlass, forKey: liquidGlassKey)
+        }
+    }
+
+    /// Gates writeDebugLog in Tweak.m — off by default, since it writes to
+    /// both NSLog and a temp file on every call and most people never need
+    /// to see it. Turned on for troubleshooting things like Liquid Glass not
+    /// picking up the right Spotify view.
+    static var debugLoggingEnabled: Bool {
+        get {
+            container.object(forKey: debugLoggingEnabledKey) as? Bool ?? false
+        }
+        set (debugLoggingEnabled) {
+            container.set(debugLoggingEnabled, forKey: debugLoggingEnabledKey)
         }
     }
 
