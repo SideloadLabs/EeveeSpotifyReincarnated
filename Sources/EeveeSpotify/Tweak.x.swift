@@ -293,6 +293,11 @@ struct EeveeSpotify: Tweak {
         // Spotify 9.1.x. Each target is runtime-gated for minor-version safety.
         activateUpsellServiceBlocker()
 
+        // Liquid Glass on EeveeSpotify-styled Spotify chrome. Self-gating:
+        // checks each target class exists before activating its group, and
+        // no-ops entirely when the setting is off.
+        activateEeveeGlass()
+
         // Block upsell components injected into Hub/home JSON (e.g. upgrade banners).
         if NSClassFromString("HUBViewModelBuilderImplementation") != nil {
             AdBlockerGroup().activate()
