@@ -5,6 +5,7 @@ extension UserDefaults {
     
     private static let musixmatchTokenKey = "musixmatchToken"
     private static let darkPopUpsKey = "darkPopUps"
+    private static let liquidGlassKey = "liquidGlass"
     private static let patchTypeKey = "patchType"
     private static let trueShuffleEnabledKey = "trueShuffleEnabled"
     private static let overwriteConfigurationKey = "overwriteConfiguration"
@@ -30,6 +31,18 @@ extension UserDefaults {
         }
         set (darkPopUps) {
             container.set(darkPopUps, forKey: darkPopUpsKey)
+        }
+    }
+
+    /// Liquid Glass chrome on EeveeSpotify's own surfaces. Defaults on:
+    /// on anything below iOS 26 EeveeGlass falls back to a plain material
+    /// automatically, so leaving it on costs those devices nothing.
+    static var liquidGlass: Bool {
+        get {
+            container.object(forKey: liquidGlassKey) as? Bool ?? true
+        }
+        set (liquidGlass) {
+            container.set(liquidGlass, forKey: liquidGlassKey)
         }
     }
 

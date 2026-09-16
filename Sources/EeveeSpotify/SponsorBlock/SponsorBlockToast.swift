@@ -17,7 +17,13 @@ struct SponsorBlockToastAction {
     }
 }
 
-final class SponsorBlockToastView: UIView {}
+/// The toast's own surface. An EeveeGlassHostView rather than a plain
+/// UIView so the toast is a glass pane on iOS 26 — it floats over Spotify's
+/// own content, which is exactly the "navigation layer over content" case
+/// Liquid Glass is for. The host falls back to the previous flat 88% black
+/// automatically when the setting is off or the OS has no glass, so nothing
+/// below needs to branch; it only has to stop painting a background itself.
+final class SponsorBlockToastView: EeveeGlassHostView {}
 
 final class SponsorBlockToast {
     static let shared = SponsorBlockToast()
@@ -54,9 +60,10 @@ final class SponsorBlockToast {
         dismissWork?.cancel()
 
         let toast = SponsorBlockToastView()
-        toast.backgroundColor = UIColor.black.withAlphaComponent(0.88)
-        toast.layer.cornerRadius = 14
-        toast.layer.masksToBounds = true
+        toast.cornerRadius = 14
+        // Kept as the fallback fill for the no-glass path — same colour the
+        // toast used before, so turning Liquid Glass off is a no-op here.
+        toast.fallbackBackgroundColor = UIColor.black.withAlphaComponent(0.88)
         toast.translatesAutoresizingMaskIntoConstraints = false
         toast.alpha = 0
         toast.isUserInteractionEnabled = true

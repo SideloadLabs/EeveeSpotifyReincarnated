@@ -25,6 +25,14 @@ struct KaraokeSyllableDto {
     var isPartOfWord: Bool
 }
 
+/// Reading direction of a run of text. Deliberately a type of this
+/// model layer's own rather than SwiftUI's LayoutDirection, so the DTOs
+/// stay free of any UI-framework import; KaraokeLineView maps it across.
+enum KaraokeTextDirection {
+    case leftToRight
+    case rightToLeft
+}
+
 /// A single lyrics line with full per-syllable timing, for the custom
 /// karaoke view. This is intentionally separate from LyricsLineDto
 /// (which only carries one offsetMs per line, matching Spotify's native
@@ -59,7 +67,17 @@ struct KaraokeLineDto {
     /// a paragraph's base direction. Used to flip the karaoke fill
     /// gradient's sweep direction and word layout order for RTL lyrics —
     /// see the environment(\.layoutDirection:) call in KaraokeLineView.
-    var isRTL: Bool {
+    var isRTL: Bool { strongDirection == .rightToLeft }
+
+    /// Direction of the first *strong* directional character in the line,
+    /// or `.none` when the line has no strong character at all — a line
+    /// that is only punctuation, digits, ellipses or musical-note glyphs
+    /// ("♪", "...", "(2x)") carries no direction of its own. Those lines
+    /// are common in Arabic lyrics as instrumental/ad-lib markers, and
+    /// treating them as LTR made them visibly jump sides mid-song, so the
+    /// view layer feeds them the surrounding song's direction instead
+    /// (see KaraokeLyricsDto.isRTL and KaraokeLineView's fallbackIsRTL).
+    var strongDirection: KaraokeTextDirection? {
         for scalar in plainText.unicodeScalars {
             switch scalar.value {
             case 0x0590...0x05FF,  // Hebrew
@@ -69,14 +87,14 @@ struct KaraokeLineDto {
                  0xFB1D...0xFB4F,  // Hebrew presentation forms
                  0xFB50...0xFDFF,  // Arabic presentation forms A
                  0xFE70...0xFEFF:  // Arabic presentation forms B
-                return true
+                return .rightToLeft
             case 0x0041...0x005A, 0x0061...0x007A:  // basic Latin letters
-                return false
+                return .leftToRight
             default:
                 continue
             }
         }
-        return false
+        return nil
     }
 }
 
@@ -86,6 +104,24 @@ struct KaraokeLineDto {
 /// type is simply not constructed.
 struct KaraokeLyricsDto {
     var lines: [KaraokeLineDto]
+
+    /// The song's overall reading direction: whichever direction more of
+    /// its lines actually declare. Only lines with a strong directional
+    /// character vote; lines that have none (instrumental markers, "♪",
+    /// bare numbers) are the ones this value exists to serve, so they
+    /// can't also decide it. Ties fall to left-to-right.
+    var isRTL: Bool {
+        var rtl = 0, ltr = 0
+        for line in lines {
+            switch line.strongDirection {
+            case .rightToLeft: rtl += 1
+            case .leftToRight: ltr += 1
+            case nil: continue
+            }
+        }
+        return rtl > ltr
+    }
+
     /// Matches the real extension's Credits/ApplyLyricsCredits.ts
     /// "Written by: ..." footer, sourced from the API's SongWriters array.
     var songWriters: [String]

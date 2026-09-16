@@ -24,6 +24,68 @@ void EeveeSBInvokeSeekDouble(id target, SEL selector, double argument) {
     (void)fn(target, selector, argument);
 }
 
+#pragma mark - Liquid Glass
+
+// iOS 26 API that no SDK EeveeSpotify builds against declares. Declared here
+// only so the calls below type-check; every use is guarded by a respondsTo
+// check first, so nothing here is sent on an older system.
+@interface UIView (EeveeGlassPrivate)
+- (void)setCornerConfiguration:(id)configuration;
+@end
+
+BOOL EeveeGlassIsAvailable(void) {
+    Class glass = NSClassFromString(@"UIGlassEffect");
+    return glass && [glass respondsToSelector:@selector(effectWithStyle:)];
+}
+
+UIVisualEffect *EeveeGlassMakeEffect(void) {
+    Class glass = NSClassFromString(@"UIGlassEffect");
+    if ([glass respondsToSelector:@selector(effectWithStyle:)]) {
+        // Style 0 is the regular (non-clear) material. Spotify's own
+        // Reprise chrome builds its glass the same way.
+        typedef id (*EffectFn)(id, SEL, NSInteger);
+        EffectFn fn = (EffectFn)objc_msgSend;
+        UIVisualEffect *effect = fn(glass, @selector(effectWithStyle:), 0);
+        if (effect) return effect;
+    }
+    return [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemChromeMaterialDark];
+}
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+void EeveeGlassApplyShape(UIView *pane, CGFloat radius, BOOL capsule) {
+    if (!pane) return;
+
+    Class config = NSClassFromString(@"UICornerConfiguration");
+    Class cornerRadius = NSClassFromString(@"UICornerRadius");
+    id shape = nil;
+
+    if (config && [pane respondsToSelector:@selector(setCornerConfiguration:)]) {
+        if (capsule && [config respondsToSelector:@selector(capsuleConfiguration)]) {
+            shape = [(id)config performSelector:@selector(capsuleConfiguration)];
+        } else if ([config respondsToSelector:@selector(configurationWithUniformRadius:)] &&
+                   [cornerRadius respondsToSelector:@selector(fixedRadius:)]) {
+            // +fixedRadius: takes a CGFloat, so it cannot go through
+            // performSelector: — CGFloat is not an object and would be
+            // read as a pointer.
+            typedef id (*RadiusFn)(id, SEL, CGFloat);
+            RadiusFn makeRadius = (RadiusFn)objc_msgSend;
+            id value = makeRadius(cornerRadius, @selector(fixedRadius:), radius);
+            if (value) shape = [(id)config performSelector:@selector(configurationWithUniformRadius:) withObject:value];
+        }
+    }
+
+    if (shape) {
+        [pane setCornerConfiguration:shape];
+        pane.clipsToBounds = NO;
+    } else {
+        pane.layer.cornerRadius = capsule ? pane.bounds.size.height / 2 : radius;
+        pane.layer.cornerCurve = kCACornerCurveContinuous;
+        pane.clipsToBounds = YES;
+    }
+}
+#pragma clang diagnostic pop
+
 static void writeDebugLog(NSString *message) {
     NSString *logPath = [NSTemporaryDirectory() stringByAppendingPathComponent:@"eeveespotify_debug.log"];
     NSString *timestamp = [[NSDate date] description];

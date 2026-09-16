@@ -123,7 +123,8 @@ private struct KaraokeScrollingLines: View {
                             line: line,
                             currentMs: currentMs,
                             isActiveLine: index == activeLineIndex,
-                            availableWidth: max(0, screenWidth - horizontalPadding * 2)
+                            availableWidth: max(0, screenWidth - horizontalPadding * 2),
+                            fallbackIsRTL: lyrics.isRTL
                         )
                         .id(index)
                         .padding(.horizontal, horizontalPadding)

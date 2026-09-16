@@ -48,6 +48,16 @@ struct EeveeUISettingsView: View {
                 }
             }
             
+            Section(footer: Text("liquid_glass_description".localized)) {
+                Toggle(
+                    "liquid_glass".localized,
+                    isOn: Binding<Bool>(
+                        get: { UserDefaults.liquidGlass },
+                        set: { UserDefaults.liquidGlass = $0 }
+                    )
+                )
+            }
+
             Section {
                 Toggle(
                     "dark_popups".localized,

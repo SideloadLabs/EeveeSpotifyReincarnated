@@ -24,6 +24,20 @@ struct KaraokeLineView: View {
     /// KaraokeLyricsView.swift's doc comment for why that implicit
     /// approach doesn't actually work for a custom Layout type.
     var availableWidth: CGFloat? = nil
+    /// Direction to use when this line declares none of its own — see
+    /// KaraokeLineDto.strongDirection. Supplied by KaraokeLyricsView from
+    /// the song's overall direction so an instrumental or "♪" line in an
+    /// Arabic song doesn't snap over to the left.
+    var fallbackIsRTL: Bool = false
+
+    /// The direction this line is actually laid out and filled in.
+    private var isRTL: Bool {
+        switch line.strongDirection {
+        case .rightToLeft: return true
+        case .leftToRight: return false
+        case nil: return fallbackIsRTL
+        }
+    }
 
     /// Groups syllables into words (consecutive IsPartOfWord runs joined),
     /// since highlight progress is most naturally computed and the text
@@ -64,7 +78,12 @@ struct KaraokeLineView: View {
     var body: some View {
         KaraokeFlowLayout(spacing: 8, alignment: SwiftUI.HorizontalAlignment(karaokeTextAlignment: UserDefaults.karaokeOptions.textAlignment)) {
             ForEach(Array(words.enumerated()), id: \.offset) { _, word in
-                KaraokeWordView(syllables: word, currentMs: currentMs, isActiveLine: isActiveLine)
+                KaraokeWordView(
+                    syllables: word,
+                    currentMs: currentMs,
+                    isActiveLine: isActiveLine,
+                    isRTL: isRTL
+                )
             }
         }
         // A FIXED width (not maxWidth) — this is what actually guarantees
@@ -78,17 +97,23 @@ struct KaraokeLineView: View {
         .animation(.easeOut(duration: 0.35), value: isActiveLine)
         // Setting layoutDirection explicitly per-line (rather than relying
         // on the app's own environment, which follows the app's UI
-        // language, not each individual song's) is what makes the syllable
-        // fill gradient below sweep the correct way for RTL lyrics like
-        // Arabic or Hebrew. UnitPoint.leading/.trailing (used for the fill
-        // gradient's start/end in KaraokeSyllableTextView) are layout-
-        // direction-relative, not literally left/right — they only flip
-        // for RTL when the environment says so, which previously never
-        // happened for an Arabic *song* played in an app whose own
-        // language was English, so the fill always swept left-to-right
-        // regardless of the lyrics' actual script.
+        // language, not each individual song's) is what puts an RTL line's
+        // WORDS and SYLLABLES in the right order.
         //
-        // This alone is also what fixes KaraokeFlowLayout's word order for
+        // It does NOT, however, flip the syllable fill gradient in
+        // KaraokeSyllableTextView. UnitPoint.leading/.trailing are plain
+        // stored constants — `UnitPoint(x: 0, y: 0.5)` and
+        // `UnitPoint(x: 1, y: 0.5)` — and neither UnitPoint nor
+        // LinearGradient consults layoutDirection at render time, so a
+        // gradient declared .leading -> .trailing always sweeps
+        // physically left-to-right no matter what this environment value
+        // says. That is why Arabic lines used to lay out correctly
+        // right-to-left while each syllable still filled in from its left
+        // edge. The gradient endpoints are therefore chosen explicitly
+        // from `isRTL` down in KaraokeSyllableTextView instead of being
+        // left to the environment to mirror.
+        //
+        // This IS what fixes KaraokeFlowLayout's word order for
         // RTL: a custom Layout conformance mirrors automatically in a
         // right-to-left environment unless it opts out (Layout's default
         // layoutDirectionBehavior is .mirrors), and KaraokeFlowLayoutImpl
@@ -97,7 +122,7 @@ struct KaraokeLineView: View {
         // environment flip here mirrors that whole result for RTL lines,
         // words included. words (above) must NOT also reverse the array
         // for this reason: that would flip the order twice, undoing this.
-        .environment(\.layoutDirection, line.isRTL ? .rightToLeft : .leftToRight)
+        .environment(\.layoutDirection, isRTL ? .rightToLeft : .leftToRight)
     }
 }
 
@@ -123,6 +148,10 @@ private struct KaraokeWordView: View {
     let syllables: [KaraokeSyllableDto]
     let currentMs: Int
     let isActiveLine: Bool
+    /// Only used to pick the fill gradient's sweep direction — see the
+    /// note in KaraokeLineView on why the environment's layoutDirection
+    /// can't do this job.
+    let isRTL: Bool
 
     private var wordStartMs: Int { syllables.first?.startMs ?? 0 }
     private var wordEndMs: Int { syllables.last?.endMs ?? wordStartMs }
@@ -154,7 +183,8 @@ private struct KaraokeWordView: View {
                 KaraokeSyllableTextView(
                     syllable: syllable,
                     currentMs: currentMs,
-                    isActiveLine: isActiveLine
+                    isActiveLine: isActiveLine,
+                    isRTL: isRTL
                 )
             }
         }
@@ -172,14 +202,26 @@ private struct KaraokeWordView: View {
 /// Renders a single syllable's text, colored by how far currentMs has
 /// progressed through its startMs...endMs window:
 ///   - before startMs:  dim (not yet sung)
-///   - during window:   progressively brightened left-to-right via a
-///                       gradient mask, for the classic karaoke "fill" look
+///   - during window:   progressively brightened from the syllable's
+///                       reading-start edge towards its reading-end edge
+///                       via a gradient mask, for the classic karaoke
+///                       "fill" look
 ///   - after endMs:     fully bright (already sung)
 @available(iOS 15.0, *)
 private struct KaraokeSyllableTextView: View {
     let syllable: KaraokeSyllableDto
     let currentMs: Int
     let isActiveLine: Bool
+    let isRTL: Bool
+
+    /// Physical (not layout-direction-relative) endpoints for the fill
+    /// sweep. `UnitPoint.leading`/`.trailing` are fixed x: 0 / x: 1
+    /// constants that LinearGradient never mirrors for a right-to-left
+    /// environment, so RTL lines have to name the opposite corners here
+    /// themselves: Arabic and Hebrew are read right-to-left, so the fill
+    /// must start at x: 1 and travel towards x: 0.
+    private var gradientStart: UnitPoint { isRTL ? .trailing : .leading }
+    private var gradientEnd: UnitPoint { isRTL ? .leading : .trailing }
 
     private var progress: Double {
         guard isActiveLine, syllable.endMs > syllable.startMs else {
@@ -200,8 +242,8 @@ private struct KaraokeSyllableTextView: View {
                         .init(color: .white.opacity(0.35), location: progress),
                         .init(color: .white.opacity(0.35), location: 1),
                     ],
-                    startPoint: .leading,
-                    endPoint: .trailing
+                    startPoint: gradientStart,
+                    endPoint: gradientEnd
                 )
             )
             .animation(.linear(duration: 0.08), value: progress)
