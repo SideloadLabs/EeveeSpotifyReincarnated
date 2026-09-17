@@ -138,7 +138,7 @@ private var lastNowPlayingLog: Date?
 /// whole session while what's found inside it (the card) changes with
 /// every track, so a single snapshot per instance would only ever show
 /// the very first track played.
-private func logNowPlayingBar(bar: UIView, card: UIView?, frame: CGRect) {
+private func logNowPlayingBar(bar: UIView, card: UIView?, frame: CGRect, hiddenWashImages: Int) {
     guard UserDefaults.debugLoggingEnabled else { return }
     let now = Date()
     if let last = lastNowPlayingLog, now.timeIntervalSince(last) < 3 { return }
@@ -150,6 +150,7 @@ private func logNowPlayingBar(bar: UIView, card: UIView?, frame: CGRect) {
     writeDebugLog("""
         [GlassBar] bar=\(Int(bar.bounds.width))x\(Int(bar.bounds.height)) \
         card=\(cardDesc) \
+        hiddenWashImages=\(hiddenWashImages) \
         finalFrame=\(Int(frame.width))x\(Int(frame.height))
         """)
 }
@@ -164,11 +165,11 @@ private func styleNowPlayingBar(_ container: UIViewController) {
     let card = detectColoredCard(in: bar)
 
     host.layer.backgroundColor = nil
-    EeveeViewTree.stripBackgrounds(bar)
+    let hiddenWashImages = EeveeViewTree.stripBackgrounds(bar)
 
     var frame = card.map { EeveeViewTree.frame(of: $0, in: host) } ?? bar.bounds
     frame.size.height = min(frame.size.height, 80)
-    logNowPlayingBar(bar: bar, card: card, frame: frame)
+    logNowPlayingBar(bar: bar, card: card, frame: frame, hiddenWashImages: hiddenWashImages)
     guard frame.size.height >= 30, frame.size.width >= 100 else { return }
 
     let radius = min(nowPlayingCardRadius, frame.size.height / 2)

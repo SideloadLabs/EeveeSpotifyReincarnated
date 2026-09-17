@@ -42,20 +42,37 @@ enum EeveeViewTree {
         return found
     }
 
-    /// Artwork, glyphs, text and thin lines (the progress bar) keep their
-    /// colour; everything else goes clear.
+    static let backgroundWashImageThreshold: CGFloat = 64
+
+    static func isBackgroundWashImage(_ view: UIView) -> Bool {
+        guard view is UIImageView else { return false }
+        return view.bounds.width > backgroundWashImageThreshold
+            || view.bounds.height > backgroundWashImageThreshold
+    }
+
     static func keepsColor(_ view: UIView) -> Bool {
-        view is UIImageView || view is UILabel || view.bounds.height <= 4
+        if view is UIImageView { return !isBackgroundWashImage(view) }
+        return view is UILabel || view.bounds.height <= 4
     }
 
     /// Clears opaque backgrounds and hides gradient layers beneath `view`, so
     /// a pane behind it has something to refract. Skips visual effect views —
     /// stripping those would blank out the panes themselves.
-    static func stripBackgrounds(_ view: UIView) {
-        if view is UIVisualEffectView { return }
+    /// Returns the number of background-wash images hidden, so the caller
+    /// can log it once and confirm whether this was actually the blocker.
+    @discardableResult
+    static func stripBackgrounds(_ view: UIView) -> Int {
+        if view is UIVisualEffectView { return 0 }
 
         if !keepsColor(view) {
             view.layer.backgroundColor = nil
+        }
+
+        var hiddenCount = 0
+
+        if isBackgroundWashImage(view) {
+            view.isHidden = true
+            hiddenCount += 1
         }
 
         if view.layer is CAGradientLayer || NSStringFromClass(type(of: view)).contains("GradientView") {
@@ -65,7 +82,8 @@ enum EeveeViewTree {
             layer.isHidden = true
         }
 
-        for sub in view.subviews { stripBackgrounds(sub) }
+        for sub in view.subviews { hiddenCount += stripBackgrounds(sub) }
+        return hiddenCount
     }
 
     // MARK: - colour tests
