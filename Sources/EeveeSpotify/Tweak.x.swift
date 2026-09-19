@@ -303,6 +303,7 @@ struct EeveeSpotify: Tweak {
         // checks each target class exists before activating its group, and
         // no-ops entirely when the setting is off.
         activateEeveeGlass()
+        activateEeveeLyricsGlass()
 
         // Block upsell components injected into Hub/home JSON (e.g. upgrade banners).
         if NSClassFromString("HUBViewModelBuilderImplementation") != nil {

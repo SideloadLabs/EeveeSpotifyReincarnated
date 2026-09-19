@@ -4,6 +4,7 @@ import UIKit
 struct EeveeGlassSearchFieldGroup: HookGroup {}
 struct EeveeGlassNowPlayingContainerGroup: HookGroup {}
 struct EeveeGlassNowPlayingInnerGroup: HookGroup {}
+struct EeveeGlassPlayerHeaderGroup: HookGroup {}
 
 // MARK: - search field
 
@@ -210,6 +211,63 @@ class EeveeNowPlayingBarInnerHook: ClassHook<UIViewController> {
     }
 }
 
+// MARK: - player header buttons
+
+/// The full-screen player's header row: a chevron (dismiss) on one side, an
+/// overflow "more" button on the other, and the playlist/context name as a
+/// label between them. Ported from spoti.pw's current
+/// Native/Player/Player.x — glassBehindRoundButtons — which is deliberately
+/// narrow: only children roughly as wide as they are tall get a pane. The
+/// playlist name label is ~110pt wide against a ~48pt row height and so
+/// never qualifies, and neither would shuffle/repeat/prev/next if this hook
+/// ran on their row too — spoti.pw's own comment on that file explains why
+/// it doesn't: turning every glyph in a row of controls into its own glass
+/// disc makes adjacent panes sample each other, "the one thing the material
+/// cannot do." Kept to the two round buttons only, on purpose.
+private let playerHeaderButtonMin: CGFloat = 36
+private let playerHeaderButtonMax: CGFloat = 48
+
+private func glassBehindPlayerHeaderButtons(_ unit: UIViewController) {
+    guard EeveeGlass.isEnabled, let host = unit.viewIfLoaded, let row = EeveeViewTree.row(in: host) else { return }
+    row.layoutIfNeeded()
+
+    var index = 0
+    for child in row.arrangedSubviews {
+        let frame = EeveeViewTree.frame(of: child, in: host)
+        guard !child.isHidden, child.alpha != 0,
+              frame.size.width >= 20, frame.size.height >= 20,
+              frame.size.width <= frame.size.height * 1.4
+        else { continue }
+
+        let side = max(playerHeaderButtonMin, min(max(frame.size.width, frame.size.height), playerHeaderButtonMax))
+        let glass = EeveeGlass.pane(for: host, at: index)
+        glass.frame = CGRect(
+            x: frame.midX - side / 2,
+            y: frame.midY - side / 2,
+            width: side,
+            height: side
+        )
+        EeveeGlass.shape(glass, radius: side / 2, capsule: true)
+        index += 1
+    }
+    EeveeGlass.hideGlass(from: host, count: index)
+}
+
+class EeveePlayerHeaderHook: ClassHook<UIViewController> {
+    typealias Group = EeveeGlassPlayerHeaderGroup
+
+    // NowPlaying_ModesImpl.HeaderElementsUnit — confirmed present in
+    // ___Spotify_v9_1_82-AppAssassin.ipa's main binary strings, the same way
+    // the two now-playing-bar classes above were confirmed rather than
+    // guessed.
+    static let targetName = "_TtC20NowPlaying_ModesImpl18HeaderElementsUnit"
+
+    func viewDidLayoutSubviews() {
+        orig.viewDidLayoutSubviews()
+        glassBehindPlayerHeaderButtons(target)
+    }
+}
+
 // MARK: - activation
 
 /// Activates only the hooks whose target classes actually exist in this build.
@@ -224,12 +282,14 @@ func activateEeveeGlass() {
     let searchFieldExists = NSClassFromString(EeveeSearchFieldHook.targetName) != nil
     let nowPlayingContainerExists = NSClassFromString(EeveeNowPlayingBarHook.targetName) != nil
     let nowPlayingInnerExists = NSClassFromString(EeveeNowPlayingBarInnerHook.targetName) != nil
+    let playerHeaderExists = NSClassFromString(EeveePlayerHeaderHook.targetName) != nil
 
     writeDebugLog("""
         [Glass] UIGlassEffect=\(EeveeGlass.isAvailable ? "Y" : "N") \
         searchField=\(searchFieldExists ? "Y" : "N") \
         nowPlayingContainer=\(nowPlayingContainerExists ? "Y" : "N") \
-        nowPlayingInner=\(nowPlayingInnerExists ? "Y" : "N")
+        nowPlayingInner=\(nowPlayingInnerExists ? "Y" : "N") \
+        playerHeader=\(playerHeaderExists ? "Y" : "N")
         """)
 
     // Each group is one class, one hook, gated on its own existence check —
@@ -240,8 +300,9 @@ func activateEeveeGlass() {
     if searchFieldExists { EeveeGlassSearchFieldGroup().activate() }
     if nowPlayingContainerExists { EeveeGlassNowPlayingContainerGroup().activate() }
     if nowPlayingInnerExists { EeveeGlassNowPlayingInnerGroup().activate() }
+    if playerHeaderExists { EeveeGlassPlayerHeaderGroup().activate() }
 
-    if !searchFieldExists && !nowPlayingContainerExists && !nowPlayingInnerExists {
+    if !searchFieldExists && !nowPlayingContainerExists && !nowPlayingInnerExists && !playerHeaderExists {
         writeDebugLog("[Glass] no known target classes in this build — nothing hooked")
     }
 }
