@@ -45,8 +45,10 @@ UIVisualEffect *EeveeGlassMakeEffect(void) {
         // Reprise chrome builds its glass the same way.
         typedef id (*EffectFn)(id, SEL, NSInteger);
         EffectFn fn = (EffectFn)objc_msgSend;
-        UIVisualEffect *effect = fn(glass, @selector(effectWithStyle:), 0);
-        if (effect) return effect;
+        id effect = fn(glass, @selector(effectWithStyle:), 0);
+        if (effect && [effect isKindOfClass:UIVisualEffect.class]) {
+            return effect;
+        }
     }
     return [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemChromeMaterialDark];
 }

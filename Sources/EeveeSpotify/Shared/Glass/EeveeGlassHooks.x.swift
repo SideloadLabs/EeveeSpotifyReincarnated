@@ -30,8 +30,9 @@ private func isSearchField(_ button: UIView) -> Bool {
 /// its guards afterward.
 private func logSearchFieldCandidate(_ button: UIView, accepted: Bool) {
     guard UserDefaults.debugLoggingEnabled, !loggedFields.contains(button) else { return }
-    loggedFields.add(button)
     let size = button.bounds.size
+    guard size.width > 0, size.height > 0 else { return }
+    loggedFields.add(button)
     let bg = button.layer.backgroundColor
     writeDebugLog("""
         [GlassSearch] candidate size=\(Int(size.width))x\(Int(size.height)) \
@@ -286,6 +287,7 @@ func activateEeveeGlass() {
 
     writeDebugLog("""
         [Glass] UIGlassEffect=\(EeveeGlass.isAvailable ? "Y" : "N") \
+        reduceTransparency=\(UIAccessibility.isReduceTransparencyEnabled ? "Y" : "N") \
         searchField=\(searchFieldExists ? "Y" : "N") \
         nowPlayingContainer=\(nowPlayingContainerExists ? "Y" : "N") \
         nowPlayingInner=\(nowPlayingInnerExists ? "Y" : "N") \
