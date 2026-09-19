@@ -56,8 +56,10 @@ class SPTDataLoaderServiceHook: ClassHook<NSObject>, SpotifySessionDelegate {
 
         guard let buffer = URLSessionHelper.shared.obtainData(for: task) else {
             // Customize 304 fallback — wg-spclient returned 304, no buffer
-            // to patch, but we have a cached body from a prior 200.
-            if url.isCustomize, let cached = SpotifyResponsePatcher.cachedCustomizeData {
+            // to patch. The in-memory cache is empty in a fresh process, so
+            // also fall back to the persisted copy of the last patched body.
+            if url.isCustomize, let cached = SpotifyResponsePatcher.cachedCustomizeData
+                ?? UserDefaults.cachedCustomizeData {
                 orig.URLSession(session, dataTask: task, didReceiveData: cached)
                 orig.URLSession(session, task: task, didCompleteWithError: nil)
             } else {
@@ -125,17 +127,22 @@ class SPTDataLoaderServiceHook: ClassHook<NSObject>, SpotifySessionDelegate {
         didReceiveResponse response: HTTPURLResponse,
         completionHandler handler: @escaping (URLSession.ResponseDisposition) -> Void
     ) {
-        if let url = task.currentRequest?.url, url.isCustomize, response.statusCode == 304,
-           let cached = SpotifyResponsePatcher.cachedCustomizeData {
-            // 304, but our cache holds the already-patched body; force 200 so the
-            // consumer accepts the cached data we replay next.
-            guard let synthetic = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "2.0", headerFields: [:]) else {
-                orig.URLSession(session, dataTask: task, didReceiveResponse: response, completionHandler: handler)
+        if let url = task.currentRequest?.url, url.isCustomize, response.statusCode == 304 {
+            // Warm relaunch: customize revalidates via ETag → 304, no body. Fall back
+            // to the persisted patched copy and force 200 so the consumer accepts the
+            // replay. Synthesizing a 200 here keeps Spotify's disk-cached UNPATCHED
+            // config (ad flags) from being consumed — the fingerprint behind
+            // relaunch crash/ads reports. No persisted copy yet → pass the 304
+            // through; the next real 200 gets patched and persisted.
+            if let cached = SpotifyResponsePatcher.cachedCustomizeData
+                ?? UserDefaults.cachedCustomizeData,
+               let synthetic = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "2.0", headerFields: [:]) {
+                orig.URLSession(session, dataTask: task, didReceiveResponse: synthetic, completionHandler: handler)
+                orig.URLSession(session, dataTask: task, didReceiveData: cached)
+                SpotifyResponsePatcher.markCustomizeTaskHandled(task.taskIdentifier)
                 return
             }
-            orig.URLSession(session, dataTask: task, didReceiveResponse: synthetic, completionHandler: handler)
-            orig.URLSession(session, dataTask: task, didReceiveData: cached)
-            SpotifyResponsePatcher.markCustomizeTaskHandled(task.taskIdentifier)
+            orig.URLSession(session, dataTask: task, didReceiveResponse: response, completionHandler: handler)
             return
         }
 

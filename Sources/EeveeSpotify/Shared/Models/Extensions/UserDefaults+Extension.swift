@@ -14,6 +14,7 @@ extension UserDefaults {
     private static let lyricsOptionsKey = "lyricsOptions"
     private static let hasShownCommonIssuesTipKey = "hasShownCommonIssuesTip"
     private static let hasPatchedBootstrapKey = "eeveeHasPatchedBootstrap"
+    private static let cachedCustomizeDataKey = "eeveeCachedCustomizeData"
     private static let iconNamePrettifyKey = "iconNamePrettify"
     private static let cleanShareLinksKey = "cleanShareLinks"
 
@@ -99,6 +100,22 @@ extension UserDefaults {
     static var hasPatchedBootstrap: Bool {
         get { container.bool(forKey: hasPatchedBootstrapKey) }
         set { container.set(newValue, forKey: hasPatchedBootstrapKey) }
+    }
+
+    /// Persisted copy of the last patched customize response body. The in-memory
+    /// cache in SpotifyResponsePatcher dies with the process, but Spotify
+    /// re-fetches customize with ETag revalidation on every warm relaunch and
+    /// gets a 304 with no body — without this persisted copy the tweak has
+    /// nothing to replay and free-tier/ad flags re-enable mid-session.
+    static var cachedCustomizeData: Data? {
+        get { container.data(forKey: cachedCustomizeDataKey) }
+        set {
+            if let newValue {
+                container.set(newValue, forKey: cachedCustomizeDataKey)
+            } else {
+                container.removeObject(forKey: cachedCustomizeDataKey)
+            }
+        }
     }
 
     static var hasShownCommonIssuesTip: Bool {

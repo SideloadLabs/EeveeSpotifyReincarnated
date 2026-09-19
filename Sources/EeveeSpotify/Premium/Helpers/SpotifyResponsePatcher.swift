@@ -13,7 +13,18 @@ enum SpotifyResponsePatcher {
 
     static var cachedCustomizeData: Data? {
         get { lock.lock(); defer { lock.unlock() }; return _cachedCustomizeData }
-        set { lock.lock(); defer { lock.unlock() }; _cachedCustomizeData = newValue }
+        set {
+            lock.lock(); defer { lock.unlock() }
+            _cachedCustomizeData = newValue
+            // Mirror to disk: on a warm relaunch the customize fetch comes back
+            // 304 (no body) and the in-memory cache is empty in the new process.
+            // Without the persisted copy there is nothing to replay and
+            // Spotify's disk-cached unpatched config re-enables ad flags —
+            // the fingerprint behind the "random crashes within minutes of
+            // relaunch" reports (empty/unpatched config + ad surfaces that the
+            // tweak then kills mid-render).
+            UserDefaults.cachedCustomizeData = newValue
+        }
     }
 
     static func markCustomizeTaskHandled(_ id: Int) {
@@ -49,9 +60,18 @@ enum SpotifyResponsePatcher {
                 || url.isPushkaTokens
                 || url.path.contains("signup/public") || url.path.contains("apresolve")
                 || url.path.contains("pses/screenconfig")
-                || url.path.contains("v1/customize")
+                || shouldHandleCustomize(url)
         }
         return false
+    }
+
+    // Customize policy shared by shouldBlock/shouldModify. We do NOT blanket-block
+    // customize: when the cache is cold there is nothing to replay, and serving an
+    // empty body re-enables free-tier flags (crash/ad recurrence). Instead we let
+    // the request through to a real 200 (patched on arrival), or synthesize a 200
+    // from cache for 304s — see the URLSession hooks.
+    static func shouldHandleCustomize(_ url: URL) -> Bool {
+        url.isCustomize && UserDefaults.patchType.isPatching
     }
 
     static func shouldModify(_ url: URL) -> Bool {
@@ -90,7 +110,7 @@ enum SpotifyResponsePatcher {
         if url.path.contains("pses/screenconfig") {
             return #"{}"#.data(using: .utf8)!
         }
-        if url.path.contains("v1/customize"), let cached = cachedCustomizeData {
+        if shouldHandleCustomize(url), let cached = cachedCustomizeData {
             return cached
         }
         return Data()

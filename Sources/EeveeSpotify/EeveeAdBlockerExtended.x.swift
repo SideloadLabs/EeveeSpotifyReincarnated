@@ -21,6 +21,8 @@ struct SponsoredPlaylistHeaderServiceGroup: HookGroup {}
 struct SponsoredPlaylistHeaderViewGroup: HookGroup {}
 struct NativeAdsLoggerServiceGroup: HookGroup {}
 struct SponsoredCtxAttachmentGroup: HookGroup {}
+struct ScrollFeedAdViewGroup: HookGroup {}
+struct ScrollFeedAdServiceGroup: HookGroup {}
 
 private let killAdsServiceImpl         = true
 private let killInStreamAdsService     = true
@@ -162,6 +164,37 @@ class SponsoredCtxAttachmentProbe: ClassHook<NSObject> {
     }
 }
 
+// Now Playing scroll-feed ad card ("Montblanc Legend Elixir · Adverti…" in the
+// scrollsita/NPV feed). The feed payload (spotify.scrollsita.v1.EmbeddedAd /
+// ImageBrandAd) is rendered by EmbeddedAdAdapterElementUI, and
+// EmbeddedCTAElementsServiceImpl provisions the embedded-CTA/ad adapter tree.
+// Same hide-on-attach pattern as SponsoredPlaylistHeaderViewKill above.
+class EmbeddedAdAdapterElementUIKill: ClassHook<UIView> {
+    typealias Group = ScrollFeedAdViewGroup
+    static let targetName =
+        "_TtC35AdsEmbedded_EmbeddedCTAElementsImpl26EmbeddedAdAdapterElementUI"
+
+    func didMoveToSuperview() {
+        orig.didMoveToSuperview()
+        target.isHidden = true
+        target.isUserInteractionEnabled = false
+        if target.superview != nil {
+            adlog("EmbeddedAdAdapterElementUI (scroll-feed ad card)")
+            target.removeFromSuperview()
+        }
+    }
+}
+
+class EmbeddedCTAElementsServiceImplKill: ClassHook<NSObject> {
+    typealias Group = ScrollFeedAdServiceGroup
+    static let targetName =
+        "_TtC35AdsEmbedded_EmbeddedCTAElementsImpl30EmbeddedCTAElementsServiceImpl"
+
+    func load() {
+        adlog("EmbeddedCTAElementsServiceImpl.load")
+    }
+}
+
 func activateEeveeAdBlockerExtended() {
     let loadSelector = Selector(("load"))
     let initSelector = Selector(("init"))
@@ -209,6 +242,26 @@ func activateEeveeAdBlockerExtended() {
         NSLog("[EeveeSpotify][AdBlock] SponsoredPlaylistHeader view unavailable; skipping")
     }
 
+    // Scroll-feed ad card (9.1.8x scrollsita): view-level hide + service-level
+    // starvation. Both runtime-gated so older builds degrade gracefully.
+    if let cls = NSClassFromString(EmbeddedAdAdapterElementUIKill.targetName) as? UIView.Type,
+       class_getInstanceMethod(cls, viewSelector) != nil {
+        ScrollFeedAdViewGroup().activate()
+        activated += 1
+        NSLog("[EeveeSpotify][AdBlock] EmbeddedAdAdapterElementUI (scroll-feed ad) activated")
+    } else {
+        NSLog("[EeveeSpotify][AdBlock] EmbeddedAdAdapterElementUI unavailable; skipping")
+    }
+
+    if let cls = NSClassFromString(EmbeddedCTAElementsServiceImplKill.targetName),
+       class_getInstanceMethod(cls, loadSelector) != nil {
+        ScrollFeedAdServiceGroup().activate()
+        activated += 1
+        NSLog("[EeveeSpotify][AdBlock] EmbeddedCTAElementsServiceImpl activated")
+    } else {
+        NSLog("[EeveeSpotify][AdBlock] EmbeddedCTAElementsServiceImpl unavailable; skipping")
+    }
+
     NSLog("[EeveeSpotify][AdBlock] activated %d/%d compatible extended hooks",
-          activated, loadTargets.count + 2)
+          activated, loadTargets.count + 4)
 }
