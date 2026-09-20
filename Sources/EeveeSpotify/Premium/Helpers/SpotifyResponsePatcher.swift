@@ -169,6 +169,10 @@ enum SpotifyResponsePatcher {
             if let stripped = BrowsitaSectionStripper.strip(buffer, url: url) {
                 return PatchResult(data: stripped, tag: .casitaStrip)
             }
+            // Ad survived in a feed we parse but found no marker in — visible
+            // only via this log. Testers hitting ads can now hand us the exact
+            // feed + payload size to dig new markers out of.
+            writeDebugLog("[STRIP] no-match \(url.path) size=\(buffer.count)")
             return nil
         }
         return nil

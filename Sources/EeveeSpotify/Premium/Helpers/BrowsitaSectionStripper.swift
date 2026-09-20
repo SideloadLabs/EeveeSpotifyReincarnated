@@ -9,6 +9,12 @@ enum BrowsitaSectionStripper {
         "sponsored", "marquee", "promoted", "home-ads", "adsproduct",
         "leavebehind", "leave-behind", "premium-upsell", "premium_upsell",
         "premiumupsell", "referralsupsellcard",
+        // Spotify's ad-event-tracking host (build-4 probe of a real 9.1.84
+        // scrollsita ad section: ~20 tracking URLs per event, viewability/
+        // clicked/quartiles). Legit sections never carry ad tracking URLs,
+        // and the "Advertisement" label itself is rendered client-side, so
+        // this host is the only reliable wire marker for those payloads.
+        "aet.spotify.com",
     ].map { Array($0.utf8) }
 
     // Generic "upsell" metadata is not enough to delete a whole section. It
@@ -116,9 +122,41 @@ enum BrowsitaSectionStripper {
     private static func surgicallyDropRepeatedAdEntries(_ data: Data, path: String) -> Data? {
         var dropped = 0
         guard let rebuilt = dropAdFields(in: data, start: 0, end: data.count, depth: 0, dropped: &dropped),
-              dropped > 0 else { return nil }
+              dropped > 0 else {
+            // Diagnostic: dump the payload's printable strings so a tester log
+            // reveals what a real ad section looks like on the wire (marker
+            // discovery without device-side capture tools). Capped.
+            if path.lowercased().contains("/scrollsita/") {
+                probeNoMatch(data, path: path)
+            }
+            return nil
+        }
         writeDebugLog("[STRIP] \(path) surgically dropped=\(dropped) \(data.count)->\(rebuilt.count)")
         return rebuilt
+    }
+
+    private static var probeCount = 0
+
+    private static func probeNoMatch(_ data: Data, path: String) {
+        guard probeCount < 6 else { return }
+        probeCount += 1
+        var strings: [String] = []
+        var current: [UInt8] = []
+        for b in data {
+            if strings.count >= 48 { break }
+            if b >= 0x20 && b < 0x7f {
+                current.append(b)
+            } else {
+                if current.count >= 6 {
+                    strings.append(String(decoding: current, as: UTF8.self))
+                }
+                current.removeAll(keepingCapacity: true)
+            }
+        }
+        if current.count >= 6, strings.count < 48 {
+            strings.append(String(decoding: current, as: UTF8.self))
+        }
+        writeDebugLog("[STRIP] probe \(path) size=\(data.count) strings=\(strings.joined(separator: " | "))")
     }
 
     private static func dropAdFields(in data: Data, start: Int, end: Int, depth: Int, dropped: inout Int) -> Data? {

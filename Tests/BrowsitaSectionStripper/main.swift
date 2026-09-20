@@ -103,4 +103,23 @@ let garbage = Data([0x0a, 0xff, 0xff, 0xff]) // truncated varint length
 require(BrowsitaSectionStripper.strip(garbage, url: scrollURL) == nil,
         "unparsable payload must pass through unmodified")
 
+// 5) Real 9.1.84 shape (build-4 probe): sections repeat at the top level and
+//    the ad section buries aet.spotify.com tracking deep inside nested
+//    singletons alongside its display data — the "Advertisement" label is
+//    rendered client-side and never appears on the wire. The whole section
+//    must be dropped; the clean section's bytes must survive verbatim.
+private func trackingEntry(_ event: String) -> Data {
+    lenDelimited(4, text(event + " https://aet.spotify.com/v2/t?p=AAAB"))
+}
+let adSectionReal = lenDelimited(2,
+    lenDelimited(1, text("spotify:section:0JQ5DBfI0TKgSZq9aKzJl0"))
+    + lenDelimited(3, lenDelimited(7, text("uDiscover Hong Kong"))
+        + trackingEntry("viewability") + trackingEntry("clicked")))
+let aboutSectionReal = lenDelimited(2, lenDelimited(1, text("About the artist")))
+let trackRefReal = lenDelimited(1, text("spotify:track:0ct6r3EGTcMLPtrXHDvVjc"))
+let realShape = trackRefReal + aboutSectionReal + adSectionReal
+let realResult = BrowsitaSectionStripper.strip(realShape, url: scrollURL)
+require(realResult == trackRefReal + aboutSectionReal,
+        "ad section with deeply nested aet tracking must be dropped whole")
+
 print("BrowsitaSectionStripper regression tests passed")

@@ -17,7 +17,8 @@ import Orion
 import UIKit
 
 private func cmpLog(_ message: String) {
-    NSLog("[EeveeSpotify][CMPBlock] %@", message)
+    // Debug file first (the tester log file), then system console.
+    writeDebugLog("[CMPBlock] \(message)")
 }
 
 struct CMPFullscreenContainerGroup: HookGroup {}
@@ -94,34 +95,36 @@ class CMPBannerViewHook: ClassHook<UIView> {
 // Upsell "element" views rendered from Hub/queue component trees. Named
 // targets (UpsellBanner/PremiumUpsell in the class name), so no DSA or status
 // UI can match.
-class UpsellBannerElementUIHook: ClassHook<UIView> {
+class UpsellBannerElementUIHook: ClassHook<NSObject> {
     typealias Group = UpsellElementViewGroup
     static let targetName =
         "_TtC18Upsells_ElementKitP33_11E507536F1F78CA735FB7F17658749321UpsellBannerElementUI"
 
     func didMoveToSuperview() {
         orig.didMoveToSuperview()
-        target.isHidden = true
-        target.isUserInteractionEnabled = false
-        if target.superview != nil {
+        guard let view = target as? UIView else { return }
+        view.isHidden = true
+        view.isUserInteractionEnabled = false
+        if view.superview != nil {
             cmpLog("suppressed UpsellBannerElementUI")
-            target.removeFromSuperview()
+            view.removeFromSuperview()
         }
     }
 }
 
-class PremiumUpsellBannerElementUIHook: ClassHook<UIView> {
+class PremiumUpsellBannerElementUIHook: ClassHook<NSObject> {
     typealias Group = UpsellElementViewGroup
     static let targetName =
         "_TtC24Jam_QueueIntegrationImpl28PremiumUpsellBannerElementUI"
 
     func didMoveToSuperview() {
         orig.didMoveToSuperview()
-        target.isHidden = true
-        target.isUserInteractionEnabled = false
-        if target.superview != nil {
+        guard let view = target as? UIView else { return }
+        view.isHidden = true
+        view.isUserInteractionEnabled = false
+        if view.superview != nil {
             cmpLog("suppressed PremiumUpsellBannerElementUI")
-            target.removeFromSuperview()
+            view.removeFromSuperview()
         }
     }
 }
@@ -163,9 +166,9 @@ func activateClientMessagingPlatformBlocker() {
     let total = containerHooks.count + viewHooks.count
 
     for (className, label, activate) in containerHooks {
-        guard let cls = NSClassFromString(className),
+        guard let cls = findTweakClass(className),
               class_getInstanceMethod(cls, viewWillAppearSelector) != nil else {
-            NSLog("[EeveeSpotify][CMPBlock] %@ unavailable; skipping", label)
+            cmpLog("\(label) unavailable; skipping (class not registered / no viewWillAppear)")
             continue
         }
         activate()
@@ -174,9 +177,13 @@ func activateClientMessagingPlatformBlocker() {
     }
 
     for (className, label, activate) in viewHooks {
-        guard let cls = NSClassFromString(className) as? UIView.Type,
+        // No UIView cast here: some ElementUI classes are not UIView-
+        // compatible on all builds (Orion rejects them with
+        // targetHasIncompatibleType). Their hooks are declared against
+        // NSObject and cast internally instead.
+        guard let cls = findTweakClass(className),
               class_getInstanceMethod(cls, didMoveToSuperviewSelector) != nil else {
-            NSLog("[EeveeSpotify][CMPBlock] %@ unavailable; skipping", label)
+            cmpLog("\(label) unavailable; skipping (class not registered / no didMoveToSuperview)")
             continue
         }
         activate()
