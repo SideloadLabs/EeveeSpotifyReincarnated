@@ -88,6 +88,13 @@ void EeveeGlassApplyShape(UIView *pane, CGFloat radius, BOOL capsule) {
 }
 #pragma clang diagnostic pop
 
+void EeveeSetBool(id target, SEL selector, BOOL value) {
+    if (!target || !selector || ![target respondsToSelector:selector]) return;
+    typedef void (*BoolSetterFn)(id, SEL, BOOL);
+    BoolSetterFn fn = (BoolSetterFn)objc_msgSend;
+    fn(target, selector, value);
+}
+
 static void writeDebugLog(NSString *message) {
     NSString *logPath = [NSTemporaryDirectory() stringByAppendingPathComponent:@"eeveespotify_debug.log"];
     NSString *timestamp = [[NSDate date] description];

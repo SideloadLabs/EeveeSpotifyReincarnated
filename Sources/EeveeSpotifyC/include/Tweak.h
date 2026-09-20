@@ -25,6 +25,8 @@ BOOL EeveeGlassIsAvailable(void);
 /// layer.cornerRadius, which loses the lensing overhang but keeps the shape.
 /// Pass capsule=YES for fully round ends; radius is ignored then.
 void EeveeGlassApplyShape(UIView *pane, CGFloat radius, BOOL capsule);
+
+void EeveeSetBool(id target, SEL selector, BOOL value);
 NSString *EeveeJBRootPath(NSString *path);
 
 NS_ASSUME_NONNULL_END

@@ -304,7 +304,9 @@ struct EeveeSpotify: Tweak {
         // no-ops entirely when the setting is off.
         activateEeveeGlass()
         activateEeveeLyricsGlass()
-        // Block ClientMessagingPlatform marketing surfaces (9.1.84 win-back
+        activateEeveeTabBarGlass()
+		
+		// Block ClientMessagingPlatform marketing surfaces (9.1.84 win-back
         // fullscreen takeover and Home Premium banner) and their element views.
         activateClientMessagingPlatformBlocker()
 
