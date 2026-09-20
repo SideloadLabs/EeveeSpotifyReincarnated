@@ -62,4 +62,45 @@ let mixedResult = BrowsitaSectionStripper.strip(mixed, url: scrollURL)
 require(mixedResult != nil && mixedResult!.count < mixed.count,
         "leave-behind section must be removed case-insensitively")
 
+// MARK: - Surgical wire walker (scrollsita NpvScrollResponse shapes)
+
+private func lenDelimited(_ fieldNumber: Int, _ payload: Data) -> Data {
+    var out = Data()
+    out.append(varint((fieldNumber << 3) | 2))
+    out.append(varint(payload.count))
+    out.append(payload)
+    return out
+}
+
+private func text(_ s: String) -> Data { Data(s.utf8) }
+
+// 1) Repeated siblings (like scrollsita sections): only ad members are cut,
+//    legit siblings' bytes are preserved verbatim.
+let legitA = text("official merch store header")
+let legitB = text("up next queue section")
+let adA = text("montblanc legend elixir spotify:ad:montblanc tracking")
+let adB = text("ADVERTISEMENT brand-ad spotify:ad:2")
+let repeatedMembers = lenDelimited(1, legitA) + lenDelimited(1, adA)
+    + lenDelimited(1, legitB) + lenDelimited(1, adB)
+let repeatedResult = BrowsitaSectionStripper.strip(repeatedMembers, url: scrollURL)
+require(repeatedResult == lenDelimited(1, legitA) + lenDelimited(1, legitB),
+        "surgical walker must drop exactly the repeated ad members")
+
+// 2) Singleton carrier: repeated ad group nested inside a singleton field.
+let carrier = lenDelimited(1,
+    lenDelimited(3, legitA) + lenDelimited(3, adA) + lenDelimited(3, legitB))
+let carrierResult = BrowsitaSectionStripper.strip(carrier, url: scrollURL)
+require(carrierResult == lenDelimited(1, lenDelimited(3, legitA) + lenDelimited(3, legitB)),
+        "surgical walker must recurse into singleton carriers")
+
+// 3) Ad-free payload passes through untouched.
+let cleanPayload = lenDelimited(1, legitA) + lenDelimited(1, legitB)
+require(BrowsitaSectionStripper.strip(cleanPayload, url: scrollURL) == nil,
+        "surgical walker must not touch ad-free payloads")
+
+// 4) Malformed bytes pass through untouched (no mis-slicing).
+let garbage = Data([0x0a, 0xff, 0xff, 0xff]) // truncated varint length
+require(BrowsitaSectionStripper.strip(garbage, url: scrollURL) == nil,
+        "unparsable payload must pass through unmodified")
+
 print("BrowsitaSectionStripper regression tests passed")

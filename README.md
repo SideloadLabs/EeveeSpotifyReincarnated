@@ -104,7 +104,7 @@ Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening issues or pull req
 Contributions are welcome — bug fixes, new features, and translations alike. If you'd like to translate the tweak into your language or improve an existing localization, see [TRANSLATING.md](TRANSLATING.md) for the workflow, the rules, and the `Tools/l10n_lint.py` checker that validates your translation before you open a PR.
 
 ## Credits
-Thanks for all of the community's support, also, thanks to all the devs who worked along with us to revive this project Go check the other dev's out:
+Thanks for all of the community's support, also, thanks to all the devs who worked to revive this project. Go check the devs out:
 
 [jaydenjcpy](https://github.com/jaydenjcpy)
 

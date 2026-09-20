@@ -23,6 +23,7 @@ struct NativeAdsLoggerServiceGroup: HookGroup {}
 struct SponsoredCtxAttachmentGroup: HookGroup {}
 struct ScrollFeedAdViewGroup: HookGroup {}
 struct ScrollFeedAdServiceGroup: HookGroup {}
+struct ScrollFeedAdControllerGroup: HookGroup {}
 
 private let killAdsServiceImpl         = true
 private let killInStreamAdsService     = true
@@ -195,6 +196,19 @@ class EmbeddedCTAElementsServiceImplKill: ClassHook<NSObject> {
     }
 }
 
+// Second scroll-feed pipeline: EmbeddedAdControllerServiceImpl wires the
+// scrollsita EmbeddedAd/ImageBrandAd payloads into renderable ad elements.
+// Starving it covers the case where the CTA service path is bypassed.
+class EmbeddedAdControllerServiceImplKill: ClassHook<NSObject> {
+    typealias Group = ScrollFeedAdControllerGroup
+    static let targetName =
+        "_TtC36AdsEmbedded_EmbeddedAdControllerImpl31EmbeddedAdControllerServiceImpl"
+
+    func load() {
+        adlog("EmbeddedAdControllerServiceImpl.load")
+    }
+}
+
 func activateEeveeAdBlockerExtended() {
     let loadSelector = Selector(("load"))
     let initSelector = Selector(("init"))
@@ -262,6 +276,15 @@ func activateEeveeAdBlockerExtended() {
         NSLog("[EeveeSpotify][AdBlock] EmbeddedCTAElementsServiceImpl unavailable; skipping")
     }
 
+    if let cls = NSClassFromString(EmbeddedAdControllerServiceImplKill.targetName),
+       class_getInstanceMethod(cls, loadSelector) != nil {
+        ScrollFeedAdControllerGroup().activate()
+        activated += 1
+        NSLog("[EeveeSpotify][AdBlock] EmbeddedAdControllerServiceImpl activated")
+    } else {
+        NSLog("[EeveeSpotify][AdBlock] EmbeddedAdControllerServiceImpl unavailable; skipping")
+    }
+
     NSLog("[EeveeSpotify][AdBlock] activated %d/%d compatible extended hooks",
-          activated, loadTargets.count + 4)
+          activated, loadTargets.count + 5)
 }
