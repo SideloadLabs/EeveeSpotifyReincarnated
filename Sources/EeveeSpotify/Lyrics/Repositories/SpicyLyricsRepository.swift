@@ -417,6 +417,7 @@ class SpicyLyricsRepository: LyricsRepository {
 
         let userKey = UserDefaults.spicyLyricsApiKey
         let apiKey = userKey.isEmpty ? SpicyLyricsDefaultKey.value : userKey
+        writeDebugLog("[SpicyLyrics] Using \(userKey.isEmpty ? "built-in" : "settings") key (\(apiKey.prefix(6))...)")
         guard !apiKey.isEmpty else {
             writeDebugLog("[SpicyLyrics] No API key set")
             throw LyricsError.missingSpicyKey
