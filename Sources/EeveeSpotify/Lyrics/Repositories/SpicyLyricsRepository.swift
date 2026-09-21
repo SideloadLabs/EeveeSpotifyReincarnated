@@ -376,8 +376,6 @@ class SpicyLyricsRepository: LyricsRepository {
         guard let code = code, !code.isEmpty else { return nil }
         switch code {
         case "spicy_lyrics": return "Spicy Lyrics"
-        case "apple_music":  return "Apple Music"
-        case "spotify":      return "Spotify"
         default:
             return code.replacingOccurrences(of: "_", with: " ").capitalized
         }
