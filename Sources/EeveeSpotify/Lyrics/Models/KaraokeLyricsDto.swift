@@ -134,4 +134,10 @@ struct KaraokeLyricsDto {
     /// ApplyLyricsProvider.ts falls back to a server-supplied display name
     /// for external sources rather than a fixed ProviderMap entry.
     var providerDisplayName: String?
+    /// From the API's UploadAttribution block (Uploader / Maker usernames).
+    /// Nil when the response carries no attribution.
+    var uploaderName: String? = nil
+    var uploaderUrl: String? = nil
+    var makerName: String? = nil
+    var makerUrl: String? = nil
 }

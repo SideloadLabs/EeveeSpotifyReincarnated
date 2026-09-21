@@ -5,12 +5,15 @@ struct LyricsDto {
     var timeSynced: Bool
     var romanization: LyricsRomanizationStatus
     var translation: LyricsTranslationDto?
+    /// Attribution text shown on Spotify's native lyrics screen in place of the
+    /// source name (e.g. "Apple Music", or "Spicy Lyrics · Made by X · Uploaded by Y").
+    var providerCredit: String? = nil
     
     func toSpotifyLyricsData(source: String) -> LyricsData {
         var lyricsData = LyricsData.with {
             $0.timeSynchronized = timeSynced
             $0.restriction = .unrestricted
-            $0.providedBy = "\(source) (EeveeSpotify)"
+            $0.providedBy = "\(providerCredit ?? source) (EeveeSpotify)"
         }
         
         let shouldRomanize = UserDefaults.lyricsOptions.romanization

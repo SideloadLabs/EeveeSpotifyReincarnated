@@ -9,6 +9,8 @@ enum LyricsError: Error, CustomStringConvertible {
     case noSuchSong
     case unknownError
     case invalidSource
+    case missingSpicyKey
+    case invalidSpicyKey
     
     // swift 5.8 compatible
     var description: String {
@@ -23,6 +25,10 @@ enum LyricsError: Error, CustomStringConvertible {
             return "decoding_error".localized
         case .unknownError:
             return "unknown_error".localized
+        case .missingSpicyKey:
+            return "spicylyrics_key_missing".localized
+        case .invalidSpicyKey:
+            return "spicylyrics_key_invalid".localized
         default:
             return ""
         }

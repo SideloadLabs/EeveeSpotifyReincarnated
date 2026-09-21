@@ -13,6 +13,12 @@ class EeveeLyricsSettingsViewModel: ObservableObject {
     @Published var musixmatchTokenInputAlertPublisher = PassthroughSubject<Bool, Never>()
     var isMusixmatchTokenValid: Bool { getMusixmatchToken(musixmatchToken) != nil }
     
+    @Published var spicyLyricsApiKey = UserDefaults.spicyLyricsApiKey
+    var isSpicyLyricsApiKeyValid: Bool {
+        let key = spicyLyricsApiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        return key.isEmpty || key.hasPrefix("sl_sk_") || key.hasPrefix("sl_pk_")
+    }
+
     @Published var showMusixmatchInvalidLanguageWarning = false
     @Published var lrclibURLState = LrclibURLState.default
     
@@ -21,6 +27,7 @@ class EeveeLyricsSettingsViewModel: ObservableObject {
             lyricsSource,
             lyricsOptions,
             isMusixmatchTokenValid,
+            isSpicyLyricsApiKeyValid,
             isRequestingMusixmatchToken,
             lrclibURLState,
             showMusixmatchInvalidLanguageWarning
