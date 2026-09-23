@@ -103,6 +103,17 @@ final class KaraokePlaybackTracker {
             self.lastPlaybackSpeed = playbackSpeed
             self.lastIsPlaying = isPlaying
             if let trackId = trackId, !trackId.isEmpty {
+                if trackId != self.lastTrackId {
+                    // Spotify only requests lyrics for tracks it has lyrics
+                    // for itself, so a track only Spicy Lyrics covers never
+                    // got fetched — no karaoke data, no Word-Synced button.
+                    // Fetch on track change instead of waiting for Spotify.
+                    DispatchQueue.main.async {
+                        if UserDefaults.lyricsSource == .spicylyrics {
+                            prefetchLyricsIfNeeded(trackId: trackId)
+                        }
+                    }
+                }
                 self.lastTrackId = trackId
             }
         }
