@@ -118,8 +118,9 @@ struct KaraokeLineView: View {
             }
         }
         .frame(width: availableWidth, alignment: Alignment(horizontal: horizontalAlignment, vertical: .center))
+        // Collapsed while inactive, but never clipped: clipping cut the
+        // active dot's glow and bounce off at the frame edge.
         .frame(height: isActiveLine ? Self.leadFontSize * 1.4 : 0, alignment: .center)
-        .clipped()
         .opacity(visible ? 1 : 0)
         .animation(.easeOut(duration: 0.35), value: visible)
         .animation(.easeOut(duration: 0.35), value: isActiveLine)

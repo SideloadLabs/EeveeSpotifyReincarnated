@@ -60,7 +60,7 @@ final class KaraokeOverlayPresenter {
             return
         }
 
-        let view = KaraokeLyricsView(lyrics: lyrics, onDismiss: {
+        let view = KaraokeLyricsView(trackId: trackId, lyrics: lyrics, onDismiss: {
             hosting?.presentingViewController?.dismiss(animated: true)
         })
         let controller = UIHostingController(rootView: view)

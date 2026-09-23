@@ -31,29 +31,100 @@ import SwiftUI
 /// entirely.
 @available(iOS 15.0, *)
 struct KaraokeLyricsView: View {
-    let lyrics: KaraokeLyricsDto
     /// Called when the user dismisses the view (e.g. tapping the close
     /// button).
     var onDismiss: () -> Void
+
+    /// The track the view is showing. Follows playback: the view used to be
+    /// built once with the opening track's lyrics and kept showing them
+    /// after the song changed.
+    @State private var trackId: String
+    /// nil while the new track's lyrics are still being fetched.
+    @State private var lyrics: KaraokeLyricsDto?
+    @State private var waitingSince: Date?
+
+    /// Give up on a track Spicy has no word/line-synced lyrics for.
+    private static let lyricsWaitTimeout: TimeInterval = 8
+    private let trackTimer = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
+
+    init(trackId: String, lyrics: KaraokeLyricsDto, onDismiss: @escaping () -> Void) {
+        self.onDismiss = onDismiss
+        _trackId = State(initialValue: trackId)
+        _lyrics = State(initialValue: lyrics)
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .topTrailing) {
+                // Re-created per track so it picks up the new artwork.
+                KaraokeBackgroundView()
+                    .id(trackId)
+                if let lyrics = lyrics {
+                    // New identity per track: fresh springs, and the scroll
+                    // position jumps to the new song's first line.
+                    KaraokeTrackLyricsView(lyrics: lyrics, screenWidth: geo.size.width)
+                        .id(trackId)
+                } else {
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                        .tint(.white)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                closeButton
+                if let lyrics = lyrics {
+                    KaraokeAttributionView(lyrics: lyrics)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
+        .onReceive(trackTimer) { _ in followCurrentTrack() }
+    }
+
+    private func followCurrentTrack() {
+        guard let current = KaraokePlaybackTracker.shared.currentTrackId() else { return }
+        if current != trackId {
+            trackId = current
+            lyrics = KaraokeLyricsStore.shared.lyrics(forTrackId: current)
+            waitingSince = lyrics == nil ? Date() : nil
+            return
+        }
+        guard lyrics == nil else { return }
+        if let fetched = KaraokeLyricsStore.shared.lyrics(forTrackId: current) {
+            lyrics = fetched
+            waitingSince = nil
+        } else if let since = waitingSince, Date().timeIntervalSince(since) > Self.lyricsWaitTimeout {
+            onDismiss()
+        }
+    }
+
+    private var closeButton: some View {
+        Button(action: onDismiss) {
+            Image(systemName: "chevron.down")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundColor(.white.opacity(0.85))
+                .padding(14)
+                .background(Circle().fill(Color.white.opacity(0.12)))
+        }
+        .padding(.top, 50)
+        .padding(.trailing, 20)
+    }
+}
+
+/// One track's lyrics, animated against playback.
+@available(iOS 15.0, *)
+private struct KaraokeTrackLyricsView: View {
+    let lyrics: KaraokeLyricsDto
+    let screenWidth: CGFloat
 
     /// Spring state for every syllable, letter and dot — lives as long as
     /// this view does. A class, so stepping it doesn't invalidate the view.
     @State private var animator = KaraokeAnimator()
 
     var body: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .topTrailing) {
-                KaraokeBackgroundView()
-                content(screenWidth: geo.size.width)
-                closeButton
-                KaraokeAttributionView(lyrics: lyrics)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-            }
-        }
-        .preferredColorScheme(.dark)
+        content(screenWidth: screenWidth)
     }
 
-    @available(iOS 15.0, *)
     private func content(screenWidth: CGFloat) -> some View {
         // .animation = every display frame (60/120Hz), which the springs
         // need: they're stepped with the real frame delta, like the
@@ -105,18 +176,6 @@ struct KaraokeLyricsView: View {
             }
         }
         return nil
-    }
-
-    private var closeButton: some View {
-        Button(action: onDismiss) {
-            Image(systemName: "chevron.down")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundColor(.white.opacity(0.85))
-                .padding(14)
-                .background(Circle().fill(Color.white.opacity(0.12)))
-        }
-        .padding(.top, 50)
-        .padding(.trailing, 20)
     }
 }
 
