@@ -180,6 +180,12 @@ jobs:
           zip -qry "$(basename "$OUT_IPA")" Payload
           rm -rf Payload
 
+      - name: Opt into iOS 26 Liquid Glass rendering
+        if: ${{ inputs.ipa_url != '' }}
+        run: |
+          chmod +x Tools/liquid-glass-compat.sh
+          Tools/liquid-glass-compat.sh "$OUT_IPA"
+
       - name: Stage alternate app icons
         if: ${{ inputs.ipa_url != '' }}
         run: |

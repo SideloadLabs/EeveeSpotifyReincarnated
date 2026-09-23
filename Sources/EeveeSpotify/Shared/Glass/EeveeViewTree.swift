@@ -45,9 +45,10 @@ enum EeveeViewTree {
     static let backgroundWashImageThreshold: CGFloat = 64
 
     static func isBackgroundWashImage(_ view: UIView) -> Bool {
-        guard view is UIImageView else { return false }
-        return view.bounds.width > backgroundWashImageThreshold
+        let isLarge = view.bounds.width > backgroundWashImageThreshold
             || view.bounds.height > backgroundWashImageThreshold
+        guard isLarge else { return false }
+        return view is UIImageView || view.layer.contents != nil
     }
 
     static func keepsColor(_ view: UIView) -> Bool {

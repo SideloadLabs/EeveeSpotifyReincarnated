@@ -144,6 +144,11 @@ jobs:
                    --dylib packages/zxPluginsInject.dylib
           echo "PATCHED_IPA=$PATCHED_OUT" >> $GITHUB_ENV
 
+      - name: Opt into iOS 26 Liquid Glass rendering
+        run: |
+          chmod +x Tools/liquid-glass-compat.sh
+          Tools/liquid-glass-compat.sh "$OUT_IPA"
+
       - name: Stage alternate app icons
         run: |
           chmod +x Tools/alt-icons.sh

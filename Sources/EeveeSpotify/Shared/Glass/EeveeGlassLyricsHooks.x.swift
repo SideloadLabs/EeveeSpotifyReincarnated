@@ -10,8 +10,9 @@ struct EeveeGlassRepaintGroup: HookGroup {}
 enum EeveeGlassRepaintRoots {
     static weak var lyricsCardRoot: UIView?
     static weak var lyricsPageRoot: UIView?
+    static weak var queueRoot: UIView?
 
-    static var anySet: Bool { lyricsCardRoot != nil || lyricsPageRoot != nil }
+    static var anySet: Bool { lyricsCardRoot != nil || lyricsPageRoot != nil || queueRoot != nil }
 }
 
 class EeveeGlassRepaintHook: ClassHook<CALayer> {
@@ -23,6 +24,7 @@ class EeveeGlassRepaintHook: ClassHook<CALayer> {
               !EeveeViewTree.keepsColor(view),
               EeveeViewTree.isInside(view, EeveeGlassRepaintRoots.lyricsCardRoot)
                   || EeveeViewTree.isInside(view, EeveeGlassRepaintRoots.lyricsPageRoot)
+                  || EeveeViewTree.isInside(view, EeveeGlassRepaintRoots.queueRoot)
         else {
             orig.setBackgroundColor(backgroundColor)
             return
@@ -82,9 +84,11 @@ class EeveeLyricsCardHook: ClassHook<UIView> {
 /// transition context — the template views Spotify's presentation chain
 /// paints opaque once, at setup, on the way to putting this page on screen.
 /// Only that chain is touched, never the page's own subtree; the rest of the
-/// page is left exactly as Spotify built it.
+/// page is left exactly as Spotify built it. Shared with EeveeGlassQueue.x.swift
+/// for the same reason: the queue sheet is presented through the same kind
+/// of transition chain as the lyrics page.
 @discardableResult
-private func clearAncestors(_ view: UIView) -> UIView {
+func clearAncestors(_ view: UIView) -> UIView {
     var top = view
     var current: UIView? = view
     while let v = current, !(v is UIWindow), !NSStringFromClass(type(of: v)).hasPrefix("UITransition") {
