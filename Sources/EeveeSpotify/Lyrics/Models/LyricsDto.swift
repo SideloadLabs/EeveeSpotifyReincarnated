@@ -36,20 +36,33 @@ struct LyricsDto {
                 ($0.offsetMs ?? 0) < ($1.offsetMs ?? 0)
             }
             let romanizing = shouldRomanize && romanization == .canBeRomanized
+            let syllablesPerLine = sortedLines.map(Self.nativeSyllables(for:))
+            // Rich sync is all or nothing: the renderer shows a blank card
+            // when only some lines carry syllables — which happened on
+            // explicit tracks, where uncensored words no longer match the
+            // syllables, and on background-only lines.
             let richSync = timeSynced && !romanizing && UserDefaults.nativeRichSync
-            lyricsData.lines = sortedLines.map { line in
+                && syllablesPerLine.contains { $0 != nil }
+            lyricsData.lines = sortedLines.enumerated().map { index, line in
                 LyricsLine.with {
                     $0.content = romanizing
                         ? line.content.applyingTransform(.toLatin, reverse: false)!
                         : line.content
                     $0.offsetMs = Int32(line.offsetMs ?? 0)
-                    if richSync, let syllables = Self.nativeSyllables(for: line) {
-                        $0.syllables = syllables
-                        $0.endTimeMs = Int32(line.endMs ?? 0)
-                    }
+                    guard richSync else { return }
+                    let startMs = line.offsetMs ?? 0
+                    let nextStartMs = sortedLines.indices.contains(index + 1)
+                        ? sortedLines[index + 1].offsetMs
+                        : nil
+                    // A line without its own syllables fills as a whole.
+                    $0.syllables = syllablesPerLine[index] ?? [LyricsSyllable.with {
+                        $0.startTimeMs = Int32(startMs)
+                        $0.numChars = Int32(line.content.utf16.count)
+                    }]
+                    $0.endTimeMs = Int32(line.endMs ?? nextStartMs ?? startMs)
                 }
             }
-            lyricsData.richSynchronized = lyricsData.lines.contains { !$0.syllables.isEmpty }
+            lyricsData.richSynchronized = richSync
         }
         
         if let translation = translation {
