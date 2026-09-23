@@ -1,8 +1,0 @@
-blank_issues_enabled: false
-contact_links:
-  - name: Common Issues / FAQ (read first)
-    url: https://github.com/jaydenjcpy/EeveeSpotifyReincarnated/blob/Master/common_issues.md
-    about: Fixes for premium/logout/lyrics issues, and the list of server-sided features that will never work
-  - name: Telegram channel
-    url: https://t.me/compiledipas
-    about: Official IPA downloads, updates, and general support
