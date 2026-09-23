@@ -538,26 +538,22 @@ class SpicyLyricsRepository: LyricsRepository {
     }
 
     /// Some SpicyLyrics syllable timing has slight overlaps between
-    /// consecutive syllables — observed across a line boundary, where a
-    /// later word's startMs lands earlier than an earlier word's endMs. This
-    /// is a data quality quirk in the source's algorithmically-derived
-    /// timing, not something this parsing step introduces. Left as-is, an
-    /// overlap lets a LATER word's highlight progress reach further than an
-    /// EARLIER word's at the same playback instant, which reads as the
-    /// highlight jumping ahead on one word while lagging behind on another
-    /// right next to it — reported as the highlight looking "broken" mid-
-    /// line.
+    /// consecutive syllables — a later word's startMs landing earlier than
+    /// an earlier word's endMs. Left as-is, a LATER word's highlight can run
+    /// ahead of an EARLIER word's at the same instant, which reads as the
+    /// highlight jumping out of order mid-line.
     ///
-    /// Clamping each syllable's startMs to be at least the previous
-    /// syllable's endMs — walked across the ENTIRE track in sung order,
-    /// across line boundaries too, not just within one line — guarantees
-    /// monotonic progress: a later syllable's window can never start before
-    /// an earlier one's has finished, so highlight progress can't visually
-    /// jump out of order anymore.
+    /// Clamping each syllable's startMs to at least the previous syllable's
+    /// endMs guarantees monotonic progress within a line. Deliberately not
+    /// across lines: overlapping lines are real (duets, a second voice
+    /// cutting in) and each keeps its own timing.
     private static func normalizeMonotonicTiming(_ lines: [KaraokeLineDto]) -> [KaraokeLineDto] {
         var result = lines
-        var previousEndMs = Int.min
         for lineIndex in result.indices {
+            // Per line only: lines legitimately overlap (duets, a second
+            // voice cutting in), and clamping across line boundaries pushed
+            // the later voice's syllables past the earlier line's end.
+            var previousEndMs = Int.min
             for syllableIndex in result[lineIndex].syllables.indices {
                 var syllable = result[lineIndex].syllables[syllableIndex]
                 if syllable.startMs < previousEndMs {

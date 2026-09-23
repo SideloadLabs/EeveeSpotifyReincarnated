@@ -66,17 +66,35 @@ struct KaraokeLyricsView: View {
             // "fire a side effect to update state" step needed; the new
             // value flows straight into the child views' bodies each tick.
             let currentMs = KaraokePlaybackTracker.shared.currentPositionMs()
-            let activeIndex = activeLineIndex(at: currentMs)
+            let active = activeLines(at: currentMs)
             let _ = animator.beginFrame(at: timeline.date.timeIntervalSinceReferenceDate)
 
             KaraokeScrollingLines(
                 lyrics: lyrics,
                 currentMs: currentMs,
-                activeLineIndex: activeIndex,
+                activeIndices: active.indices,
+                activeLineIndex: active.scrollAnchor,
                 screenWidth: screenWidth,
                 animator: animator
             )
         }
+    }
+
+    /// Every line being sung right now — duet lines and a second voice
+    /// cutting in overlap, and each stays lit until its own end — plus the
+    /// line to keep scrolled to. Port of GetScrollLine
+    /// (ScrollToActiveLine.ts): the topmost active line holds the anchor
+    /// while the active lines are contiguous; if they're further apart, the
+    /// lowest one does. With nothing active (a short gap), the last line
+    /// that started keeps its place.
+    private func activeLines(at currentMs: Int) -> (indices: [Int], scrollAnchor: Int?) {
+        let indices = lyrics.lines.indices.filter {
+            lyrics.lines[$0].startMs <= currentMs && currentMs < lyrics.lines[$0].endMs
+        }
+        if let first = indices.first, let last = indices.last {
+            return (indices, last - first <= 1 ? first : last)
+        }
+        return ([], activeLineIndex(at: currentMs))
     }
 
     private func activeLineIndex(at currentMs: Int) -> Int? {
@@ -109,6 +127,8 @@ struct KaraokeLyricsView: View {
 private struct KaraokeScrollingLines: View {
     let lyrics: KaraokeLyricsDto
     let currentMs: Int
+    let activeIndices: [Int]
+    /// The line kept scrolled to.
     let activeLineIndex: Int?
     let screenWidth: CGFloat
     let animator: KaraokeAnimator
@@ -137,9 +157,17 @@ private struct KaraokeScrollingLines: View {
     }
 
     private func state(of index: Int) -> KaraokeElementState {
-        guard let active = activeLineIndex else { return .notSung }
-        if index == active { return .active }
-        return index < active ? .sung : .notSung
+        if activeIndices.contains(index) { return .active }
+        let line = lyrics.lines[index]
+        return currentMs >= line.endMs ? .sung : .notSung
+    }
+
+    /// Lines to the nearest active one (or to the scroll anchor in a gap).
+    private func distance(of index: Int) -> Int {
+        if let nearest = activeIndices.map({ abs(index - $0) }).min() {
+            return nearest
+        }
+        return activeLineIndex.map { abs(index - $0) } ?? 0
     }
 
     var body: some View {
@@ -154,7 +182,7 @@ private struct KaraokeScrollingLines: View {
                             lineIndex: index,
                             currentMs: currentMs,
                             lineState: state(of: index),
-                            distanceFromActive: activeLineIndex.map { abs(index - $0) } ?? 0,
+                            distanceFromActive: distance(of: index),
                             animator: animator,
                             availableWidth: max(0, screenWidth - horizontalPadding * 2),
                             alignment: alignment(for: line)
