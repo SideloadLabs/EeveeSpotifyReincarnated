@@ -77,6 +77,26 @@ struct LyricsLine {
 
   var content: String = String()
 
+  /// Hand-added (not in the original generated schema): Spotify's rich
+  /// (syllable) sync data — field 3 `syllables`, field 4 `end_time_ms`,
+  /// matching the web client's color-lyrics line shape
+  /// {startTimeMs, words, syllables, endTimeMs}.
+  var syllables: [LyricsSyllable] = []
+
+  var endTimeMs: Int32 = 0
+
+  var unknownFields = EeveeSwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
+/// Hand-added: one syllable of a rich-synced line. It covers the next
+/// `numChars` characters of the line's `content`, starting at `startTimeMs`.
+struct LyricsSyllable {
+  var startTimeMs: Int32 = 0
+
+  var numChars: Int32 = 0
+
   var unknownFields = EeveeSwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -118,6 +138,11 @@ struct LyricsData {
   // methods supported on all messages.
 
   var timeSynchronized: Bool = false
+
+  /// Hand-added: field 1 is really Spotify's SyncType enum (0 unsynced,
+  /// 1 line synced, 2 rich/syllable synced) — the Bool above covers 0/1.
+  /// When set, field 1 is written as 2 instead.
+  var richSynchronized: Bool = false
 
   var lines: [LyricsLine] = []
 
@@ -175,6 +200,7 @@ struct Lyrics {
 #if swift(>=5.5) && canImport(_Concurrency)
 extension LyricsRestriction: @unchecked Sendable {}
 extension LyricsLine: @unchecked Sendable {}
+extension LyricsSyllable: @unchecked Sendable {}
 extension LyricsColors: @unchecked Sendable {}
 extension LyricsTranslation: @unchecked Sendable {}
 extension LyricsData: @unchecked Sendable {}
@@ -197,6 +223,8 @@ extension LyricsLine: EeveeSwiftProtobuf.Message, EeveeSwiftProtobuf._MessageImp
   static let _protobuf_nameMap: EeveeSwiftProtobuf._NameMap = [
     1: .same(proto: "offsetMs"),
     2: .same(proto: "content"),
+    3: .same(proto: "syllables"),
+    4: .same(proto: "endTimeMs"),
   ]
 
   mutating func decodeMessage<D: EeveeSwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -207,6 +235,8 @@ extension LyricsLine: EeveeSwiftProtobuf.Message, EeveeSwiftProtobuf._MessageImp
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularInt32Field(value: &self.offsetMs) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.content) }()
+      case 3: try { try decoder.decodeRepeatedMessageField(value: &self.syllables) }()
+      case 4: try { try decoder.decodeSingularInt32Field(value: &self.endTimeMs) }()
       default: break
       }
     }
@@ -219,12 +249,20 @@ extension LyricsLine: EeveeSwiftProtobuf.Message, EeveeSwiftProtobuf._MessageImp
     if !self.content.isEmpty {
       try visitor.visitSingularStringField(value: self.content, fieldNumber: 2)
     }
+    if !self.syllables.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.syllables, fieldNumber: 3)
+    }
+    if self.endTimeMs != 0 {
+      try visitor.visitSingularInt32Field(value: self.endTimeMs, fieldNumber: 4)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: LyricsLine, rhs: LyricsLine) -> Bool {
     if lhs.offsetMs != rhs.offsetMs {return false}
     if lhs.content != rhs.content {return false}
+    if lhs.syllables != rhs.syllables {return false}
+    if lhs.endTimeMs != rhs.endTimeMs {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -343,7 +381,9 @@ extension LyricsData: EeveeSwiftProtobuf.Message, EeveeSwiftProtobuf._MessageImp
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if self.timeSynchronized != false {
+    if self.richSynchronized {
+      try visitor.visitSingularInt32Field(value: 2, fieldNumber: 1)
+    } else if self.timeSynchronized != false {
       try visitor.visitSingularBoolField(value: self.timeSynchronized, fieldNumber: 1)
     }
     if !self.lines.isEmpty {
@@ -363,6 +403,7 @@ extension LyricsData: EeveeSwiftProtobuf.Message, EeveeSwiftProtobuf._MessageImp
 
   static func ==(lhs: LyricsData, rhs: LyricsData) -> Bool {
     if lhs.timeSynchronized != rhs.timeSynchronized {return false}
+    if lhs.richSynchronized != rhs.richSynchronized {return false}
     if lhs.lines != rhs.lines {return false}
     if lhs.providedBy != rhs.providedBy {return false}
     if lhs.restriction != rhs.restriction {return false}
@@ -409,6 +450,41 @@ extension Lyrics: EeveeSwiftProtobuf.Message, EeveeSwiftProtobuf._MessageImpleme
   static func ==(lhs: Lyrics, rhs: Lyrics) -> Bool {
     if lhs._data != rhs._data {return false}
     if lhs._colors != rhs._colors {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension LyricsSyllable: EeveeSwiftProtobuf.Message, EeveeSwiftProtobuf._MessageImplementationBase, EeveeSwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = "LyricsSyllable"
+  static let _protobuf_nameMap: EeveeSwiftProtobuf._NameMap = [
+    1: .same(proto: "startTimeMs"),
+    2: .same(proto: "numChars"),
+  ]
+
+  mutating func decodeMessage<D: EeveeSwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt32Field(value: &self.startTimeMs) }()
+      case 2: try { try decoder.decodeSingularInt32Field(value: &self.numChars) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: EeveeSwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.startTimeMs != 0 {
+      try visitor.visitSingularInt32Field(value: self.startTimeMs, fieldNumber: 1)
+    }
+    if self.numChars != 0 {
+      try visitor.visitSingularInt32Field(value: self.numChars, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: LyricsSyllable, rhs: LyricsSyllable) -> Bool {
+    if lhs.startTimeMs != rhs.startTimeMs {return false}
+    if lhs.numChars != rhs.numChars {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

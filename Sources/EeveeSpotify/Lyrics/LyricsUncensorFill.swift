@@ -220,6 +220,8 @@ struct LyricsUncensorFill {
             }
         }
 
-        return KaraokeLineDto(syllables: newSyllables, startMs: original.startMs, endMs: original.endMs)
+        var filled = original
+        filled.syllables = newSyllables
+        return filled
     }
 }

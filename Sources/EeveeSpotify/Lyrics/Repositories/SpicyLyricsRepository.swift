@@ -32,6 +32,28 @@ class SpicyLyricsRepository: LyricsRepository {
     private let session: URLSession
 
     private static let apiUrl        = "https://api.spicylyrics.org"
+
+    // ── Developer API ────────────────────────────────────────────────────
+    // /query above is the Spicetify extension's internal API: without the
+    // desktop-browser headers faked below it answers 418 and asks third
+    // parties to use the developer API instead, and with them it hands out
+    // inconsistent fidelity (the same track Syllable one day, Static the
+    // next). The developer API (https://developers.spicylyrics.org) is the
+    // supported route: plain JSON, no Spotify token, consistent results.
+    //
+    // It needs a *client* key (sl_pk_…) created with "Allow requests with
+    // no Origin header" — never a secret sl_sk_ key, which must not ship in
+    // a client. The bundled key's rate limit is shared by every install, so
+    // users can set their own key in Lyrics settings. With no key at all,
+    // the legacy /query path below is still used.
+    private static let developerApiUrl = "https://api.spicylyrics.org/v1/lyrics"
+    static let bundledClientKey = ""
+
+    private static var developerApiKey: String? {
+        let userKey = UserDefaults.spicyLyricsApiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !userKey.isEmpty { return userKey }
+        return bundledClientKey.isEmpty ? nil : bundledClientKey
+    }
     private static let authHeaderKey = "SpicyLyrics-WebAuth"
     // Bumped to match the real client's shipped ProjectVersion
     // (project/config.ts). Version alone was a dead end for the
@@ -79,16 +101,63 @@ class SpicyLyricsRepository: LyricsRepository {
     }()
 
     private func performQuery(trackId: String) throws -> Data {
-        for (attempt, delay) in ([0.0] + SpicyLyricsRepository.queuedRetryDelays).enumerated() {
+        if let key = SpicyLyricsRepository.developerApiKey {
+            let (data, status) = try withQueuedRetries(trackId: trackId) {
+                try performDeveloperRequest(trackId: trackId, key: key)
+            }
+            if status != 401 && status != 403 { return data }
+            // A rejected key shouldn't take lyrics down with it.
+            writeDebugLog("[SpicyLyrics] Developer API rejected the key (\(status)) — falling back to /query")
+        }
+        return try withQueuedRetries(trackId: trackId) {
+            try performQueryOnce(trackId: trackId)
+        }.0
+    }
+
+    private func withQueuedRetries(trackId: String, _ attempt: () throws -> (Data, Int)) throws -> (Data, Int) {
+        for (index, delay) in ([0.0] + SpicyLyricsRepository.queuedRetryDelays).enumerated() {
             if delay > 0 {
-                writeDebugLog("[SpicyLyrics] Track \(trackId) queued (503) — retrying in \(delay)s (attempt \(attempt + 1))")
+                writeDebugLog("[SpicyLyrics] Track \(trackId) queued (503) — retrying in \(delay)s (attempt \(index + 1))")
                 Thread.sleep(forTimeInterval: delay)
             }
-            let (data, httpStatus) = try performQueryOnce(trackId: trackId)
-            if httpStatus != 503 { return data }
+            let result = try attempt()
+            if result.1 != 503 { return result }
         }
         writeDebugLog("[SpicyLyrics] Track \(trackId) still queued after all retries — giving up")
         throw LyricsError.noSuchSong
+    }
+
+    /// GET /v1/lyrics/{trackId}. Returns the raw response and its status —
+    /// the body's own `Status` field, which mirrors the HTTP one.
+    private func performDeveloperRequest(trackId: String, key: String) throws -> (Data, Int) {
+        guard let url = URL(string: "\(SpicyLyricsRepository.developerApiUrl)/\(trackId)") else {
+            throw LyricsError.decodingError
+        }
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        let semaphore = DispatchSemaphore(value: 0)
+        var responseData: Data?
+        var responseStatus = 0
+        var responseError: Error?
+        session.dataTask(with: request) { data, response, error in
+            responseData = data
+            responseStatus = (response as? HTTPURLResponse)?.statusCode ?? 0
+            responseError = error
+            semaphore.signal()
+        }.resume()
+        semaphore.wait()
+
+        if let error = responseError {
+            writeDebugLog("[SpicyLyrics] Developer API network error for \(trackId): \(error)")
+            throw error
+        }
+        guard let data = responseData else { throw LyricsError.decodingError }
+        let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let status = json?["Status"] as? Int ?? responseStatus
+        writeDebugLog("[SpicyLyrics] Developer API \(status), \(data.count) bytes for \(trackId)")
+        return (data, status)
     }
 
     /// Single request attempt. Returns the raw envelope bytes alongside the
@@ -206,60 +275,135 @@ class SpicyLyricsRepository: LyricsRepository {
         return data
     }
 
+    // MARK: - Fidelity cache
+    //
+    // The API doesn't return the same thing for a track every time: the same
+    // track id comes back as Syllable, then Line, then Static hours later
+    // (seen in debug logs — e.g. one track Syllable on two days, Static on two
+    // others, identical request each time). The real client never notices,
+    // because it keeps every successful response in its LyricsStore cache and
+    // serves that before asking the API again (fetchLyrics.ts). Without a
+    // cache here, every play gambled on whatever the server felt like
+    // returning, which is what showed up as "lyrics not synced yet" for
+    // tracks that are word-synced in the desktop extension.
+    //
+    // So: remember the best response per track on disk, serve a cached
+    // Syllable response straight away, and never let a fresh response
+    // downgrade a better cached one.
+
+    private static let syllableFidelity = 3
+
+    private func bestAvailableData(trackId: String) throws -> Data {
+        let cached = SpicyLyricsCache.load(trackId: trackId)
+        let cachedFidelity = cached.map(SpicyLyricsRepository.fidelity(of:)) ?? 0
+
+        if let cached = cached, cachedFidelity == SpicyLyricsRepository.syllableFidelity {
+            writeDebugLog("[SpicyLyrics] Serving cached Syllable response for \(trackId)")
+            return cached
+        }
+
+        let fresh: Data
+        do {
+            fresh = try performQuery(trackId: trackId)
+        } catch {
+            if let cached = cached, cachedFidelity > 0 {
+                writeDebugLog("[SpicyLyrics] Query failed for \(trackId) (\(error)) — serving cached response")
+                return cached
+            }
+            throw error
+        }
+
+        let freshFidelity = SpicyLyricsRepository.fidelity(of: fresh)
+        if let cached = cached, cachedFidelity > freshFidelity {
+            writeDebugLog("[SpicyLyrics] Server downgraded \(trackId) (fidelity \(freshFidelity) < cached \(cachedFidelity)) — serving cached response")
+            return cached
+        }
+        if freshFidelity > 0 {
+            SpicyLyricsCache.save(fresh, trackId: trackId)
+        }
+        return fresh
+    }
+
+    /// Syllable 3, Line 2, Static 1; 0 for anything that isn't a usable 200.
+    private static func fidelity(of data: Data) -> Int {
+        switch (try? lyricsRoot(from: data, trackId: nil))?["Type"]?.stringValue {
+        case "Syllable": return syllableFidelity
+        case "Line":     return 2
+        case "Static":   return 1
+        default:         return 0
+        }
+    }
+
     // MARK: - Parse
 
-    private func parseLyricsData(_ data: Data, trackId: String, query: LyricsSearchQuery, options: LyricsOptions) throws -> LyricsDto {
-        guard
-            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-            let queriesRaw = json["queries"] as? [[String: Any]]
-        else {
-            let rawBody = String(data: data, encoding: .utf8) ?? "<non-utf8 \(data.count) bytes>"
-            writeDebugLog("[SpicyLyrics] Malformed envelope for \(trackId): \(rawBody)")
+    /// Unwraps either response format into the lyrics object itself:
+    /// the developer API's `{Body, Status}` JSON, or /query's envelope with
+    /// its SLObjPack-encoded `data`. Throws for anything but a usable 200.
+    /// `trackId` is only for logging; nil keeps it quiet.
+    private static func lyricsRoot(from data: Data, trackId: String?) throws -> SLObjPackValue {
+        func log(_ message: String) {
+            if let trackId = trackId { writeDebugLog("[SpicyLyrics] \(message) for \(trackId)") }
+        }
+        let rawBody = { String(data: data, encoding: .utf8) ?? "<non-utf8 \(data.count) bytes>" }
+
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            log("Malformed response: \(rawBody())")
             throw LyricsError.decodingError
         }
 
-        // The server may prepend extra entries ahead of the real query result
-        // (e.g. a "_notice" block with no "operationId"/"result"). The real
-        // Spicetify client never assumes index 0 — it looks results up by
-        // operationId via queries.get("0") — so we match that instead of
-        // blindly taking queriesRaw.first.
-        guard
-            let matchedQuery = queriesRaw.first(where: { $0["operationId"] as? String == "0" }),
-            let result = matchedQuery["result"] as? [String: Any]
-        else {
-            let rawBody = String(data: data, encoding: .utf8) ?? "<non-utf8 \(data.count) bytes>"
-            writeDebugLog("[SpicyLyrics] No matching operationId 0 for \(trackId): \(rawBody)")
-            throw LyricsError.decodingError
+        let httpStatus: Int
+        let body: SLObjPackValue?
+        if let developerBody = json["Body"] {
+            httpStatus = json["Status"] as? Int ?? 0
+            body = SLObjPackValue(json: developerBody)
+        } else {
+            // The server may prepend extra entries ahead of the real query
+            // result (e.g. a "_notice" block with no "operationId"/"result").
+            // The real Spicetify client never assumes index 0 — it looks
+            // results up by operationId via queries.get("0") — so we match
+            // that instead of blindly taking queriesRaw.first.
+            guard
+                let queriesRaw = json["queries"] as? [[String: Any]],
+                let matchedQuery = queriesRaw.first(where: { $0["operationId"] as? String == "0" }),
+                let result = matchedQuery["result"] as? [String: Any]
+            else {
+                log("No matching operationId 0: \(rawBody())")
+                throw LyricsError.decodingError
+            }
+            httpStatus = result["httpStatus"] as? Int ?? 0
+            if httpStatus == 200, let rawData = result["data"] {
+                do {
+                    body = try SLObjPack.unpack(rawData)
+                } catch {
+                    log("SLObjPack error \(error)")
+                    throw LyricsError.decodingError
+                }
+            } else {
+                body = nil
+            }
         }
 
-        let httpStatus = result["httpStatus"] as? Int ?? 0
-        writeDebugLog("[SpicyLyrics] API status \(httpStatus) for \(trackId)")
+        log("API status \(httpStatus)")
 
         switch httpStatus {
-        case 404:
-            throw LyricsError.noSuchSong
         case 200:
             break
         case 401, 403:
-            // Auth failure — token was stale or rejected. Clear it so the next
-            // attempt re-waits for a fresh one.
-            writeDebugLog("[SpicyLyrics] Auth error \(httpStatus) for \(trackId) — clearing cached token")
+            // /query: the Spotify token was stale or rejected. Clear it so
+            // the next attempt re-waits for a fresh one.
+            log("Auth error \(httpStatus) — clearing cached token")
             spotifyAccessToken = nil
             throw LyricsError.noSuchSong
         default:
-            writeDebugLog("[SpicyLyrics] Unexpected status \(httpStatus) for \(trackId)")
             throw LyricsError.noSuchSong
         }
 
-        guard let rawData = result["data"] else { throw LyricsError.decodingError }
+        guard let body = body else { throw LyricsError.decodingError }
+        return body
+    }
 
-        let packed: SLObjPackValue
-        do {
-            packed = try SLObjPack.unpack(rawData)
-        } catch {
-            writeDebugLog("[SpicyLyrics] SLObjPack error for \(trackId): \(error)")
-            throw LyricsError.decodingError
-        }
+    private func parseLyricsData(_ data: Data, trackId: String, query: LyricsSearchQuery, options: LyricsOptions) throws -> LyricsDto {
+        let packed = try SpicyLyricsRepository.lyricsRoot(from: data, trackId: trackId)
 
         guard let type = packed["Type"]?.stringValue else {
             writeDebugLog("[SpicyLyrics] Missing Type for \(trackId)")
@@ -268,14 +412,17 @@ class SpicyLyricsRepository: LyricsRepository {
 
         writeDebugLog("[SpicyLyrics] Lyrics type=\(type) for \(trackId)")
 
+        var dto: LyricsDto
         switch type {
-        case "Syllable": return parseSyllableLyrics(packed, trackId: trackId, query: query, options: options)
-        case "Line":     return parseLineLyrics(packed)
-        case "Static":   return parseStaticLyrics(packed)
+        case "Syllable": dto = parseSyllableLyrics(packed, trackId: trackId, query: query, options: options)
+        case "Line":     dto = parseLineLyrics(packed)
+        case "Static":   dto = parseStaticLyrics(packed)
         default:
             writeDebugLog("[SpicyLyrics] Unknown type '\(type)' for \(trackId)")
             throw LyricsError.decodingError
         }
+        dto.providerName = SpicyLyricsAttribution(root: packed).nativeProviderLine
+        return dto
     }
 
     // MARK: Syllable lyrics
@@ -288,72 +435,67 @@ class SpicyLyricsRepository: LyricsRepository {
         var hasRomanized = root["HasTransliterations"]?.boolValue ?? false
 
         for entry in content {
-            guard entry["Type"]?.stringValue == "Vocal",
-                  let lead = entry["Lead"] else { continue }
+            guard entry["Type"]?.stringValue == "Vocal" else { continue }
+            let lead = entry["Lead"]
+
+            let karaokeSyllables = SpicyLyricsRepository.karaokeSyllables(from: lead?["Syllables"]?.arrayValue ?? [])
+
+            // Background vocals — one or more groups, each with its own
+            // syllable timing. Groups are joined in order; the view renders
+            // them as one smaller row under the lead, same as Syllable.ts.
+            var backgroundSyllables = [KaraokeSyllableDto]()
+            for group in entry["Background"]?.arrayValue ?? [] {
+                let groupSyllables = SpicyLyricsRepository.karaokeSyllables(from: group["Syllables"]?.arrayValue ?? [])
+                guard !groupSyllables.isEmpty else { continue }
+                if var last = backgroundSyllables.popLast() {
+                    last.isPartOfWord = false
+                    backgroundSyllables.append(last)
+                }
+                backgroundSyllables.append(contentsOf: groupSyllables)
+            }
 
             let lineText: String
-            var karaokeSyllables = [KaraokeSyllableDto]()
-
-            if let syllables = lead["Syllables"]?.arrayValue, !syllables.isEmpty {
-                // Real client rule (Syllable.ts / tools.ts): IsPartOfWord is a
-                // FORWARD-looking flag — a syllable with IsPartOfWord=true means
-                // the word continues into the *next* syllable with no gap (e.g.
-                // "Lo" (IsPartOfWord=true) + "la" -> "Lola"). So whether a space
-                // goes before the *current* syllable depends on the *previous*
-                // syllable's flag, not this one's own. (Verified directly against
-                // the real client: Syllable.ts's word-grouping gates inclusion on
-                // `lead.IsPartOfWord || (prev?.IsPartOfWord && currentWordGroup)`,
-                // and tools.ts's convertSyllableToStatic appends a space *after*
-                // a syllable only `if (!syllable.IsPartOfWord)`.) Reading this
-                // backwards (checking the current syllable's own flag to decide
-                // the preceding space, as an earlier version of this file did)
-                // is what produced broken spacing like "wasLo la" instead of
-                // "was Lola" — plain .joined() (no separator) had the same
-                // underlying problem, producing "Doyourecall,notlongago?".
-                var text = ""
-                var previousIsPartOfWord = false
-                for syllable in syllables {
-                    guard let syllableText = syllable["Text"]?.stringValue else { continue }
-                    let isPartOfWord = syllable["IsPartOfWord"]?.boolValue ?? false
-                    if !text.isEmpty && !previousIsPartOfWord {
-                        text += " "
-                    }
-                    text += syllableText
-                    previousIsPartOfWord = isPartOfWord
-
-                    let startMs = syllable["StartTime"]?.doubleValue.map { Int($0 * 1000) } ?? 0
-                    let endMs   = syllable["EndTime"]?.doubleValue.map { Int($0 * 1000) } ?? startMs
-                    karaokeSyllables.append(KaraokeSyllableDto(
-                        text: syllableText,
-                        startMs: startMs,
-                        endMs: endMs,
-                        isPartOfWord: isPartOfWord
-                    ))
-                }
+            if !karaokeSyllables.isEmpty {
+                lineText = SpicyLyricsRepository.flattenedText(karaokeSyllables)
+            } else if let text = lead?["Text"]?.stringValue, !text.isEmpty {
                 lineText = text
-                if syllables.contains(where: { ($0["TransliteratedText"]?.stringValue ?? "").isEmpty == false }) {
-                    hasRomanized = true
-                }
-            } else if let text = lead["Text"]?.stringValue {
-                lineText = text
+            } else if !backgroundSyllables.isEmpty {
+                // Background-only line (the real client's IsEmptyLyricsLine
+                // keeps these) — the native screen gets the background text.
+                lineText = "(\(SpicyLyricsRepository.flattenedText(backgroundSyllables)))"
             } else {
                 continue
             }
 
-            if (lead["TransliteratedText"]?.stringValue ?? "").isEmpty == false { hasRomanized = true }
+            let transliterated = (lead?["Syllables"]?.arrayValue ?? []).contains {
+                ($0["TransliteratedText"]?.stringValue ?? "").isEmpty == false
+            }
+            if transliterated || (lead?["TransliteratedText"]?.stringValue ?? "").isEmpty == false {
+                hasRomanized = true
+            }
 
-            let lineStartMs = lead["StartTime"]?.doubleValue.map { Int($0 * 1000) } ?? 0
-            let lineEndMs   = lead["EndTime"]?.doubleValue.map { Int($0 * 1000) }
-                ?? karaokeSyllables.last?.endMs
-                ?? lineStartMs
+            let firstSyllableMs = (karaokeSyllables.first ?? backgroundSyllables.first)?.startMs ?? 0
+            let lastSyllableMs = max(karaokeSyllables.last?.endMs ?? 0, backgroundSyllables.last?.endMs ?? 0)
+            let lineStartMs = lead?["StartTime"]?.doubleValue.map { Int($0 * 1000) } ?? firstSyllableMs
+            let lineEndMs = max(
+                lead?["EndTime"]?.doubleValue.map { Int($0 * 1000) } ?? lineStartMs,
+                lastSyllableMs
+            )
 
-            lines.append(LyricsLineDto(content: lineText.lyricsNoteIfEmpty, offsetMs: lineStartMs))
+            lines.append(LyricsLineDto(
+                content: lineText.lyricsNoteIfEmpty,
+                offsetMs: lineStartMs,
+                syllables: karaokeSyllables.isEmpty ? nil : karaokeSyllables,
+                endMs: lineEndMs
+            ))
 
-            if !karaokeSyllables.isEmpty {
+            if !karaokeSyllables.isEmpty || !backgroundSyllables.isEmpty {
                 karaokeLines.append(KaraokeLineDto(
                     syllables: karaokeSyllables,
                     startMs: lineStartMs,
-                    endMs: lineEndMs
+                    endMs: lineEndMs,
+                    background: backgroundSyllables,
+                    oppositeAligned: entry["OppositeAligned"]?.boolValue ?? false
                 ))
             }
         }
@@ -364,23 +506,29 @@ class SpicyLyricsRepository: LyricsRepository {
 
         if !karaokeLines.isEmpty {
             let songWriters = root["SongWriters"]?.arrayValue?.compactMap { $0.stringValue } ?? []
-            let providerCode = root["source"]?.stringValue
-            let providerDisplayName = providerCode == "ext" ? root["sourceName"]?.stringValue : nil
+            let attribution = SpicyLyricsAttribution(root: root)
 
             let filledKaraokeLines = LyricsUncensorFill.fillKaraoke(
                 lines: karaokeLines,
                 query: query,
                 options: options
             )
-            let normalizedKaraokeLines = SpicyLyricsRepository.normalizeMonotonicTiming(filledKaraokeLines)
+            // Interludes are inserted last: LyricsUncensorFill matches
+            // karaoke lines against other providers' lines by index, so the
+            // synthesized dot lines must not exist yet at that point.
+            let normalizedKaraokeLines = SpicyLyricsRepository.insertInterludes(
+                SpicyLyricsRepository.normalizeMonotonicTiming(filledKaraokeLines)
+            )
 
             KaraokeLyricsStore.shared.set(
                 trackId: trackId,
                 lyrics: KaraokeLyricsDto(
                     lines: normalizedKaraokeLines,
                     songWriters: songWriters,
-                    providerCode: providerCode,
-                    providerDisplayName: providerDisplayName
+                    providerCode: attribution.providerCode,
+                    providerDisplayName: attribution.providerDisplayName,
+                    uploader: attribution.uploader,
+                    maker: attribution.maker
                 )
             )
             writeDebugLog("[SpicyLyrics] Stored karaoke data: \(karaokeLines.count) lines for \(trackId)")
@@ -420,6 +568,88 @@ class SpicyLyricsRepository: LyricsRepository {
                 }
                 previousEndMs = syllable.endMs
                 result[lineIndex].syllables[syllableIndex] = syllable
+            }
+            // Background vocals legitimately overlap the lead, so they're
+            // only clamped against themselves, within the line.
+            var previousBackgroundEndMs = Int.min
+            for syllableIndex in result[lineIndex].background.indices {
+                var syllable = result[lineIndex].background[syllableIndex]
+                syllable.startMs = max(syllable.startMs, previousBackgroundEndMs)
+                syllable.endMs = max(syllable.endMs, syllable.startMs)
+                previousBackgroundEndMs = syllable.endMs
+                result[lineIndex].background[syllableIndex] = syllable
+            }
+        }
+        return result
+    }
+
+    // MARK: Syllable helpers
+
+    private static func karaokeSyllables(from values: [SLObjPackValue]) -> [KaraokeSyllableDto] {
+        values.compactMap { syllable in
+            guard let text = syllable["Text"]?.stringValue, !text.isEmpty else { return nil }
+            let startMs = syllable["StartTime"]?.doubleValue.map { Int($0 * 1000) } ?? 0
+            let endMs   = syllable["EndTime"]?.doubleValue.map { Int($0 * 1000) } ?? startMs
+            return KaraokeSyllableDto(
+                text: text,
+                startMs: startMs,
+                endMs: endMs,
+                isPartOfWord: syllable["IsPartOfWord"]?.boolValue ?? false
+            )
+        }
+    }
+
+    /// Joins syllables into running text. Real client rule (Syllable.ts /
+    /// tools.ts): IsPartOfWord is a FORWARD-looking flag — a syllable with
+    /// IsPartOfWord=true glues onto the *next* one ("Lo" + "la" -> "Lola"),
+    /// so the space before a syllable depends on the *previous* syllable's
+    /// flag. Same rule as KaraokeLineDto.plainText.
+    private static func flattenedText(_ syllables: [KaraokeSyllableDto]) -> String {
+        KaraokeLineDto(syllables: syllables, startMs: 0, endMs: 0).plainText
+    }
+
+    /// Matches getLyricsBetweenShow() in the real extension's lyrics.ts —
+    /// a gap this long (or a first line starting this late) gets a
+    /// "• • •" musical line.
+    private static let interludeThresholdMs = 3000
+    /// Matches getInterludeTimePadding() (preHiddenDotLineMs + 50): the
+    /// dots finish filling this long before the next line starts, so the
+    /// dot line has time to fade out instead of vanishing mid-fill.
+    private static let interludePaddingMs = 550
+
+    private static func insertInterludes(_ lines: [KaraokeLineDto]) -> [KaraokeLineDto] {
+        guard let first = lines.first else { return lines }
+
+        func interlude(from startMs: Int, to endMs: Int, oppositeAligned: Bool) -> KaraokeLineDto {
+            let fillEndMs = max(startMs, endMs - interludePaddingMs)
+            let dotMs = (fillEndMs - startMs) / 3
+            let dots = (0 ..< 3).map { index in
+                KaraokeSyllableDto(
+                    text: "•",
+                    startMs: startMs + dotMs * index,
+                    endMs: index == 2 ? fillEndMs : startMs + dotMs * (index + 1),
+                    isPartOfWord: false
+                )
+            }
+            return KaraokeLineDto(
+                syllables: dots,
+                startMs: startMs,
+                endMs: endMs,
+                oppositeAligned: oppositeAligned,
+                isInterlude: true
+            )
+        }
+
+        var result = [KaraokeLineDto]()
+        if first.startMs >= interludeThresholdMs {
+            result.append(interlude(from: 0, to: first.startMs, oppositeAligned: first.oppositeAligned))
+        }
+        for (index, line) in lines.enumerated() {
+            result.append(line)
+            guard index + 1 < lines.count else { continue }
+            let next = lines[index + 1]
+            if next.startMs - line.endMs >= interludeThresholdMs {
+                result.append(interlude(from: line.endMs, to: next.startMs, oppositeAligned: next.oppositeAligned))
             }
         }
         return result
@@ -472,7 +702,7 @@ class SpicyLyricsRepository: LyricsRepository {
             writeDebugLog("[SpicyLyrics] Empty track ID")
             throw LyricsError.noSuchSong
         }
-        let data = try performQuery(trackId: trackId)
+        let data = try bestAvailableData(trackId: trackId)
         var dto = try parseLyricsData(data, trackId: trackId, query: query, options: options)
 
         let filledContents = LyricsUncensorFill.fill(
@@ -484,5 +714,136 @@ class SpicyLyricsRepository: LyricsRepository {
             dto.lines[index].content = content
         }
         return dto
+    }
+}
+
+// MARK: - SpicyLyricsCache
+
+/// On-disk store of the best SpicyLyrics API response seen per track — the
+/// iOS counterpart of the real extension's LyricsStore — kept for at most
+/// 30 days per the developer API terms. Raw response bytes are
+/// kept as-is so a cache hit goes through exactly the same parse path as a
+/// fresh response. Lives in Caches, so iOS may purge it under storage
+/// pressure; that only costs a refetch.
+enum SpicyLyricsCache {
+    private static let maxEntries = 1000
+
+    private static let directory: URL? = {
+        guard let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else {
+            return nil
+        }
+        let url = caches.appendingPathComponent("EeveeSpicyLyrics", isDirectory: true)
+        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }()
+
+    private static func fileURL(trackId: String) -> URL? {
+        // Spotify track ids are base62; anything else is not a cache key.
+        guard !trackId.isEmpty, trackId.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber) }) else {
+            return nil
+        }
+        return directory?.appendingPathComponent("\(trackId).json")
+    }
+
+    /// The developer API's terms: refetch or discard every stored response
+    /// within 30 days.
+    private static let maxAge: TimeInterval = 30 * 24 * 60 * 60
+
+    static func load(trackId: String) -> Data? {
+        guard let url = fileURL(trackId: trackId) else { return nil }
+        let written = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+        if let written = written, Date().timeIntervalSince(written) > maxAge {
+            try? FileManager.default.removeItem(at: url)
+            return nil
+        }
+        return try? Data(contentsOf: url)
+    }
+
+    static func save(_ data: Data, trackId: String) {
+        guard let url = fileURL(trackId: trackId) else { return }
+        try? data.write(to: url, options: .atomic)
+        pruneIfNeeded()
+    }
+
+    /// Drops the least recently written entries once the cache grows past
+    /// maxEntries, so it can't grow without bound.
+    private static func pruneIfNeeded() {
+        guard
+            let directory = directory,
+            let files = try? FileManager.default.contentsOfDirectory(
+                at: directory,
+                includingPropertiesForKeys: [.contentModificationDateKey]
+            ),
+            files.count > maxEntries
+        else { return }
+
+        let sorted = files.sorted {
+            let a = (try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+            let b = (try? $1.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+            return a < b
+        }
+        for file in sorted.prefix(files.count - maxEntries) {
+            try? FileManager.default.removeItem(at: file)
+        }
+    }
+}
+
+// MARK: - Attribution
+
+/// Who to credit for a response, read from the response itself as the
+/// developer API's attribution rules require: always the provider, and for
+/// community syncs (`source == "spicy_lyrics"`) the uploader and maker too.
+struct SpicyLyricsAttribution {
+    let providerCode: String?
+    let providerDisplayName: String?
+    let uploader: KaraokeCreditDto?
+    let maker: KaraokeCreditDto?
+
+    init(root: SLObjPackValue) {
+        providerCode = root["source"]?.stringValue
+        providerDisplayName = providerCode == "ext" ? root["sourceName"]?.stringValue : nil
+        let upload = root["UploadAttribution"]
+        uploader = KaraokeCreditDto(upload?["Uploader"])
+        maker = KaraokeCreditDto(upload?["Maker"])
+    }
+
+    /// Spotify's native lyrics screen only has the one "provided by" string,
+    /// so everything owed goes into it.
+    var nativeProviderLine: String {
+        let provider = KaraokeCreditDto.providerLabel(code: providerCode, displayName: providerDisplayName)
+        var parts = [provider.map { $0 == "Spicy Lyrics" ? $0 : "\($0) via Spicy Lyrics" } ?? "Spicy Lyrics"]
+        if let maker = maker { parts.append("synced by \(maker.name)") }
+        if let uploader = uploader, uploader.name != maker?.name { parts.append("uploaded by \(uploader.name)") }
+        return parts.joined(separator: ", ")
+    }
+}
+
+extension KaraokeCreditDto {
+    init?(_ value: SLObjPackValue?) {
+        guard let value = value,
+              let name = value["username"]?.stringValue ?? value["name"]?.stringValue,
+              !name.isEmpty else { return nil }
+        self.init(name: name, url: value["url"]?.stringValue.flatMap(URL.init(string:)))
+    }
+}
+
+// MARK: - JSON bridge
+
+extension SLObjPackValue {
+    /// Bridges a JSONSerialization value (developer API responses) into the
+    /// same value type /query responses unpack to, so both share one parser.
+    init(json: Any) {
+        switch json {
+        case let number as NSNumber:
+            self = CFGetTypeID(number) == CFBooleanGetTypeID() ? .bool(number.boolValue) : .number(number.doubleValue)
+        case let string as String:
+            self = .string(string)
+        case let array as [Any]:
+            self = .array(array.map(SLObjPackValue.init(json:)))
+        case let object as [String: Any]:
+            self = .object(object.mapValues(SLObjPackValue.init(json:)))
+        default:
+            self = .null
+        }
     }
 }

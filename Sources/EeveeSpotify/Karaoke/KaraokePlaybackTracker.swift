@@ -1,5 +1,6 @@
 import Foundation
 import ObjectiveC.runtime
+import EeveeSpotifyC
 
 /// Tracks live playback position and the current track's Spotify ID, for the
 /// karaoke overlay's animation loop.
@@ -20,6 +21,11 @@ final class KaraokePlaybackTracker {
     private var lastTrackId: String?
 
     private var didDumpStateShape = false
+
+    /// The player the karaoke observer is registered on (SPTEsperantoPlayer
+    /// via provideStateObservable) — used for tap-to-seek.
+    weak var player: AnyObject?
+    private var seekSelector: Selector?
 
     private init() {}
 
@@ -73,9 +79,23 @@ final class KaraokePlaybackTracker {
             ? String(uriString.dropFirst("spotify:track:".count))
             : nil
 
-        let positionRaw: Double = (safeValue("position") as? NSNumber)?.doubleValue ?? lastPosition
-        let playbackSpeed: Double = (safeValue("playbackSpeed") as? NSNumber)?.doubleValue ?? lastPlaybackSpeed
-        let isPlaying: Bool = (safeValue("isPlaying") as? Bool) ?? lastIsPlaying
+        // Same unit handling as SponsorBlockSkipper.normalizeSeconds: the
+        // player state can report position/duration in milliseconds, and
+        // reading that as seconds put currentPositionMs() 1000x ahead —
+        // every syllable instantly "sung", no progressive fill at all.
+        let durationRaw: Double = (safeValue("duration") as? NSNumber)?.doubleValue ?? 0
+        let positionRaw: Double = (safeValue("position") as? NSNumber).map {
+            Self.normalizeSeconds($0.doubleValue, durationHint: durationRaw)
+        } ?? lastPosition
+        let reportedSpeed = (safeValue("playbackSpeed") as? NSNumber)?.doubleValue
+        // isPlaying stays true while paused on this player state (it means
+        // "has an active playback"), so the overlay kept running through a
+        // pause. Paused shows up as isPaused, or as a playback speed of 0.
+        let isPaused = (safeValue("isPaused") as? Bool) ?? false
+        let isPlaying: Bool = ((safeValue("isPlaying") as? Bool) ?? lastIsPlaying)
+            && !isPaused
+            && reportedSpeed != 0
+        let playbackSpeed: Double = reportedSpeed.flatMap { $0 > 0 ? $0 : nil } ?? lastPlaybackSpeed
 
         queue.async {
             self.lastPosition = positionRaw
@@ -136,12 +156,50 @@ final class KaraokePlaybackTracker {
         }
     }
 
+    /// Seeks playback and moves the estimate there immediately, so the
+    /// lyrics jump without waiting for the next state callback.
+    func seek(toMs ms: Int) {
+        guard let player = player else {
+            writeDebugLog("[Karaoke] seek skipped: no player captured")
+            return
+        }
+        if seekSelector == nil || !player.responds(to: seekSelector!) {
+            seekSelector = ["seekTo:", "seekToPosition:", "seekToMs:"]
+                .map(NSSelectorFromString)
+                .first { player.responds(to: $0) }
+        }
+        guard let selector = seekSelector,
+              let method = class_getInstanceMethod(object_getClass(player), selector) else {
+            writeDebugLog("[Karaoke] seek skipped: \(type(of: player)) has no seek selector")
+            return
+        }
+        // Same unit rule as SponsorBlockSkipper.seek: a Double argument
+        // is seconds, anything else milliseconds.
+        let argType: String = {
+            guard let raw = method_copyArgumentType(method, 2) else { return "?" }
+            defer { free(raw) }
+            return String(cString: raw)
+        }()
+        let seconds = Double(max(0, ms)) / 1000
+        EeveeSBInvokeSeekDouble(player, selector, argType == "d" ? seconds : seconds * 1000)
+        queue.async {
+            self.lastPosition = seconds
+            self.lastPositionStamp = self.uptimeSec()
+        }
+        writeDebugLog("[Karaoke] seek to \(ms)ms via \(NSStringFromSelector(selector))")
+    }
+
     func currentTrackId() -> String? {
         queue.sync { lastTrackId }
     }
 
     func isPlaying() -> Bool {
         queue.sync { lastIsPlaying }
+    }
+
+    private static func normalizeSeconds(_ raw: Double, durationHint: Double) -> Double {
+        if raw > 10_000 || durationHint > 10_000 { return raw / 1000.0 }
+        return raw
     }
 
     private func uptimeSec() -> TimeInterval {

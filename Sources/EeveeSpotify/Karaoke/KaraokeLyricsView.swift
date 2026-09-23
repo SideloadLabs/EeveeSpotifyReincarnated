@@ -36,12 +36,18 @@ struct KaraokeLyricsView: View {
     /// button).
     var onDismiss: () -> Void
 
+    /// Spring state for every syllable, letter and dot — lives as long as
+    /// this view does. A class, so stepping it doesn't invalidate the view.
+    @State private var animator = KaraokeAnimator()
+
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .topTrailing) {
                 KaraokeBackgroundView()
                 content(screenWidth: geo.size.width)
                 closeButton
+                KaraokeAttributionView(lyrics: lyrics)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
             }
         }
         .preferredColorScheme(.dark)
@@ -49,7 +55,10 @@ struct KaraokeLyricsView: View {
 
     @available(iOS 15.0, *)
     private func content(screenWidth: CGFloat) -> some View {
-        TimelineView(.periodic(from: .now, by: 1.0 / 30.0)) { _ in
+        // .animation = every display frame (60/120Hz), which the springs
+        // need: they're stepped with the real frame delta, like the
+        // extension's requestAnimationFrame loop.
+        TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
             // Reading the tracker here, inside the TimelineView's per-tick
             // closure, is what actually drives the animation — TimelineView
             // re-invokes this closure on its schedule, and since this read
@@ -58,12 +67,14 @@ struct KaraokeLyricsView: View {
             // value flows straight into the child views' bodies each tick.
             let currentMs = KaraokePlaybackTracker.shared.currentPositionMs()
             let activeIndex = activeLineIndex(at: currentMs)
+            let _ = animator.beginFrame(at: timeline.date.timeIntervalSinceReferenceDate)
 
             KaraokeScrollingLines(
                 lyrics: lyrics,
                 currentMs: currentMs,
                 activeLineIndex: activeIndex,
-                screenWidth: screenWidth
+                screenWidth: screenWidth,
+                animator: animator
             )
         }
     }
@@ -100,6 +111,7 @@ private struct KaraokeScrollingLines: View {
     let currentMs: Int
     let activeLineIndex: Int?
     let screenWidth: CGFloat
+    let animator: KaraokeAnimator
 
     private let horizontalPadding: CGFloat = 24
     private var options: KaraokeOptions { UserDefaults.karaokeOptions }
@@ -112,6 +124,24 @@ private struct KaraokeScrollingLines: View {
         }
     }
 
+    /// Duet songs (any OppositeAligned line) switch to Spicy Lyrics' duet
+    /// layout: lead vocalist on one side, the other vocalist on the
+    /// opposite side. Centered text has no "opposite" side, so centered
+    /// duets fall back to left/right like the real extension's
+    /// HasDuetLines styling.
+    private func alignment(for line: KaraokeLineDto) -> KaraokeTextAlignment {
+        guard lyrics.lines.contains(where: \.oppositeAligned) else { return options.textAlignment }
+        let leadAlignment: KaraokeTextAlignment = options.textAlignment == .trailing ? .trailing : .leading
+        guard line.oppositeAligned else { return leadAlignment }
+        return leadAlignment == .leading ? .trailing : .leading
+    }
+
+    private func state(of index: Int) -> KaraokeElementState {
+        guard let active = activeLineIndex else { return .notSung }
+        if index == active { return .active }
+        return index < active ? .sung : .notSung
+    }
+
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(showsIndicators: false) {
@@ -121,11 +151,29 @@ private struct KaraokeScrollingLines: View {
                     ForEach(Array(lyrics.lines.enumerated()), id: \.offset) { index, line in
                         KaraokeLineView(
                             line: line,
+                            lineIndex: index,
                             currentMs: currentMs,
-                            isActiveLine: index == activeLineIndex,
-                            availableWidth: max(0, screenWidth - horizontalPadding * 2)
+                            lineState: state(of: index),
+                            distanceFromActive: activeLineIndex.map { abs(index - $0) } ?? 0,
+                            animator: animator,
+                            availableWidth: max(0, screenWidth - horizontalPadding * 2),
+                            alignment: alignment(for: line)
                         )
+                        // Only the active line changes frame to frame; the
+                        // rest compare equal and skip re-rendering. Redrawing
+                        // every blurred line each frame was what starved the
+                        // main thread (choppy line transitions, and Spotify's
+                        // own UI lagging behind while the overlay was up).
+                        .equatable()
                         .id(index)
+                        // Tap a line to jump to it, like the extension:
+                        // seeks to the line's first sung syllable.
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            guard !line.isInterlude else { return }
+                            let target = (line.syllables.first ?? line.background.first)?.startMs ?? line.startMs
+                            KaraokePlaybackTracker.shared.seek(toMs: target)
+                        }
                         .padding(.horizontal, horizontalPadding)
                         // Counter-flip each row — see the note on the outer
                         // ScrollView's own flip below for why this needs to

@@ -14,20 +14,30 @@ import SwiftUI
 /// safe to copy here now that KaraokeButtonOverlay's own small window
 /// exists alongside Spotify's main one).
 final class KaraokeOverlayPresenter {
+    /// The karaoke view's hosting controller while it's up. Weak, so a
+    /// dismissal from anywhere — our close button, or Spotify dismissing
+    /// presented controllers on its own — is noticed without a callback.
+    private static weak var hosting: UIViewController?
+
     /// True while the karaoke view itself is on screen. KaraokeButtonOverlay
     /// checks this (alongside isAvailableForCurrentTrack) so the floating
-    /// launcher button hides itself once the karaoke view is open — without
-    /// this, the button's overlay window (which sits above the app's main
-    /// window so it can float over the Now Playing screen) would also float
-    /// on top of the karaoke view once presented, and tapping it again
-    /// would stack a second presentation on top of the first.
-    private(set) static var isPresented = false
+    /// launcher button hides itself once the karaoke view is open.
+    ///
+    /// Derived from the live controller rather than a stored flag: the flag
+    /// used to be set *before* present() and only cleared by our own close
+    /// button, so a presentation UIKit refused (another transition in
+    /// flight) or a dismissal Spotify did itself left it stuck at true —
+    /// the button then never showed again and taps did nothing.
+    static var isPresented: Bool {
+        guard let hosting = hosting else { return false }
+        return hosting.presentingViewController != nil || hosting.isBeingPresented
+    }
 
     /// Call this wherever the user triggers the karaoke view — the visible
     /// "Word-Synced Lyrics" button on the Now Playing screen
     /// (KaraokeButtonOverlay) is the primary trigger; the long-press
     /// gesture (KaraokeGestureTrigger) remains as a secondary shortcut.
-    static func present() {
+    static func present(attempt: Int = 0) {
         guard !isPresented else { return }
         guard #available(iOS 15.0, *) else {
             writeDebugLog("[Karaoke] present() skipped: requires iOS 15+")
@@ -42,18 +52,25 @@ final class KaraokeOverlayPresenter {
             writeDebugLog("[Karaoke] present() called but no karaoke (Syllable) data available for current track")
             return
         }
+        // A host mid-transition silently drops present(); report it
+        // instead of looking like a dead button.
+        if attempt < 4, host.isBeingDismissed || host.isBeingPresented || host.transitionCoordinator != nil {
+            writeDebugLog("[Karaoke] present() deferred: \(type(of: host)) is mid-transition")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { present(attempt: attempt + 1) }
+            return
+        }
 
         let view = KaraokeLyricsView(lyrics: lyrics, onDismiss: {
-            isPresented = false
-            topVC()?.dismiss(animated: true)
+            hosting?.presentingViewController?.dismiss(animated: true)
         })
-        let hosting = UIHostingController(rootView: view)
-        hosting.overrideUserInterfaceStyle = .dark
-        hosting.modalPresentationStyle = .fullScreen
-        hosting.view.backgroundColor = .black
+        let controller = UIHostingController(rootView: view)
+        controller.overrideUserInterfaceStyle = .dark
+        controller.modalPresentationStyle = .fullScreen
+        controller.view.backgroundColor = .black
 
-        isPresented = true
-        host.present(hosting, animated: true)
+        hosting = controller
+        host.present(controller, animated: true)
+        writeDebugLog("[Karaoke] presented for \(trackId) from \(type(of: host))")
     }
 
     /// True if karaoke data exists for the current track — callers (e.g.

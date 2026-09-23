@@ -137,3 +137,11 @@ play_songs_in_any_order = "Треки в любом порядке";
 organize_listening_queue = "Добавление треков в очередь";
 
 payment_notice = "EeveeSpotify применяет патчи, которые активируют некоторые возможности Premium. Это бесплатно.";
+
+spicylyrics_client_key = "Клиентский ключ Spicy Lyrics";
+spicylyrics_client_key_placeholder = "sl_pk_… (необязательно)";
+spicylyrics_native_rich_sync = "Пословная синхронизация в лирике Spotify (экспериментально)";
+karaoke_lyrics_provided_by = "Текст предоставлен %@";
+karaoke_synced_by = "Синхронизация:";
+karaoke_uploaded_by = "Загрузил(а)";
+karaoke_uploaded_by_continued = "· загрузил(а)";

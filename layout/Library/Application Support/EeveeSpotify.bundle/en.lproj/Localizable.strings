@@ -300,3 +300,11 @@ managingSegmentsSectionDeps2 = "Settings → 'Reporting & drafts' holds your in-
 categoriesTitle = "Categories";
 categoriesSectionTitle1 = "Per-category actions";
 categoriesSectionDeps1 = "Off = ignore. Show = draw on the bar only. Manual = prompt before skipping. Auto = skip silently.";
+
+spicylyrics_client_key = "Spicy Lyrics client key";
+spicylyrics_client_key_placeholder = "sl_pk_… (optional)";
+spicylyrics_native_rich_sync = "Word-by-word in Spotify lyrics (experimental)";
+karaoke_lyrics_provided_by = "Lyrics provided by %@";
+karaoke_synced_by = "Synced by";
+karaoke_uploaded_by = "Uploaded by";
+karaoke_uploaded_by_continued = "· uploaded by";

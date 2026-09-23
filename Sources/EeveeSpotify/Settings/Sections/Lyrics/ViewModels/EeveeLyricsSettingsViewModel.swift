@@ -13,6 +13,14 @@ class EeveeLyricsSettingsViewModel: ObservableObject {
     @Published var musixmatchTokenInputAlertPublisher = PassthroughSubject<Bool, Never>()
     var isMusixmatchTokenValid: Bool { getMusixmatchToken(musixmatchToken) != nil }
     
+    @Published var nativeRichSync = UserDefaults.nativeRichSync {
+        didSet { UserDefaults.nativeRichSync = nativeRichSync }
+    }
+    
+    @Published var spicyLyricsApiKey = UserDefaults.spicyLyricsApiKey {
+        didSet { UserDefaults.spicyLyricsApiKey = spicyLyricsApiKey }
+    }
+
     @Published var showMusixmatchInvalidLanguageWarning = false
     @Published var lrclibURLState = LrclibURLState.default
     

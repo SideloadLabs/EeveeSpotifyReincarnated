@@ -63,6 +63,13 @@ final class KaraokeButtonOverlay {
     // reset to it below.
     private var restFrame: CGRect?
     private var pollTimer: Timer?
+    private weak var buttonController: KaraokeButtonViewController?
+
+    /// While a finger is on the button, the window must not move or hide:
+    /// the scroll-follow logic used to reposition it under the finger
+    /// (and re-found the scroll view every 0.15s, resetting the frame),
+    /// which cancelled the touch — the "tap it ten times" bug.
+    private var isTouchingButton: Bool { buttonController?.button.isTracking ?? false }
 
     // Set by KaraokeButtonOverlayLyricsScreenHook (viewDidAppear/
     // viewWillDisappear on Spotify's native Lyrics fullscreen screen). This
@@ -134,6 +141,7 @@ final class KaraokeButtonOverlay {
     private var lastLoggedDiagnostic: String?
 
     private func refresh() {
+        if isTouchingButton { return }
         let liveVC = !isOnNativeLyricsScreen ? KaraokeButtonOverlay.findLiveNowPlayingScrollViewController() : nil
         let isNowPlayingScreenVisible = !isOnNativeLyricsScreen && KaraokeButtonOverlay.isNowPlayingScreenCurrentlyVisible(liveVC: liveVC)
         let isMinimized = KaraokeButtonOverlay.isNowPlayingScreenMinimized(liveVC: liveVC)
@@ -463,6 +471,12 @@ final class KaraokeButtonOverlay {
             return
         }
 
+        // Walking the whole Now Playing hierarchy every poll tick was both
+        // main-thread cost and a source of frame resets whenever a
+        // different scroll view happened to be found first.
+        if let tracked = trackedScrollView, tracked.window != nil, tracked.isDescendant(of: liveVC.view) {
+            return
+        }
         let scrollView = KaraokeButtonOverlay.findFirstScrollView(in: liveVC.view)
 
         if scrollView !== trackedScrollView {
@@ -552,7 +566,8 @@ final class KaraokeButtonOverlay {
     }
 
     private func applyScrollOffset(_ currentOffsetY: CGFloat) {
-        guard let window = window,
+        guard !isTouchingButton,
+              let window = window,
               let baseWindowY = baseWindowY,
               let baseContentOffsetY = baseContentOffsetY else { return }
 
@@ -699,7 +714,7 @@ final class KaraokeButtonOverlay {
         // this just shrinks the window to match, so there isn't dead
         // tappable space left around a now-smaller button.
         let areaWidth: CGFloat = isPhone ? 180 : 152
-        let areaHeight: CGFloat = isPhone ? 56 : 46
+        let areaHeight: CGFloat = isPhone ? 44 : 46
         // Lower on iPhone specifically — iPhone's Now Playing layout puts
         // the action row closer to the bottom of the screen than iPad's
         // does (iPad has more vertical space above the mini-player/controls
@@ -707,7 +722,7 @@ final class KaraokeButtonOverlay {
         // on iPhone. This is still a fixed guess, not a true anchor — see
         // the comment below on why I couldn't verify the real button's
         // frame — so let me know if it needs further adjustment.
-        let bottomInset: CGFloat = isPhone ? 52 : 100
+        let bottomInset: CGFloat = isPhone ? 24 : 100
         let trailingInset: CGFloat = 8
 
         // Best-effort placement near where Spotify's own action row (share/
@@ -829,44 +844,96 @@ final class KaraokeButtonOverlay {
         overlayWindow.backgroundColor = .clear
         overlayWindow.isHidden = true // refresh() unhides it when appropriate
 
-        let hosting = UIHostingController(rootView: KaraokeButtonOverlayView())
-        hosting.view.backgroundColor = .clear
-        overlayWindow.rootViewController = hosting
+        let controller = KaraokeButtonViewController()
+        overlayWindow.rootViewController = controller
+        buttonController = controller
 
         window = overlayWindow
         restFrame = frame
     }
 }
 
-@available(iOS 15.0, *)
-private struct KaraokeButtonOverlayView: View {
+/// The launcher button. Plain UIKit rather than a SwiftUI Button in a
+/// hosting controller: the whole overlay window is one UIButton, so any
+/// touch landing in the window counts, and UIButton's touch-up tracking
+/// tolerates the finger drifting while pressed.
+private final class KaraokeButtonViewController: UIViewController {
+    let button = UIButton(type: .custom)
+    private let capsule = CapsuleView()
+    private let label = UILabel()
+    private let icon = UIImageView()
+
     private var isPhone: Bool { UIDevice.current.userInterfaceIdiom == .phone }
 
-    var body: some View {
-        Button(action: { KaraokeOverlayPresenter.present() }) {
-            HStack(spacing: 6) {
-                Image(systemName: "text.bubble.fill")
-                    .font(.system(size: isPhone ? 13 : 11, weight: .semibold))
-                Text("karaoke_word_synced_button".localized)
-                    .font(.system(size: isPhone ? 13 : 11, weight: .semibold))
-            }
-            .foregroundColor(.white)
-            .padding(.horizontal, isPhone ? 14 : 11)
-            .padding(.vertical, isPhone ? 10 : 8)
-            .background(Capsule().fill(Color.white.opacity(0.18)))
-            .overlay(Capsule().strokeBorder(Color.white.opacity(0.25), lineWidth: 1))
-            .shadow(color: .black.opacity(0.3), radius: 8, y: 2)
-        }
-        .buttonStyle(.plain)
-        // Alignment within the window's own frame mirrors the window's
-        // origin logic in ensureWindowExists: centered on iPhone, trailing
-        // on iPad. The window itself doesn't span the full screen, so this
-        // just needs to match how much of the window's own width is empty
-        // space around the button on each idiom.
-        .frame(
-            maxWidth: .infinity,
-            maxHeight: .infinity,
-            alignment: isPhone ? .center : .trailing
-        )
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .clear
+
+        button.frame = view.bounds
+        button.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        button.addTarget(self, action: #selector(tapped), for: .touchUpInside)
+        button.addTarget(self, action: #selector(pressed), for: [.touchDown, .touchDragEnter])
+        button.addTarget(self, action: #selector(released), for: [.touchUpInside, .touchUpOutside, .touchCancel, .touchDragExit])
+        view.addSubview(button)
+
+        let fontSize: CGFloat = isPhone ? 13 : 11
+        icon.image = UIImage(systemName: "text.bubble.fill")
+        icon.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: fontSize, weight: .semibold)
+        icon.tintColor = .white
+        label.text = "karaoke_word_synced_button".localized
+        label.font = .systemFont(ofSize: fontSize, weight: .semibold)
+        label.textColor = .white
+
+        let stack = UIStackView(arrangedSubviews: [icon, label])
+        stack.spacing = 6
+        stack.alignment = .center
+        stack.translatesAutoresizingMaskIntoConstraints = false
+
+        capsule.isUserInteractionEnabled = false
+        capsule.backgroundColor = UIColor.white.withAlphaComponent(0.18)
+        capsule.layer.borderColor = UIColor.white.withAlphaComponent(0.25).cgColor
+        capsule.layer.borderWidth = 1
+        capsule.layer.shadowColor = UIColor.black.cgColor
+        capsule.layer.shadowOpacity = 0.3
+        capsule.layer.shadowRadius = 8
+        capsule.layer.shadowOffset = CGSize(width: 0, height: 2)
+        capsule.translatesAutoresizingMaskIntoConstraints = false
+        capsule.addSubview(stack)
+        button.addSubview(capsule)
+
+        let horizontal: CGFloat = isPhone ? 14 : 11
+        let vertical: CGFloat = isPhone ? 10 : 8
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: capsule.leadingAnchor, constant: horizontal),
+            stack.trailingAnchor.constraint(equalTo: capsule.trailingAnchor, constant: -horizontal),
+            stack.topAnchor.constraint(equalTo: capsule.topAnchor, constant: vertical),
+            stack.bottomAnchor.constraint(equalTo: capsule.bottomAnchor, constant: -vertical),
+            capsule.centerYAnchor.constraint(equalTo: button.centerYAnchor),
+            isPhone
+                ? capsule.centerXAnchor.constraint(equalTo: button.centerXAnchor)
+                : capsule.trailingAnchor.constraint(equalTo: button.trailingAnchor),
+        ])
+    }
+
+    @objc private func tapped() {
+        KaraokeOverlayPresenter.present()
+    }
+
+    @objc private func pressed() {
+        UIView.animate(withDuration: 0.1) { self.capsule.alpha = 0.6 }
+    }
+
+    @objc private func released() {
+        UIView.animate(withDuration: 0.15) { self.capsule.alpha = 1 }
+    }
+}
+
+/// Rounds itself from its own layout pass — the view controller's
+/// viewDidLayoutSubviews ran before the button laid the capsule out, so
+/// the radius was computed from a zero height (a plain rectangle).
+private final class CapsuleView: UIView {
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        layer.cornerRadius = bounds.height / 2
     }
 }

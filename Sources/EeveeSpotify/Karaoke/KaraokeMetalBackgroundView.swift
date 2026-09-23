@@ -120,11 +120,16 @@ struct KaraokeMetalBackgroundView: UIViewRepresentable {
             renderer.setAlbumArt(albumArt)
             view.delegate = renderer
             context.coordinator.renderer = renderer
+            context.coordinator.albumArt = albumArt
         }
         return view
     }
 
     func updateUIView(_ uiView: MTKView, context: Context) {
+        // Re-uploading the texture on every SwiftUI update was needless
+        // main-thread work; only do it when the artwork actually changed.
+        guard context.coordinator.albumArt !== albumArt else { return }
+        context.coordinator.albumArt = albumArt
         context.coordinator.renderer?.setAlbumArt(albumArt)
     }
 
@@ -132,5 +137,6 @@ struct KaraokeMetalBackgroundView: UIViewRepresentable {
 
     final class Coordinator {
         var renderer: KaraokeBackgroundRenderer?
+        weak var albumArt: UIImage?
     }
 }

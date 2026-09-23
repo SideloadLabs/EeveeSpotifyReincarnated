@@ -51,10 +51,28 @@ extension EeveeLyricsSettingsView {
                 if viewModel.lyricsSource == .lrclib {
                     lrclibURLField()
                 }
+
+                if viewModel.lyricsSource == .spicylyrics {
+                    spicyLyricsApiKeyField()
+                    
+                    Toggle("spicylyrics_native_rich_sync".localized, isOn: $viewModel.nativeRichSync)
+                }
             }
         }
     }
-    
+
+    @ViewBuilder private func spicyLyricsApiKeyField() -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text("spicylyrics_client_key".localized)
+
+            TextField("spicylyrics_client_key_placeholder".localized, text: $viewModel.spicyLyricsApiKey)
+                .foregroundColor(.gray)
+                .autocapitalization(.none)
+                .disableAutocorrection(true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     @ViewBuilder private func musixmatchTokenField() -> some View {
         VStack(alignment: .leading, spacing: 5) {
             Text("musixmatch_user_token".localized)

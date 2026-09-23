@@ -50,10 +50,14 @@ internal-stage::
 	# .metallib or that the staged path is correct; if `make package`
 	# fails at this step or the shader doesn't load at runtime, check
 	# this block first).
-	xcrun -sdk iphoneos metal -c Sources/EeveeSpotify/Karaoke/KaraokeBackgroundShader.metal \
-		-o $(THEOS_OBJ_DIR)/KaraokeBackgroundShader.air
+	# Optional: without the Metal Toolchain (not installed with Xcode by
+	# default) the karaoke view just uses its placeholder background.
+	mkdir -p $(THEOS_STAGING_DIR)/Library/MobileSubstrate/DynamicLibraries
+	( xcrun -sdk iphoneos metal -c Sources/EeveeSpotify/Karaoke/KaraokeBackgroundShader.metal \
+		-o $(THEOS_OBJ_DIR)/KaraokeBackgroundShader.air && \
 	xcrun -sdk iphoneos metallib $(THEOS_OBJ_DIR)/KaraokeBackgroundShader.air \
-		-o $(THEOS_STAGING_DIR)/Library/MobileSubstrate/DynamicLibraries/KaraokeBackgroundShader.metallib
+		-o $(THEOS_STAGING_DIR)/Library/MobileSubstrate/DynamicLibraries/KaraokeBackgroundShader.metallib ) \
+		|| echo "Metal Toolchain unavailable - skipping karaoke background shader"
 
 # Build EeveeSwiftProtobuf.framework from apple/swift-protobuf source. Run
 # this once before `make package`. Re-run if SWIFTPROTOBUF_VERSION changes
