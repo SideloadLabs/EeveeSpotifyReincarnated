@@ -382,6 +382,35 @@ func emptyLyricsData(originalLyrics: Lyrics? = nil) -> Data? {
     return try? lyrics.serializedData()
 }
 
+private func applyLyricsColors(to lyrics: inout Lyrics, originalLyrics: Lyrics?) {
+    let lyricsColorsSettings = UserDefaults.lyricsColors
+
+    if lyricsColorsSettings.displayOriginalColors, let originalLyrics = originalLyrics {
+        lyrics.colors = originalLyrics.colors
+    }
+    else {
+        // no track object on 9.1.6: static color, else background color, else gray
+        var color: Color
+
+        if lyricsColorsSettings.useStaticColor {
+            color = Color(hex: lyricsColorsSettings.staticColor)
+        }
+        else if let uiColor = backgroundViewModel?.color() {
+            color = Color(uiColor)
+                .normalized(lyricsColorsSettings.normalizationFactor)
+        }
+        else {
+            color = Color.gray
+        }
+
+        lyrics.colors = LyricsColors.with {
+            $0.backgroundColor = color.uInt32
+            $0.lineColor = Color.black.uInt32
+            $0.activeLineColor = Color.white.uInt32
+        }
+    }
+}
+
 func getLyricsDataForCurrentTrack(_ originalPath: String, originalLyrics: Lyrics? = nil) throws -> Data {
     
     // track id from URL path; player objects are nil on 9.1.6
@@ -404,14 +433,16 @@ func getLyricsDataForCurrentTrack(_ originalPath: String, originalLyrics: Lyrics
     }
 
     // Use a prefetched result if one finished in time for this track.
-    // Note: if displayOriginalColors is on, the prefetched payload won't carry
-    // Spotify's true original colors (prefetch has no access to `originalLyrics`),
-    // so it falls back to static/bg/gray coloring in that case — see the caveat
-    // in prefetchLyricsIfNeeded.
+    // Colours are applied here, not at prefetch time: the prefetch has no
+    // access to Spotify's original colours, and with "original colours" on
+    // it stored none at all — every colour 0, black text on a black card.
+    // Prefetching on every track change made that the common path.
     if let prefetched = prefetchedResult, prefetched.trackId == trackIdentifier {
         prefetchedResult = nil
         writeDebugLog("[Lyrics] using prefetched result for \(trackIdentifier)")
-        return prefetched.data
+        var lyrics = try Lyrics(serializedData: prefetched.data)
+        applyLyricsColors(to: &lyrics, originalLyrics: originalLyrics)
+        return try lyrics.serializedData()
     }
 
     // Bounded wait around the synchronous fallback fetch, specifically
@@ -455,32 +486,7 @@ func getLyricsDataForCurrentTrack(_ originalPath: String, originalLyrics: Lyrics
         throw LyricsError.noSuchSong
     }
     
-    let lyricsColorsSettings = UserDefaults.lyricsColors
-    
-    if lyricsColorsSettings.displayOriginalColors, let originalLyrics = originalLyrics {
-        lyrics.colors = originalLyrics.colors
-    }
-    else {
-        // no track object on 9.1.6: static color, else background color, else gray
-        var color: Color
-        
-        if lyricsColorsSettings.useStaticColor {
-            color = Color(hex: lyricsColorsSettings.staticColor)
-        }
-        else if let uiColor = backgroundViewModel?.color() {
-            color = Color(uiColor)
-                .normalized(lyricsColorsSettings.normalizationFactor)
-        }
-        else {
-            color = Color.gray
-        }
-        
-        lyrics.colors = LyricsColors.with {
-            $0.backgroundColor = color.uInt32
-            $0.lineColor = Color.black.uInt32
-            $0.activeLineColor = Color.white.uInt32
-        }
-    }
+    applyLyricsColors(to: &lyrics, originalLyrics: originalLyrics)
     
     return try lyrics.serializedData()
 }
