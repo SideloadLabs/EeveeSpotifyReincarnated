@@ -164,6 +164,9 @@ enum KaraokeCurves {
     static let dotYOffset = KaraokeSpline([(0, 0), (0.9, -0.12), (1, 0)])
     static let dotGlow = KaraokeSpline([(0, 0), (0.6, 1), (1, 1)])
     static let dotOpacity = KaraokeSpline([(0, 0.35), (0.6, 1), (1, 1)])
+    /// Line mode: whole-line glow (LineGlowRange).
+    static let lineGlow = KaraokeSpline([(0, 0), (0.5, 1), (1, 0)])
+    static let lineGlowFrequency = 1.0, lineGlowDamping = 0.5
 
     // Word springs
     static let yOffsetFrequency = 1.45, yOffsetDamping = 0.4
@@ -344,6 +347,33 @@ final class KaraokeAnimator {
             scale: scale,
             yOffset: yOffset,
             glow: glow
+        )
+        style.gradientPosition = gradient
+        return style
+    }
+
+    /// A whole line-synced line: gradient sweeps 0% -> 100% with the line's
+    /// progress, glow follows LineGlowRange through a spring.
+    func line(_ key: String, state: KaraokeElementState, progress: Double) -> KaraokeElementStyle {
+        let t: Double
+        let gradient: Double
+        switch state {
+        case .active: t = progress; gradient = progress * 100
+        case .notSung: t = 0; gradient = -20
+        case .sung: t = 1; gradient = 100
+        }
+        var style = step(
+            key,
+            make: {
+                Springs(
+                    scale: KaraokeSpring(1, frequency: 1, damping: 1),
+                    yOffset: KaraokeSpring(0, frequency: 1, damping: 1),
+                    glow: KaraokeSpring(KaraokeCurves.lineGlow.at(0), frequency: KaraokeCurves.lineGlowFrequency, damping: KaraokeCurves.lineGlowDamping)
+                )
+            },
+            scale: 1,
+            yOffset: 0,
+            glow: KaraokeCurves.lineGlow.at(t)
         )
         style.gradientPosition = gradient
         return style

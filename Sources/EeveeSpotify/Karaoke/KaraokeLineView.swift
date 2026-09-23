@@ -144,9 +144,49 @@ struct KaraokeLineView: View {
         return CGFloat(amount / 2)
     }
 
+    /// Line mode: the whole line wraps as one text and fills as one, the
+    /// gradient spanning its full width (rows fill together), like the
+    /// extension's `.line` element.
+    private var lineSyncedText: some View {
+        let style: KaraokeElementStyle = {
+            switch lineState {
+            case .notSung: return KaraokeElementStyle(scale: 1, yOffset: 0, glow: 0, gradientPosition: -20)
+            case .sung: return .sung
+            case .active:
+                return animator.line(
+                    "\(lineIndex).line",
+                    state: .active,
+                    progress: karaokeProgress(ms: currentMs, start: line.startMs, end: line.endMs)
+                )
+            }
+        }()
+        return KaraokeFillText(
+            text: line.plainText,
+            fontSize: Self.leadFontSize,
+            gradientPosition: style.gradientPosition,
+            isBackground: false,
+            // text-shadow: 4 + 8·glow px at glow·50% opacity
+            glowRadius: CGFloat(4 + 8 * style.glow) / 2,
+            glowOpacity: min(style.glow * 0.5, 1),
+            wraps: true,
+            textAlignment: textAlignment
+        )
+        .frame(width: availableWidth, alignment: Alignment(horizontal: horizontalAlignment, vertical: .center))
+    }
+
+    private var textAlignment: TextAlignment {
+        switch alignment {
+        case .leading: return .leading
+        case .center: return .center
+        case .trailing: return .trailing
+        }
+    }
+
     private var lyricsBody: some View {
         VStack(alignment: horizontalAlignment, spacing: 6) {
-            if !line.syllables.isEmpty {
+            if line.isLineSynced {
+                lineSyncedText
+            } else if !line.syllables.isEmpty {
                 wordRow(line.syllables, group: "l", fontSize: Self.leadFontSize, isBackground: false)
             }
             if !line.background.isEmpty {
@@ -340,6 +380,9 @@ private struct KaraokeFillText: View {
     let isBackground: Bool
     let glowRadius: CGFloat
     let glowOpacity: Double
+    /// Syllables never wrap; a whole line-synced line does.
+    var wraps: Bool = false
+    var textAlignment: TextAlignment = .center
 
     var body: some View {
         let alpha = isBackground ? KaraokeCurves.backgroundGradientAlpha : KaraokeCurves.gradientAlpha
@@ -357,7 +400,8 @@ private struct KaraokeFillText: View {
 
         Text(text)
             .font(.system(size: fontSize, weight: .bold))
-            .fixedSize()
+            .multilineTextAlignment(textAlignment)
+            .fixedSize(horizontal: !wraps, vertical: true)
             .foregroundStyle(
                 fill.map { AnyShapeStyle($0) }
                     ?? AnyShapeStyle(LinearGradient(stops: stops, startPoint: .leading, endPoint: .trailing))

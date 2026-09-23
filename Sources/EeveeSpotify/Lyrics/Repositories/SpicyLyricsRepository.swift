@@ -415,7 +415,7 @@ class SpicyLyricsRepository: LyricsRepository {
         var dto: LyricsDto
         switch type {
         case "Syllable": dto = parseSyllableLyrics(packed, trackId: trackId, query: query, options: options)
-        case "Line":     dto = parseLineLyrics(packed)
+        case "Line":     dto = parseLineLyrics(packed, trackId: trackId)
         case "Static":   dto = parseStaticLyrics(packed)
         default:
             writeDebugLog("[SpicyLyrics] Unknown type '\(type)' for \(trackId)")
@@ -657,17 +657,48 @@ class SpicyLyricsRepository: LyricsRepository {
 
     // MARK: Line lyrics
 
-    private func parseLineLyrics(_ root: SLObjPackValue) -> LyricsDto {
+    private func parseLineLyrics(_ root: SLObjPackValue, trackId: String) -> LyricsDto {
         guard let content = root["Content"]?.arrayValue else { return emptyDto() }
 
         var lines        = [LyricsLineDto]()
+        var karaokeLines = [KaraokeLineDto]()
         let hasRomanized = root["HasTransliterations"]?.boolValue ?? false
 
         for entry in content {
             guard entry["Type"]?.stringValue == "Vocal" else { continue }
             let text      = entry["Lead"]?["Text"]?.stringValue ?? entry["Text"]?.stringValue ?? ""
             let startTime = entry["Lead"]?["StartTime"]?.doubleValue ?? entry["StartTime"]?.doubleValue
+            let endTime   = entry["Lead"]?["EndTime"]?.doubleValue ?? entry["EndTime"]?.doubleValue
             lines.append(LyricsLineDto(content: text.lyricsNoteIfEmpty, offsetMs: startTime.map { Int($0 * 1000) }))
+
+            guard !text.isEmpty, let startTime = startTime else { continue }
+            let startMs = Int(startTime * 1000)
+            let endMs = max(startMs, endTime.map { Int($0 * 1000) } ?? startMs)
+            karaokeLines.append(KaraokeLineDto(
+                syllables: [KaraokeSyllableDto(text: text, startMs: startMs, endMs: endMs, isPartOfWord: false)],
+                startMs: startMs,
+                endMs: endMs,
+                oppositeAligned: entry["OppositeAligned"]?.boolValue ?? false,
+                isLineSynced: true
+            ))
+        }
+
+        // Tracks Spotify has no lyrics for often only have line-synced
+        // lyrics on Spicy; give those the karaoke view too.
+        if !karaokeLines.isEmpty {
+            let attribution = SpicyLyricsAttribution(root: root)
+            KaraokeLyricsStore.shared.set(
+                trackId: trackId,
+                lyrics: KaraokeLyricsDto(
+                    lines: SpicyLyricsRepository.insertInterludes(karaokeLines),
+                    songWriters: root["SongWriters"]?.arrayValue?.compactMap { $0.stringValue } ?? [],
+                    providerCode: attribution.providerCode,
+                    providerDisplayName: attribution.providerDisplayName,
+                    uploader: attribution.uploader,
+                    maker: attribution.maker
+                )
+            )
+            writeDebugLog("[SpicyLyrics] Stored line-synced karaoke data: \(karaokeLines.count) lines for \(trackId)")
         }
 
         let romanization: LyricsRomanizationStatus = hasRomanized

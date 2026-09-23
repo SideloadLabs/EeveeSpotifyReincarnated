@@ -48,6 +48,10 @@ struct KaraokeLineDto {
     /// real extension's musical-line dots (Syllable.ts). Its `syllables`
     /// are the three dots, each timed to one third of the gap.
     var isInterlude: Bool = false
+    /// Line-synced lyrics (the API's Type "Line"): `syllables` holds the
+    /// whole line as one entry spanning the line's time, and the view
+    /// fills it as one line, like the extension's Line mode.
+    var isLineSynced: Bool = false
 
     /// Flattened text. A space is inserted before a syllable unless the
     /// *previous* syllable's isPartOfWord flag says it glues forward onto
