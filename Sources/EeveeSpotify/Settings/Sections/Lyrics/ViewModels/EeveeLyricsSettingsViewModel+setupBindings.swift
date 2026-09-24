@@ -60,14 +60,6 @@ extension EeveeLyricsSettingsViewModel {
             }
             .store(in: &cancellables)
         
-        $spicyLyricsApiKey
-            .dropFirst()
-            .receive(on: DispatchQueue.main)
-            .sink { key in
-                UserDefaults.spicyLyricsApiKey = key
-            }
-            .store(in: &cancellables)
-        
         $lyricsSource
             .dropFirst()
             .sink { [weak self] newSource in

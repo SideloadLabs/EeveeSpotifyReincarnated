@@ -44,10 +44,6 @@ extension EeveeLyricsSettingsView {
                     }
                 }
 
-                if viewModel.lyricsSource == .spicylyrics {
-                    spicyLyricsKeyField()
-                }
-
                 if viewModel.lyricsSource == .musixmatch {
                     musixmatchTokenField()
                 }
@@ -57,26 +53,6 @@ extension EeveeLyricsSettingsView {
                 }
             }
         }
-    }
-    
-    @ViewBuilder private func spicyLyricsKeyField() -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text("spicylyrics_api_key".localized)
-            
-            SecureField("spicylyrics_api_key_placeholder".localized, text: $viewModel.spicyLyricsApiKey)
-                .foregroundColor(.gray)
-                .autocapitalization(.none)
-                .disableAutocorrection(true)
-        }
-        .icon(
-            "exclamationmark.circle",
-            color: .red,
-            when: Binding<Bool>(
-                get: { !viewModel.isSpicyLyricsApiKeyValid },
-                set: { _ in }
-            )
-        )
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
     
     @ViewBuilder private func musixmatchTokenField() -> some View {

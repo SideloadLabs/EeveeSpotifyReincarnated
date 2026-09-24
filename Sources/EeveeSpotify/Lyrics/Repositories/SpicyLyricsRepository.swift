@@ -9,8 +9,7 @@ import Foundation
 // the response is plain JSON with the lyrics under "Body".
 //
 // ── Auth ─────────────────────────────────────────────────────────────────────
-// A key the user pastes into EeveeSpotify's lyrics settings
-// (UserDefaults.spicyLyricsApiKey) wins; otherwise SpicyLyricsDefaultKey is used.
+// Uses the built-in SpicyLyricsDefaultKey for every request.
 // The docs want secret keys (sl_sk_...) kept off client code; for a shipped
 // native client they intend a publishable key (sl_pk_...) with the dashboard's
 // "no origin header" option enabled (per-application limit + per-viewer IP limit).
@@ -413,9 +412,8 @@ class SpicyLyricsRepository: LyricsRepository {
             throw LyricsError.noSuchSong
         }
 
-        let userKey = UserDefaults.spicyLyricsApiKey
-        let apiKey = userKey.isEmpty ? SpicyLyricsDefaultKey.value : userKey
-        writeDebugLog("[SpicyLyrics] Using \(userKey.isEmpty ? "built-in" : "settings") key (\(apiKey.prefix(6))...)")
+        let apiKey = SpicyLyricsDefaultKey.value
+        writeDebugLog("[SpicyLyrics] Using built-in key (\(apiKey.prefix(6))...)")
         guard !apiKey.isEmpty else {
             writeDebugLog("[SpicyLyrics] No API key set")
             throw LyricsError.missingSpicyKey

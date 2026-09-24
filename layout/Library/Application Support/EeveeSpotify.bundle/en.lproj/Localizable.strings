@@ -47,9 +47,7 @@ LRCLIB: The most open service, offering time-synced lyrics. However, it lacks ly
 
 Musixmatch: The service Spotify uses. Provides time-synced lyrics for many songs, but you'll need a user token to use this source.";
 lyrics_additional_info = "If EeveeSpotify is unable to find a song or process the lyrics, you'll see a \"Couldn't load the lyrics for this song\" message. The lyrics might be wrong for some songs when using Genius due to how the tweak searches songs. I've made it work in most cases.";
-spicylyrics_description = "SpicyLyrics provides word-by-word karaoke lyrics. A built-in key is used by default; to use your own, create an application at developers.spicylyrics.org and paste its key below.";
-spicylyrics_api_key = "SpicyLyrics API Key";
-spicylyrics_api_key_placeholder = "sl_sk_...";
+spicylyrics_description = "SpicyLyrics provides word-by-word karaoke lyrics.";
 spicylyrics_key_missing = "No SpicyLyrics API Key";
 spicylyrics_key_invalid = "SpicyLyrics API Key Rejected";
 petitlyrics_description = "PetitLyrics: Offers plenty of time-synced Japanese and some international lyrics.";
