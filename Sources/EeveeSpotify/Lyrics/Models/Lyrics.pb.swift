@@ -366,7 +366,15 @@ extension LyricsData: EeveeSwiftProtobuf.Message, EeveeSwiftProtobuf._MessageImp
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBoolField(value: &self.timeSynchronized) }()
+      // Field 1 is really the SyncType enum; reading it as a Bool
+      // dropped rich sync (2) whenever lyrics were decoded and
+      // re-encoded, e.g. to add colours to a prefetched result.
+      case 1: try {
+        var syncType: Int32 = 0
+        try decoder.decodeSingularInt32Field(value: &syncType)
+        self.timeSynchronized = syncType != 0
+        self.richSynchronized = syncType == 2
+      }()
       case 2: try { try decoder.decodeRepeatedMessageField(value: &self.lines) }()
       case 5: try { try decoder.decodeSingularStringField(value: &self.providedBy) }()
       case 9: try { try decoder.decodeSingularMessageField(value: &self._translation) }()
