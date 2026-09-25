@@ -44,20 +44,37 @@ struct EeveeLyricsSettingsView: View {
 
     @ViewBuilder private func karaokeAppearanceSection() -> some View {
         Section {
-            Picker("Lyrics alignment", selection: $karaokeOptions.textAlignment) {
-                ForEach(KaraokeTextAlignment.allCases, id: \.self) { alignment in
-                    Text(alignment.displayName).tag(alignment)
+            Toggle(
+                "Custom lyrics view",
+                isOn: $karaokeOptions.enabled
+            )
+
+            if karaokeOptions.enabled {
+                Picker("Lyrics alignment", selection: $karaokeOptions.textAlignment) {
+                    ForEach(KaraokeTextAlignment.allCases, id: \.self) { alignment in
+                        Text(alignment.displayName).tag(alignment)
+                    }
+                }
+
+                Toggle(
+                    "Reversed direction",
+                    isOn: $karaokeOptions.reversedDirection
+                )
+
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack {
+                        Text("Blur intensity")
+                        Spacer()
+                        Text(String(format: "%.1f", karaokeOptions.blurIntensity))
+                            .foregroundColor(.gray)
+                    }
+                    Slider(value: $karaokeOptions.blurIntensity, in: 0...4, step: 0.1)
                 }
             }
-
-            Toggle(
-                "Reversed direction",
-                isOn: $karaokeOptions.reversedDirection
-            )
         } header: {
-            Text("Word-Synced Lyrics")
+            Text("Custom Lyrics View")
         } footer: {
-            Text("Reversed direction flows lines bottom-to-top instead of top-to-bottom, with the active line lower on screen.")
+            Text("Reversed direction flows lines bottom-to-top instead of top-to-bottom, with the active line lower on screen. Blur intensity controls how blurred inactive lines appear.")
         }
     }
     

@@ -143,7 +143,7 @@ class SpicyLyricsRepository: LyricsRepository {
 
         switch type {
         case "Syllable": return parseSyllableLyrics(packed, trackId: trackId, query: query, options: options)
-        case "Line":     return parseLineLyrics(packed)
+        case "Line":     return parseLineLyrics(packed, trackId: trackId, query: query, options: options)
         case "Static":   return parseStaticLyrics(packed)
         default:
             writeDebugLog("[SpicyLyrics] Unknown type '\(type)' for \(trackId)")
@@ -310,22 +310,74 @@ class SpicyLyricsRepository: LyricsRepository {
 
     // MARK: Line lyrics
 
-    private func parseLineLyrics(_ root: SLObjPackValue) -> LyricsDto {
+    private func parseLineLyrics(_ root: SLObjPackValue, trackId: String, query: LyricsSearchQuery, options: LyricsOptions) -> LyricsDto {
         guard let content = root["Content"]?.arrayValue else { return emptyDto() }
 
         var lines        = [LyricsLineDto]()
+        var karaokeLines = [KaraokeLineDto]()
         let hasRomanized = root["HasTransliterations"]?.boolValue ?? false
 
         for entry in content {
             guard entry["Type"]?.stringValue == "Vocal" else { continue }
             let text      = SpicyLyricsRepository.leadText(entry)
             let startTime = entry["Lead"]?["StartTime"]?.doubleValue ?? entry["StartTime"]?.doubleValue
-            lines.append(LyricsLineDto(content: text.lyricsNoteIfEmpty, offsetMs: startTime.map { Int($0 * 1000) }))
+            let endTime   = entry["Lead"]?["EndTime"]?.doubleValue ?? entry["EndTime"]?.doubleValue
+            let startMs   = startTime.map { Int($0 * 1000) }
+            lines.append(LyricsLineDto(content: text.lyricsNoteIfEmpty, offsetMs: startMs))
+
+            guard let lineStartMs = startMs, !text.isEmpty else { continue }
+            let words = text.split(separator: " ", omittingEmptySubsequences: true)
+            guard !words.isEmpty else { continue }
+
+            let karaokeSyllables = words.map {
+                KaraokeSyllableDto(text: String($0), startMs: lineStartMs, endMs: lineStartMs, isPartOfWord: false)
+            }
+            let lineEndMs = endTime.map { Int($0 * 1000) } ?? lineStartMs
+
+            karaokeLines.append(KaraokeLineDto(
+                syllables: karaokeSyllables,
+                startMs: lineStartMs,
+                endMs: max(lineEndMs, lineStartMs)
+            ))
         }
 
         let romanization: LyricsRomanizationStatus = hasRomanized
             ? .romanized
             : (lines.map(\.content).canBeRomanized ? .canBeRomanized : .original)
+
+        if !karaokeLines.isEmpty {
+            let songWriters = root["SongWriters"]?.arrayValue?.compactMap { $0.stringValue } ?? []
+            let providerCode = root["source"]?.stringValue
+            let providerDisplayName = providerCode == "ext" ? root["sourceName"]?.stringValue : nil
+
+            let filledKaraokeLines = LyricsUncensorFill.fillKaraoke(
+                lines: karaokeLines,
+                query: query,
+                options: options
+            )
+            let normalizedKaraokeLines = SpicyLyricsRepository.normalizeMonotonicTiming(filledKaraokeLines)
+
+            let attribution = root["UploadAttribution"]
+            let uploaderName = attribution?["Uploader"]?["username"]?.stringValue
+            let uploaderUrl  = attribution?["Uploader"]?["url"]?.stringValue
+            let makerName    = attribution?["Maker"]?["username"]?.stringValue
+            let makerUrl     = attribution?["Maker"]?["url"]?.stringValue
+
+            KaraokeLyricsStore.shared.set(
+                trackId: trackId,
+                lyrics: KaraokeLyricsDto(
+                    lines: normalizedKaraokeLines,
+                    songWriters: songWriters,
+                    providerCode: providerCode,
+                    providerDisplayName: providerDisplayName,
+                    uploaderName: uploaderName,
+                    uploaderUrl: uploaderUrl,
+                    makerName: makerName,
+                    makerUrl: makerUrl
+                )
+            )
+            writeDebugLog("[SpicyLyrics] Stored line-synced karaoke data: \(karaokeLines.count) lines for \(trackId)")
+        }
 
         return LyricsDto(lines: lines, timeSynced: true, romanization: romanization, providerCredit: SpicyLyricsRepository.providerCredit(root))
     }
@@ -369,15 +421,9 @@ class SpicyLyricsRepository: LyricsRepository {
 
     // MARK: Attribution
 
-    /// Display name for the response's `source` field. Unknown future sources
-    /// are prettified rather than dropped, since the provider must always show.
     static func providerName(for code: String?) -> String? {
         guard let code = code, !code.isEmpty else { return nil }
-        switch code {
-        case "spicy_lyrics": return "Spicy Lyrics"
-        default:
-            return code.replacingOccurrences(of: "_", with: " ").capitalized
-        }
+        return "Spicy Lyrics"
     }
 
     /// Plain-text credit for surfaces that can't render links (Spotify's

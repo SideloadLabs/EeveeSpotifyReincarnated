@@ -92,7 +92,7 @@ struct KaraokeLineView: View {
         // no nil/unspecified fallback possible.
         .frame(width: availableWidth)
         .opacity(isActiveLine ? 1.0 : 0.4)
-        .blur(radius: isActiveLine ? 0 : 1.5)
+        .blur(radius: isActiveLine ? 0 : CGFloat(UserDefaults.karaokeOptions.blurIntensity))
         .scaleEffect(isActiveLine ? 1.0 : 0.97, anchor: .center)
         .animation(.easeOut(duration: 0.35), value: isActiveLine)
         // Setting layoutDirection explicitly per-line (rather than relying

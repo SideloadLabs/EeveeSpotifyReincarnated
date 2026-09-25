@@ -9,11 +9,7 @@ struct KaraokeCreditsFooterView: View {
     let lyrics: KaraokeLyricsDto
 
     private var providerLabel: String? {
-        guard let code = lyrics.providerCode else { return nil }
-        if code == "ext" {
-            return lyrics.providerDisplayName ?? "External Source"
-        }
-        return SpicyLyricsRepository.providerName(for: code)
+        SpicyLyricsRepository.providerName(for: lyrics.providerCode)
     }
 
     private func creditLine(_ prefix: String, name: String, url: String?) -> some View {
