@@ -86,6 +86,7 @@ static_color = "Static Color";
 
 color_normalization_factor = "Color Normalization Factor";
 dark_popups = "Dark PopUps";
+amoled_theme = "AMOLED Black Theme";
 
 // Experiments
 
