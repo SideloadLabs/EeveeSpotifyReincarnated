@@ -2,7 +2,7 @@ import UIKit
 import Combine
 
 struct AnonymousTokenHelper {
-    private static let apiUrl = "https://apic.musixmatch.com"
+    private static let apiUrl = "https://apic-appmobile.musixmatch.com"
 
     private static func fetchToken(appId: String) throws -> String {
         let urlString = "\(apiUrl)/ws/1.1/token.get?app_id=\(appId)"

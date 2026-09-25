@@ -28,7 +28,7 @@ If you're using a paid certificate, to navigate to a song from the lock screen, 
 
 EeveeSpotify does not accept free feature requests. If you need something, feel free to implement it yourself, or submit a pull request if you think others may find it useful. If you're willing to pay for a feature, open an issue to discuss further opportunities.
 
-Note that many Premium features are server-sided and will never work without a Premium subscription (e.g., very high quality audio, offline downloads on mobile data).
+Note that many Premium features are server-sided and will never work without a Premium subscription (e.g., very high quality audio, AI DJ, offline downloads on mobile data).
 
 # Troubleshooting & Issues
 
