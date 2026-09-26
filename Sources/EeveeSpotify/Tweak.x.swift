@@ -466,6 +466,7 @@ struct EeveeSpotify: Tweak {
             activateEeveeProbes()
             activateSponsorBlock()
             activateKaraokeHooks()
+            activateLockScreenArtworkHooks()
             return
         }
 
@@ -516,5 +517,6 @@ struct EeveeSpotify: Tweak {
         activateEeveeProbes()
         activateSponsorBlock()
         activateKaraokeHooks()
+        activateLockScreenArtworkHooks()
     }
 }

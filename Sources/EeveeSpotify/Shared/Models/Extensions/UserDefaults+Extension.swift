@@ -17,6 +17,7 @@ extension UserDefaults {
     private static let cachedCustomizeDataKey = "eeveeCachedCustomizeData"
     private static let iconNamePrettifyKey = "iconNamePrettify"
     private static let cleanShareLinksKey = "cleanShareLinks"
+    private static let animatedLockScreenArtworkKey = "animatedLockScreenArtwork"
 
     static var musixmatchToken: String {
         get {
@@ -145,6 +146,16 @@ extension UserDefaults {
         }
         set (cleanShareLinks) {
             container.set(cleanShareLinks, forKey: cleanShareLinksKey)
+        }
+    }
+
+    /// running for everyone on update.
+    static var animatedLockScreenArtwork: Bool {
+        get {
+            container.object(forKey: animatedLockScreenArtworkKey) as? Bool ?? false
+        }
+        set (enabled) {
+            container.set(enabled, forKey: animatedLockScreenArtworkKey)
         }
     }
 }

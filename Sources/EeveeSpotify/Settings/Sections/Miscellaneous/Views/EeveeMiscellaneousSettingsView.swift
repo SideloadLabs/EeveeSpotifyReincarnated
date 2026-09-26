@@ -13,6 +13,18 @@ struct EeveeMiscellaneousSettingsView: View {
                     )
                 )
             }
+
+            if #available(iOS 26.0, *) {
+                Section(footer: Text("Shows the playing track's Spotify Canvas as a looping video behind the lock screen controls, the way Apple Music plays an animated cover. Only tracks with a Canvas are affected.")) {
+                    Toggle(
+                        "Animated lock screen artwork",
+                        isOn: Binding<Bool>(
+                            get: { UserDefaults.animatedLockScreenArtwork },
+                            set: { UserDefaults.animatedLockScreenArtwork = $0 }
+                        )
+                    )
+                }
+            }
         }
         .listStyle(GroupedListStyle())
     }
