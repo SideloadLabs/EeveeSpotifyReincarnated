@@ -2,6 +2,7 @@ import Foundation
 import AVFoundation
 import CoreGraphics
 
+@available(iOS 16.0, *)
 enum LockScreenArtworkFile {
     private static let cacheCapBytes: UInt64 = 120 * 1024 * 1024
     private static let aspectSlack: CGFloat = 0.02
