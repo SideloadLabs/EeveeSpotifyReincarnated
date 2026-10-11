@@ -65,6 +65,109 @@ static id swappedObject(id value) {
     })); \
     count++; \
 } while (0)
+// Targeted image handling: 510x31 template tint and 510x1 strip recoloring.
+static const CGFloat kTintW = 510, kTintH = 31;
+static char sStripCacheKey, sStripProcessedKey;
+
+static BOOL isTintTarget(UIImage *img) {
+    return img && fabs(img.size.width - kTintW) < 1 &&
+           fabs(img.size.height - kTintH) < 1;
+}
+
+static BOOL isStripTarget(UIImage *img) {
+    return img && fabs(img.size.width - 510.0) < 0.1 &&
+           fabs(img.size.height - 1.0) < 0.1;
+}
+
+static UIImage *SPTRecolor510x1Image(UIImage *image) {
+    if (!image.CGImage || !isStripTarget(image))
+        return nil;
+
+    id cached = objc_getAssociatedObject(image, &sStripCacheKey);
+    if (cached)
+        return cached == NSNull.null ? nil : cached;
+
+    CGImageRef source = image.CGImage;
+    size_t w = CGImageGetWidth(source), h = CGImageGetHeight(source);
+    if (!w || !h || w > 8192 || h > 64)
+        return nil;
+
+    size_t rowBytes = w * 4;
+    uint8_t *pixels = calloc(h, rowBytes);
+    CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+    CGContextRef ctx = pixels && cs
+        ? CGBitmapContextCreate(pixels, w, h, 8, rowBytes, cs,
+            kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big)
+        : NULL;
+
+    if (!ctx) {
+        if (cs) CGColorSpaceRelease(cs);
+        free(pixels);
+        return nil;
+    }
+
+    CGContextDrawImage(ctx, CGRectMake(0, 0, w, h), source);
+    BOOL changed = NO;
+
+    for (size_t y = 0; y < h; y++) {
+        for (size_t x = 0; x < w; x++) {
+            uint8_t *px = pixels + y * rowBytes + x * 4;
+            CGFloat a = px[3] / 255.0;
+            if (a <= 0) continue;
+
+            CGFloat r = MIN(1.0, px[0] / (255.0 * a));
+            CGFloat g = MIN(1.0, px[1] / (255.0 * a));
+            CGFloat b = MIN(1.0, px[2] / (255.0 * a));
+            CGFloat brightness = MAX(r, MAX(g, b));
+            CGFloat position = (CGFloat)x / (CGFloat)w;
+
+            if (!((position >= 0.82 && position < 0.91) ||
+                  (g > r * 1.05 && g > b * 0.75 && g > 0.08)))
+                continue;
+
+            CGFloat factor = MIN(1.0, brightness / (215.0 / 255.0));
+            px[0] = (uint8_t)lrint(MIN(1.0, sAccent[0] * factor) * a * 255.0);
+            px[1] = (uint8_t)lrint(MIN(1.0, sAccent[1] * factor) * a * 255.0);
+            px[2] = (uint8_t)lrint(MIN(1.0, sAccent[2] * factor) * a * 255.0);
+            changed = YES;
+        }
+    }
+
+    CGImageRef outCG = changed ? CGBitmapContextCreateImage(ctx) : NULL;
+    UIImage *out = outCG
+        ? [[UIImage imageWithCGImage:outCG scale:image.scale
+                        orientation:image.imageOrientation]
+            imageWithRenderingMode:image.renderingMode]
+        : nil;
+
+    if (out) {
+        objc_setAssociatedObject(out, &sStripProcessedKey, @YES,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        CGImageRelease(outCG);
+    }
+
+    CGContextRelease(ctx);
+    CGColorSpaceRelease(cs);
+    free(pixels);
+
+    objc_setAssociatedObject(image, &sStripCacheKey,
+        out ?: (id)NSNull.null, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    return out;
+}
+
+static UIImage *SPTProcess510x1Image(UIImage *image) {
+    if (!image || objc_getAssociatedObject(image, &sStripProcessedKey))
+        return image;
+    if (!isStripTarget(image))
+        return image;
+    return SPTRecolor510x1Image(image) ?: image;
+}
+
+static UIImage *SPTProcessImage(UIImage *image) {
+    return isTintTarget(image)
+        ? [image imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate]
+        : SPTProcess510x1Image(image);
+}
 
 int EeveeInstallColorSwaps(BOOL amoled, NSInteger accentRGB) {
     static dispatch_once_t once;
@@ -141,6 +244,69 @@ int EeveeInstallColorSwaps(BOOL amoled, NSInteger accentRGB) {
                 orig(self_, sel, swappedObject(value));
             }));
             count++;
+        }
+	
+        Method setImg = class_getInstanceMethod(UIImageView.class, @selector(setImage:));
+        if (setImg) {
+            void (*orig)(id, SEL, UIImage *) =
+                (void *)method_getImplementation(setImg);
+            method_setImplementation(setImg, imp_implementationWithBlock(
+                ^(UIImageView *view, UIImage *img) {
+                    BOOL tint = isTintTarget(img);
+                    orig(view, @selector(setImage:), SPTProcessImage(img));
+                    if (tint)
+                        view.tintColor = [UIColor colorWithRed:sAccent[0]
+                            green:sAccent[1] blue:sAccent[2] alpha:1];
+                }));
+            count++;
+        }
+
+        Method initImg = class_getInstanceMethod(UIImageView.class,
+                                                  @selector(initWithImage:));
+        if (initImg) {
+            id (*orig)(id, SEL, UIImage *) =
+                (void *)method_getImplementation(initImg);
+            method_setImplementation(initImg, imp_implementationWithBlock(
+                ^id(UIImageView *view, UIImage *img) {
+                    BOOL tint = isTintTarget(img);
+                    UIImageView *result = orig(view, @selector(initWithImage:),
+                                                SPTProcessImage(img));
+                    if (tint)
+                        result.tintColor = [UIColor colorWithRed:sAccent[0]
+                            green:sAccent[1] blue:sAccent[2] alpha:1];
+                    return result;
+                }));
+            count++;
+        }
+
+        Method buttonImg = class_getInstanceMethod(UIButton.class,
+                                                    @selector(setImage:forState:));
+        if (buttonImg) {
+            void (*orig)(id, SEL, UIImage *, UIControlState) =
+                (void *)method_getImplementation(buttonImg);
+            method_setImplementation(buttonImg, imp_implementationWithBlock(
+                ^(UIButton *button, UIImage *img, UIControlState state) {
+                    orig(button, @selector(setImage:forState:),
+                         SPTProcess510x1Image(img), state);
+                }));
+            count++;
+        }
+
+        // Add a UISwitch-specific override; do not replace UIView's inherited method.
+        SEL moveSel = @selector(didMoveToWindow);
+        Method moveMethod = class_getInstanceMethod(UISwitch.class, moveSel);
+        if (moveMethod) {
+            void (*orig)(id, SEL) =
+                (void *)method_getImplementation(moveMethod);
+            IMP replacement = imp_implementationWithBlock(^(UISwitch *sw) {
+                orig(sw, moveSel);
+                if (sw.window)
+                    sw.onTintColor = [UIColor colorWithRed:sAccent[0]
+                        green:sAccent[1] blue:sAccent[2] alpha:1];
+            });
+            if (class_addMethod(UISwitch.class, moveSel, replacement,
+                                method_getTypeEncoding(moveMethod)))
+                count++;
         }
     });
     return count;
