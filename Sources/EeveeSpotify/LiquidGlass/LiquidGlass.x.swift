@@ -103,7 +103,7 @@ func activateLiquidGlass() {
         nowPlaying = activate(GlassNowPlayingBarGroup(), GlassNowPlayingBarContainerHook.targetName, GlassNowPlayingBarHook.targetName)
         add("now playing bar", nowPlaying)
     }
-    if player.glassLyricsCard {
+    if player.glassLyricsCard && !eeveeSpotiPwInjected {
         add("lyrics card", activate(PlayerLyricsCardGroup(), PlayerLyricsCardHook.targetName, GlassLyricsPageHook.targetName))
     }
     if options.search != false {
