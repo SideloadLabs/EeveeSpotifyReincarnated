@@ -6,6 +6,14 @@ private let liveMessagingAssignmentKeys = Set([
     "ios-feature-sidedrawer-platform.is_list_page_enabled"
 ])
 
+// Scopes spoti.pw's redesigned player and lyrics page read from the live account config.
+private let spotiPwLiveAssignmentScopes: Set<String> = [
+    "ios-feature-nowplaying",
+    "ios-feature-nowplaying-elements",
+    "ios-feature-lyrics",
+    "ios-reprise-liquid-glass-properties",
+]
+
 func modifyRemoteConfiguration(_ configuration: inout UcsResponse) {
     modifyAttributes(&configuration.attributes.accountAttributes)
 
@@ -15,16 +23,20 @@ func modifyRemoteConfiguration(_ configuration: inout UcsResponse) {
     ) {
         // Messaging availability is assigned to the current account. A bundled
         // Premium snapshot can otherwise hide the chat UI for a different cohort.
-        let liveMessagingAssignments = configuration.assignedValues.filter {
-            liveMessagingAssignmentKeys.contains("\($0.propertyID.scope).\($0.propertyID.name)")
+        // With spoti.pw injected, its redesigned player and lyrics page read the account's live
+        // now-playing and lyrics assignments, so those survive the overwrite too.
+        let keepsLiveAssignment: (AssignedValue) -> Bool = { value in
+            if liveMessagingAssignmentKeys.contains("\(value.propertyID.scope).\(value.propertyID.name)") {
+                return true
+            }
+            return eeveeSpotiPwInjected && spotiPwLiveAssignmentScopes.contains(value.propertyID.scope)
         }
+        let liveAssignments = configuration.assignedValues.filter(keepsLiveAssignment)
 
         configuration.resolve.configuration = try! BundleHelper.shared.resolveConfiguration()
 
-        configuration.assignedValues.removeAll {
-            liveMessagingAssignmentKeys.contains("\($0.propertyID.scope).\($0.propertyID.name)")
-        }
-        configuration.assignedValues.append(contentsOf: liveMessagingAssignments)
+        configuration.assignedValues.removeAll(where: keepsLiveAssignment)
+        configuration.assignedValues.append(contentsOf: liveAssignments)
     }
 
     // Apply targeted changes after an optional full overwrite. Doing it
