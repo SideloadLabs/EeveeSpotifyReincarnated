@@ -635,7 +635,7 @@ NSArray<NSString *> *EVCoreDebugLines(void) {
         (unsigned long long)atomic_load(&statCalls), (unsigned long long)atomic_load(&statMatched), (unsigned long long)atomic_load(&statCaptured),
         (unsigned long long)atomic_load(&statDropped), (unsigned long long)atomic_load(&statBadLayout),
         (unsigned long long)EVCoreFramesCaptured(), EVFormatTime((double)EVCoreFramesCaptured() / rate)]];
-    [l addObject:[NSString stringWithFormat:@"caller filter: %s resolved=%d", 
+    [l addObject:[NSString stringWithFormat:@"caller filter: %s resolved=%d",
 #ifdef CALLER_FILTER
         CALLER_FILTER,
 #else
