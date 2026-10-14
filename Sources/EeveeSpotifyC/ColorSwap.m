@@ -246,6 +246,7 @@ int EeveeInstallColorSwaps(BOOL amoled, NSInteger accentRGB) {
             count++;
         }
 	
+
         Method setImg = class_getInstanceMethod(UIImageView.class, @selector(setImage:));
         if (setImg) {
             void (*orig)(id, SEL, UIImage *) =
