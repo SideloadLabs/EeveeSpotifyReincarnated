@@ -74,6 +74,8 @@ Please check out the hyperlink above before opening an issue
 
 EeveeSpotify replaces Spotify monthly limited lyrics with one of the following four lyrics providers:
 
+- SpicyLyrics: Word synced lyric source. Requires no setup.
+
 - Genius: Offers the best quality lyrics, provides the most songs, and updates lyrics the fastest. Does not and will never be time-synced.
 
 - LRCLIB: The most open service, offering time-synced lyrics. However, it lacks lyrics for many songs.
