@@ -15,6 +15,7 @@ final class KaraokePlaybackTracker {
 
     private var lastPosition: Double = 0
     private var lastPositionStamp: TimeInterval = 0
+    private var lastDuration: Double = 0
     private var lastPlaybackSpeed: Double = 1.0
     private var lastIsPlaying: Bool = false
     private var lastTrackId: String?
@@ -71,11 +72,15 @@ final class KaraokePlaybackTracker {
 
         // spotify:track:<id> — same extraction style used elsewhere in the
         // codebase for episode URIs (extractEpisodeID in SponsorBlockSkipper).
-        let trackId: String? = uriString.hasPrefix("spotify:track:")
-            ? String(uriString.dropFirst("spotify:track:".count))
+        let cleanURI = uriString.components(separatedBy: "#").first?
+            .components(separatedBy: "?").first ?? uriString
+        let rawTrackId = cleanURI.hasPrefix("spotify:track:")
+            ? String(cleanURI.dropFirst("spotify:track:".count))
             : nil
+        let trackId = rawTrackId.flatMap { $0.isEmpty ? nil : $0 }
 
         let positionRaw: Double = (safeValue("position") as? NSNumber)?.doubleValue ?? lastPosition
+        let durationRaw: Double = (safeValue("duration") as? NSNumber)?.doubleValue ?? 0
         let playbackSpeed: Double = (safeValue("playbackSpeed") as? NSNumber)?.doubleValue ?? lastPlaybackSpeed
         let isPlaying: Bool = (safeValue("isPlaying") as? Bool) ?? lastIsPlaying
 
@@ -86,6 +91,9 @@ final class KaraokePlaybackTracker {
         queue.async {
             self.lastPosition = positionRaw
             self.lastPositionStamp = self.uptimeSec()
+            if durationRaw > 0 {
+                self.lastDuration = durationRaw
+            }
             self.lastPlaybackSpeed = playbackSpeed
             self.lastIsPlaying = isPlaying
 
@@ -139,6 +147,10 @@ final class KaraokePlaybackTracker {
 
     func isPlaying() -> Bool {
         queue.sync { lastIsPlaying }
+    }
+
+    func durationMs() -> Int {
+        queue.sync { Int(max(0, lastDuration) * 1000) }
     }
 
     private func uptimeSec() -> TimeInterval {
