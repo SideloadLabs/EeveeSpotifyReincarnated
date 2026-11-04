@@ -25,6 +25,17 @@ struct SponsoredCtxAttachmentGroup: HookGroup {}
 struct ScrollFeedAdViewGroup: HookGroup {}
 struct ScrollFeedAdServiceGroup: HookGroup {}
 struct ScrollFeedAdControllerGroup: HookGroup {}
+struct RealTimeAdControllerServiceGroup: HookGroup {}
+struct AdsBaseSwiftServiceGroup: HookGroup {}
+struct AudioAdPiPCoordinatorServiceGroup: HookGroup {}
+struct AdsInstrumentationServiceGroup: HookGroup {}
+struct AdsElementServiceGroup: HookGroup {}
+struct RewardedAdFetchControllerServiceGroup: HookGroup {}
+struct AdOnAppOpenServiceGroup: HookGroup {}
+struct EmbeddedCTACardsServiceGroup: HookGroup {}
+struct EmbeddedPlaylistServiceGroup: HookGroup {}
+struct NativeAdsElementServiceGroup: HookGroup {}
+struct OnDemandAdEventLoggerServiceGroup: HookGroup {}
 struct CoreURLSessionAdsGroup: HookGroup {}
 
 private let killAdsServiceImpl         = true
@@ -296,6 +307,117 @@ class LeavebehindAdElementProviderKill: ClassHook<NSObject> {
     }
 }
 
+// Spotify 9.1.88 real-time ad controller and sibling Swift ad services.
+class RealTimeAdControllerServiceKill: ClassHook<NSObject> {
+    typealias Group = RealTimeAdControllerServiceGroup
+    static let targetName =
+        "_TtC36AdsPlatform_RealTimeAdControllerImpl31RealTimeAdControllerServiceImpl"
+
+    func load() {
+        adlog("RealTimeAdControllerServiceImpl.load")
+    }
+}
+
+class AdsBaseSwiftServiceKill: ClassHook<NSObject> {
+    typealias Group = AdsBaseSwiftServiceGroup
+    static let targetName =
+        "_TtC28AdsPlatform_AdsBaseSwiftImpl23AdsBaseSwiftServiceImpl"
+
+    func load() {
+        adlog("AdsBaseSwiftServiceImpl.load")
+    }
+}
+
+class AudioAdPiPCoordinatorServiceKill: ClassHook<NSObject> {
+    typealias Group = AudioAdPiPCoordinatorServiceGroup
+    static let targetName =
+        "_TtC46Betamax_AudioAdPictureInPictureCoordinatorImpl41AudioAdPictureInPictureCoordinatorService"
+
+    func load() {
+        adlog("AudioAdPictureInPictureCoordinatorService.load")
+    }
+}
+
+class AdsInstrumentationServiceKill: ClassHook<NSObject> {
+    typealias Group = AdsInstrumentationServiceGroup
+    static let targetName =
+        "_TtC34AdsPlatform_AdsInstrumentationImpl29AdsInstrumentationServiceImpl"
+
+    func load() {
+        adlog("AdsInstrumentationServiceImpl.load")
+    }
+}
+
+class AdsElementServiceKill: ClassHook<NSObject> {
+    typealias Group = AdsElementServiceGroup
+    static let targetName =
+        "_TtC23AdsPlatform_ElementImpl18ElementServiceImpl"
+
+    func load() {
+        adlog("ElementServiceImpl.load")
+    }
+}
+
+class RewardedAdFetchControllerServiceKill: ClassHook<NSObject> {
+    typealias Group = RewardedAdFetchControllerServiceGroup
+    static let targetName =
+        "_TtC28AdsStandalone_RewardedAdImpl32RewardedAdFetchControllerService"
+
+    func load() {
+        adlog("RewardedAdFetchControllerService.load")
+    }
+}
+
+class AdOnAppOpenServiceKill: ClassHook<NSObject> {
+    typealias Group = AdOnAppOpenServiceGroup
+    static let targetName =
+        "_TtC29AdsStandalone_AdOnAppOpenImpl22AdOnAppOpenServiceImpl"
+
+    func load() {
+        adlog("AdOnAppOpenServiceImpl.load")
+    }
+}
+
+class EmbeddedCTACardsServiceKill: ClassHook<NSObject> {
+    typealias Group = EmbeddedCTACardsServiceGroup
+    static let targetName =
+        "_TtC32AdsEmbedded_EmbeddedCTACardsImpl23EmbeddedCTACardsService"
+
+    func load() {
+        adlog("EmbeddedCTACardsService.load")
+    }
+}
+
+class EmbeddedPlaylistServiceKill: ClassHook<NSObject> {
+    typealias Group = EmbeddedPlaylistServiceGroup
+    static let targetName =
+        "_TtC32AdsEmbedded_EmbeddedPlaylistImpl27EmbeddedPlaylistServiceImpl"
+
+    func load() {
+        adlog("EmbeddedPlaylistServiceImpl.load")
+    }
+}
+
+class NativeAdsElementServiceKill: ClassHook<NSObject> {
+    typealias Group = NativeAdsElementServiceGroup
+    static let targetName =
+        "_TtC21NativeAds_ElementImpl27NativeAdsElementServiceImpl"
+
+    func load() {
+        adlog("NativeAdsElementServiceImpl.load")
+    }
+}
+
+class OnDemandAdEventLoggerServiceKill: ClassHook<NSObject> {
+    typealias Group = OnDemandAdEventLoggerServiceGroup
+    static let targetName =
+        "_TtC28AdsStandalone_RewardedAdImpl28OnDemandAdEventLoggerService"
+
+    func load() {
+        adlog("OnDemandAdEventLoggerService.load")
+    }
+}
+
 // HTML-backed brand-ad creative. NSObject-based with an internal cast:
 // ElementUI classes have proven non-UIView on some 9.1.x builds.
 class HtmlAdElementUIKill: ClassHook<NSObject> {
@@ -339,14 +461,6 @@ class DSAMainViewKill: ClassHook<NSObject> {
 // blocks in SpotifyResponsePatcher never see the core's ad-break requests
 // (ads/v3/ads, ad-logic/prefetch, ad-logic/v3/config, ...). Cancelling at the
 // response makes the core treat the ad fetch as failed and skip the break.
-// Matched narrowly on purpose: everything else the core fetches stays intact.
-private func isCoreAdRequest(_ url: URL) -> Bool {
-    let host = (url.host ?? "").lowercased()
-    guard host.contains("spotify") || host.contains("spclient") else { return false }
-    let path = url.path.lowercased()
-    return path.contains("/ads/") || path.hasSuffix("/ads") || path.contains("/ad-logic/")
-}
-
 class CoreURLSessionAdsKill: ClassHook<NSObject> {
     typealias Group = CoreURLSessionAdsGroup
     static let targetName = "SPTCoreURLSessionDataDelegate"
@@ -357,7 +471,7 @@ class CoreURLSessionAdsKill: ClassHook<NSObject> {
         didReceiveResponse response: URLResponse,
         completionHandler handler: @escaping (URLSession.ResponseDisposition) -> Void
     ) {
-        if let url = task.currentRequest?.url ?? task.originalRequest?.url, isCoreAdRequest(url) {
+        if let url = task.currentRequest?.url ?? task.originalRequest?.url, url.isAdRelated {
             adlog("core request \(url.host ?? "?")\(url.path)")
             handler(.cancel)
             return
@@ -384,6 +498,17 @@ func activateEeveeAdBlockerExtended() {
         (PlaylistAdControllerV2Kill.targetName, "PlaylistAdControllerV2", { ScrollFeedAdControllerGroup().activate() }),
         (PlaylistAdControllerImplKill.targetName, "PlaylistAdControllerImpl", { ScrollFeedAdControllerGroup().activate() }),
         (LeavebehindAdElementProviderKill.targetName, "LeavebehindAdElementProvider", { ScrollFeedAdControllerGroup().activate() }),
+        (RealTimeAdControllerServiceKill.targetName, "RealTimeAdControllerServiceImpl", { RealTimeAdControllerServiceGroup().activate() }),
+        (AdsBaseSwiftServiceKill.targetName, "AdsBaseSwiftServiceImpl", { AdsBaseSwiftServiceGroup().activate() }),
+        (AudioAdPiPCoordinatorServiceKill.targetName, "AudioAdPictureInPictureCoordinatorService", { AudioAdPiPCoordinatorServiceGroup().activate() }),
+        (AdsInstrumentationServiceKill.targetName, "AdsInstrumentationServiceImpl", { AdsInstrumentationServiceGroup().activate() }),
+        (AdsElementServiceKill.targetName, "ElementServiceImpl", { AdsElementServiceGroup().activate() }),
+        (RewardedAdFetchControllerServiceKill.targetName, "RewardedAdFetchControllerService", { RewardedAdFetchControllerServiceGroup().activate() }),
+        (AdOnAppOpenServiceKill.targetName, "AdOnAppOpenServiceImpl", { AdOnAppOpenServiceGroup().activate() }),
+        (EmbeddedCTACardsServiceKill.targetName, "EmbeddedCTACardsService", { EmbeddedCTACardsServiceGroup().activate() }),
+        (EmbeddedPlaylistServiceKill.targetName, "EmbeddedPlaylistServiceImpl", { EmbeddedPlaylistServiceGroup().activate() }),
+        (NativeAdsElementServiceKill.targetName, "NativeAdsElementServiceImpl", { NativeAdsElementServiceGroup().activate() }),
+        (OnDemandAdEventLoggerServiceKill.targetName, "OnDemandAdEventLoggerService", { OnDemandAdEventLoggerServiceGroup().activate() }),
     ]
 
     var activated = 0
