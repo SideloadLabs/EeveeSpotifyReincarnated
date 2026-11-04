@@ -35,6 +35,12 @@ endif
 
 include $(THEOS_MAKE_PATH)/tweak.mk
 
+# Karaoke background shader. Recursive (=) so these pick up the per-arch
+# values THEOS_OBJ_DIR/THEOS_STAGING_DIR have once the recipe actually runs.
+KARAOKE_SHADER_SRC = Sources/EeveeSpotify/Karaoke/KaraokeBackgroundShader.metal
+KARAOKE_SHADER_AIR = $(THEOS_OBJ_DIR)/KaraokeBackgroundShader.air
+KARAOKE_SHADER_LIB = $(THEOS_STAGING_DIR)/Library/MobileSubstrate/DynamicLibraries/KaraokeBackgroundShader.metallib
+
 internal-stage::
 	# Bundle EeveeSwiftProtobuf.framework into the package. Renamed from
 	# SwiftProtobuf so the @objc class names don't collide with the
@@ -45,15 +51,37 @@ internal-stage::
 	# stage it next to the tweak binary so device.makeLibrary(filepath:)
 	# can load it at runtime (Theos's tweak.mk has no built-in Metal
 	# shader compilation step the way an Xcode app target's build phases
-	# do, so this is done by hand here — UNTESTED, no Theos/Metal
-	# toolchain was available to verify this actually produces a working
-	# .metallib or that the staged path is correct; if `make package`
-	# fails at this step or the shader doesn't load at runtime, check
-	# this block first).
-	xcrun -sdk iphoneos metal -c Sources/EeveeSpotify/Karaoke/KaraokeBackgroundShader.metal \
-		-o $(THEOS_OBJ_DIR)/KaraokeBackgroundShader.air
-	xcrun -sdk iphoneos metallib $(THEOS_OBJ_DIR)/KaraokeBackgroundShader.air \
-		-o $(THEOS_STAGING_DIR)/Library/MobileSubstrate/DynamicLibraries/KaraokeBackgroundShader.metallib
+	# do, so this is done by hand here).
+	#
+	# Required by default, because KaraokeMetalBackgroundView silently
+	# falls back to a placeholder gradient when the .metallib is missing:
+	# a build that skipped this step would produce a package that differs
+	# from CI's with nothing in the output to say so. Xcode 26+ ships the
+	# Metal compiler as a separately downloaded component, so the failure
+	# mode is a stub `metal` rather than a missing binary:
+	#     xcodebuild -downloadComponent MetalToolchain
+	# To build without the shader on purpose, pass SKIP_KARAOKE_SHADER=1.
+	#
+	# Remove stale artifacts first so a failed compile can never leave a
+	# previous .metallib staged next to the dylib.
+	@rm -f $(KARAOKE_SHADER_AIR) $(KARAOKE_SHADER_LIB)
+ifeq ($(SKIP_KARAOKE_SHADER),1)
+	@echo "warning: SKIP_KARAOKE_SHADER=1 — not building KaraokeBackgroundShader.metallib"
+	@echo "warning: the karaoke background will use the placeholder gradient"
+else
+	@xcrun -sdk iphoneos metal -c $(KARAOKE_SHADER_SRC) -o $(KARAOKE_SHADER_AIR) || { \
+		echo "error: could not compile $(KARAOKE_SHADER_SRC)"; \
+		echo "error: if that mentions 'missing Metal Toolchain', install it with:"; \
+		echo "error:     xcodebuild -downloadComponent MetalToolchain"; \
+		echo "error: to build without the karaoke shader instead, re-run with SKIP_KARAOKE_SHADER=1"; \
+		exit 1; \
+	}
+	@xcrun -sdk iphoneos metallib $(KARAOKE_SHADER_AIR) -o $(KARAOKE_SHADER_LIB) || { \
+		echo "error: could not link $(KARAOKE_SHADER_AIR) into a .metallib"; \
+		exit 1; \
+	}
+	@echo "staged KaraokeBackgroundShader.metallib"
+endif
 
 # Build EeveeSwiftProtobuf.framework from apple/swift-protobuf source. Run
 # this once before `make package`. Re-run if SWIFTPROTOBUF_VERSION changes
