@@ -42,6 +42,9 @@ jobs:
         with:
           xcode-version: '26.3.0'
 
+      - name: Run regression tests
+        run: bash Scripts/run-tests.sh
+
       - name: Setup Theos
         uses: actions/checkout@v4
         with:
