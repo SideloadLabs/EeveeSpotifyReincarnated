@@ -78,7 +78,7 @@ extension URL {
         }
         
         // Block all other spclient /ads/* endpoints
-        if path.contains("/ads/") {
+        if path.contains("/ads/") || path.hasSuffix("/ads") {
             return true
         }
         

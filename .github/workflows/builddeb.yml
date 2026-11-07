@@ -92,6 +92,10 @@ jobs:
             Tests/CustomTabsActivation/main.swift \
             -o "$RUNNER_TEMP/custom-tabs-activation-tests"
           "$RUNNER_TEMP/custom-tabs-activation-tests"
+          swiftc \
+            Tests/HookSourceAudit/main.swift \
+            -o "$RUNNER_TEMP/hook-source-audit-tests"
+          "$RUNNER_TEMP/hook-source-audit-tests"
           python3 Tests/ResolveConfigurationSnapshot/test.py
 
       - name: Build ${{ matrix.label }} .deb

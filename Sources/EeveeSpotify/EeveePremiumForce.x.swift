@@ -63,6 +63,42 @@ private func forcedPremiumString(forKey key: String) -> String? {
     }
 }
 
+private let directGetterCoreAdKeys: Set<String> = [
+    "type",
+    "catalogue",
+    "product",
+    "name",
+    "player-license",
+    "player-license-v2",
+    "financial-product",
+    "ads",
+    "ab-ad-player-targeting",
+    "allow-advertising-id-transmission",
+    "restrict-advertising-id-transmission",
+    "audio-ad-frequency",
+    "video-ad-frequency",
+    "ad-formats",
+    "on-demand",
+    "unrestricted",
+    "shuffle-eligible",
+    "high-bitrate",
+    "streaming-rules",
+    "previous-streaming-rules",
+    "shuffle",
+    "shuffle-mode",
+    "pick-and-shuffle",
+    "forced_logout",
+    "forced_logout_abroad_since",
+    "force_logout",
+    "logout_required",
+    "session_invalidated",
+]
+
+private func forcedDirectGetterString(forKey key: String) -> String? {
+    guard directGetterCoreAdKeys.contains(key) else { return nil }
+    return forcedPremiumString(forKey: key)
+}
+
 private let stripKeys: Set<String> = [
     "payment-state",
     "last-premium-activation-date",
@@ -118,6 +154,9 @@ private let premiumWatchKeys: [String] = [
 ]
 
 private func passiveLogProductState(_ tag: String, _ dict: NSDictionary) {
+    if dict["ads"] as? String == "1" {
+        writeDebugLog("[ORACLE][ENTITLEMENT_DRIFT] SPTCoreProductState reported ads=1 in \(tag)")
+    }
     var pairs: [String] = []
     for k in premiumWatchKeys {
         if let v = dict[k] { pairs.append("\(k)=\(v)") }
@@ -149,14 +188,14 @@ class CoreProductStateHook: ClassHook<NSObject> {
     }
 
     func stringForKey(_ key: NSString) -> NSString? {
-        if enableDirectGetters, let forced = forcedPremiumString(forKey: key as String) {
+        if enableDirectGetters, let forced = forcedDirectGetterString(forKey: key as String) {
             return forced as NSString
         }
         return orig.stringForKey(key)
     }
 
     func objectForKeyedSubscript(_ key: NSString) -> Any? {
-        if enableDirectGetters, let forced = forcedPremiumString(forKey: key as String) {
+        if enableDirectGetters, let forced = forcedDirectGetterString(forKey: key as String) {
             return forced as NSString
         }
         return orig.objectForKeyedSubscript(key)
@@ -216,8 +255,8 @@ private func swizzleBoolGetter(_ cls: AnyClass, _ name: String, _ value: Bool) {
 struct EeveePremiumForceGroup: HookGroup {}
 
 private let enableDictRewrite = false
-private let enableDirectGetters = false
-private let enableAdsHook = false
+private let enableDirectGetters = true
+private let enableAdsHook = true
 private let enablePassiveProductStateLog = true
 
 func activateEeveePremiumForce() {
