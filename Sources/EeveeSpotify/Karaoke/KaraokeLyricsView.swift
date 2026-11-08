@@ -130,5 +130,6 @@ private struct KaraokeScrollingLines: View {
             // Flip the list and counter-flip rows; y-only so leading/trailing alignment isn't mirrored.
             .scaleEffect(x: 1, y: flip)
         }
+        .environment(\.layoutDirection, lyrics.isRTL ? .rightToLeft : .leftToRight)
     }
 }

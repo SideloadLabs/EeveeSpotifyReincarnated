@@ -70,6 +70,13 @@ final class KaraokePlaybackTracker {
             return ""
         }()
 
+        let isAdFlag = ( trackObj?.responds(to: Selector(("isAd"))) == true )
+            ? (trackObj?.value(forKey: "isAd") as? Bool ?? false)
+            : false
+        if isAdFlag || uriString.hasPrefix("spotify:ad:") {
+            writeDebugLog("[ORACLE][AD_LEAK] Player entered ad track! uri=\(uriString) isAd=\(isAdFlag)")
+        }
+
         // spotify:track:<id> — same extraction style used elsewhere in the
         // codebase for episode URIs (extractEpisodeID in SponsorBlockSkipper).
         let cleanURI = uriString.components(separatedBy: "#").first?

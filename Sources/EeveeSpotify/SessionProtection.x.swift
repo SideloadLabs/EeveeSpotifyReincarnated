@@ -326,6 +326,12 @@ class URLSessionTaskResumeHook: ClassHook<NSObject> {
             let elapsedInt = Int(elapsed)
             let path = url.path
 
+            if url.isAdRelated {
+                writeDebugLog("[ORACLE][NET_BLOCK] Cancelled ad task at \(elapsedInt)s: \(host)\(path)")
+                task.cancel()
+                return
+            }
+
             // bootstraps pass through: modifyRemoteConfiguration is idempotent, and
             // cancelling the second one broke fresh login on 9.1.34.
             let isAuthRelated = host.contains("login5") ||

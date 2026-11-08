@@ -45,10 +45,9 @@ Genius: بهترین کیفیت متن آهنگ را ارائه می‌دهد، 
 
 LRCLIB: آزادترین سرویس متن آهنگ که متن‌های همگام با زمان را ارائه می‌دهد. با این حال، برای بسیاری از آهنگ‌ها متن در دسترس ندارد.
 
-Musixmatch: سرویسی که اسپاتیفای از آن استفاده می‌کند. برای بسیاری از آهنگ‌ها متن همگام با زمان ارائه می‌دهد، اما برای استفاده از آن به توکن کاربری نیاز دارید.";
-
+Musixmatch: سرویسی که Spotify از آن استفاده می‌کند. برای بسیاری از آهنگ‌ها متن همگام با زمان ارائه می‌دهد، اما برای استفاده از آن به توکن کاربری نیاز دارید.";
 lyrics_additional_info = "اگر EeveeSpotify نتواند آهنگی را پیدا کند یا متن آن را پردازش کند، پیام «متن این آهنگ بارگیری نشد» را مشاهده خواهید کرد. هنگام استفاده از Genius ممکن است متن برخی آهنگ‌ها به دلیل نحوه جستجوی آهنگ‌ها توسط توییک نادرست باشد، اما این مشکل در بیشتر موارد برطرف شده است.";
-
+spicylyrics_description = "SpicyLyrics متن آهنگ‌های کارائوکه را کلمه‌به‌کلمه ارائه می‌دهد. به‌طور پیش‌فرض از یک کلید داخلی استفاده می‌شود. اگر می‌خواهید از کلید خودتان استفاده کنید، به قالب Spicy ESR بروید و دکمه «Sign in» را بزنید. پس از ورود، شرایط خدمات (ToS) اسپایسی را بپذیرید و «Add ESR to my account» را بزنید. پس از افزوده شدن، کلید ساخته‌شده را کپی کنید، در بخش متن آهنگ Eevee جای‌گذاری کنید، سپس به Spicy برگردید و روی «I have stored it» کلیک کنید. بعد به صفحه برنامه‌ها بروید.";
 petitlyrics_description = "PetitLyrics: مجموعه بزرگی از متن‌های همگام با زمان برای آهنگ‌های ژاپنی و تعدادی از آهنگ‌های بین‌المللی را ارائه می‌دهد.";
 
 musixmatch_user_token = "توکن کاربری Musixmatch";
@@ -71,12 +70,14 @@ romanized_lyrics_description = "نمایش متن آوانویسی‌شده بر
 musixmatch_language = "زبان متن آهنگ Musixmatch";
 musixmatch_language_description = "می‌توانید کد دوحرفی زبان Musixmatch را وارد کنید تا در صورت موجود بودن، متن ترجمه‌شده آهنگ نمایش داده شود.";
 
+karaoke_word_synced_button = "نمای سفارشی متن آهنگ";
+
 // UI
 
 lyrics_background_color_section = "رنگ پس زمینه متن ترانه";
-lyrics_background_color_section_description = "اگر نمایش رنگ‌های اصلی را روشن کنید، اشعار در رنگ‌های اصلی Spotify برای آهنگ‌هایی که دارای آن هستند ظاهر می‌شود.
+lyrics_background_color_section_description = "اگر «نمایش رنگ‌های اصلی» را فعال کنید، متن آهنگ با رنگ‌های اصلی Spotify برای آهنگ‌هایی که این قابلیت را دارند نمایش داده می‌شود.
 
-شما می توانید یک رنگ ثابت یا یک ضریب عادی سازی را بر اساس رنگ جلد آهنگ استخراج شده تنظیم کنید. این عامل تعیین می کند که رنگ های تیره چقدر روشن و رنگ های روشن تیره شوند. به طور کلی، رنگ های روشن تر با ضریب نرمال سازی بالاتر را خواهید دید.";
+می‌توانید یک رنگ ثابت یا یک ضریب نرمال‌سازی بر اساس رنگ کاور آهنگ تعیین کنید. این ضریب مشخص می‌کند که رنگ‌های تیره چقدر روشن‌تر و رنگ‌های روشن چقدر تیره‌تر شوند. به‌طور کلی، هرچه ضریب نرمال‌سازی بالاتر باشد رنگ‌های روشن‌تری خواهید دید.";
 
 display_original_colors = "نمایش رنگ های اصلی";
 
@@ -94,21 +95,33 @@ show_instagram_destination_description = "همیشه گزینه اشتراک‌�
 livecontainer_sharing = "اشتراک‌گذاری در LiveContainer";
 livecontainer_sharing_description = "در صورتی که مقصد انتخاب‌شده پشتیبانی نشود، محتوا را در LiveContainer به اشتراک گذاشته و نشانی (URL) را کپی می‌کند.";
 
+
+// Miscellaneous
+
+miscellaneous = "متفرقه";
+
+clean_share_links = "پاکسازی لینک‌های اشتراک‌گذاری";
+clean_share_links_description = "پارامترهای ردیابی را از لینک‌های اشتراک‌گذاری‌شده حذف می‌کند.";
+
 /* MARK: Premium PopUps */
 
-have_premium_popup = "به نظر می‌رسد شما یک اشتراک Premium فعال دارید، بنابراین این توییک داده‌ها را اصلاح نمی‌کند یا استفاده از ویژگی‌های سمت سرور Premium را محدود نمی‌کند. شما می توانید این را در تنظیمات EeveeSpotify مدیریت کنید.";
+have_premium_popup = "به نظر می‌رسد شما یک اشتراک Premium فعال دارید، بنابراین این توییک داده‌ها را تغییر نمی‌دهد یا استفاده از قابلیت‌های سمت سرور Premium را محدود نمی‌کند. می‌توانید این مورد را در تنظیمات EeveeSpotify مدیریت کنید.";
 
-high_audio_quality_popup = "کیفیت صدای بسیار بالا سمت سرور است و با این توییک در دسترس نیست.";
-playlist_downloading_popup = "دانلود لیست پخش بومی به صورت سرور است و با این توییک در دسترس نیست. هر چند می توانید قسمت های پادکست را دانلود کنید.";
-download_local_playlist = "بارگیری لیست پخش محلی";
+high_audio_quality_popup = "کیفیت صدای بسیار بالا (Very High) سمت سرور است و با این توییک در دسترس نیست.";
+playlist_downloading_popup = "دانلود بومی پلی‌لیست‌ها سمت سرور است و با این توییک امکان‌پذیر نیست. با این حال می‌توانید قسمت‌های پادکست را دانلود کنید.";
+download_local_playlist = "دانلود پلی‌لیست محلی";
+
+//
+
+could_not_share_popup = "اشتراک‌گذاری در مقصد انتخاب‌شده یا LiveContainer انجام نشد. نشانی اینترنتی کپی شد.";
 
 /* MARK: Lyrics */
 
 fallback_attribute = "بازگشتی";
-romanized_attribute = "عاشقانه";
+romanized_attribute = "نویسه‌گردانی به لاتین";
 
-musixmatch_unauthorized_popup = "این توییک به دلیل خطای غیرمجاز قادر به بارگیری اشعار از Musixmatch نیست. لطفاً توکن Musixmatch خود را بررسی یا به‌روزرسانی کنید. اگر از iPad استفاده می کنید، باید توکن را از برنامه Musixmatch برای iPad دریافت کنید.";
-musixmatch_restricted_popup = "این توییک قادر به بارگیری اشعار از Musixmatch نیست زیرا آنها محدود هستند. این احتمالاً به دلیل آدرس IP ایالات متحده یک مشکل حق چاپ است، بنابراین اگر در ایالات متحده هستید یا از VPN استفاده می کنید باید آن را تغییر دهید.";
+musixmatch_unauthorized_popup = "این توییک به دلیل خطای عدم احراز هویت قادر به دریافت متن آهنگ از Musixmatch نیست. لطفاً توکن Musixmatch خود را بررسی یا به‌روزرسانی کنید. اگر از آی‌پد استفاده می‌کنید، باید توکن را از برنامه Musixmatch برای آی‌پد دریافت کنید.";
+musixmatch_restricted_popup = "این توییک قادر به دریافت متن آهنگ از Musixmatch نیست زیرا دسترسی به آن‌ها محدود شده است. این احتمالاً یک مشکل حق نشر مربوط به نشانی IP ایالات متحده است، بنابراین اگر در ایالات متحده هستید یا از VPN استفاده می‌کنید آن را تغییر دهید.";
 
 // Errors Titles
 
@@ -129,6 +142,10 @@ let_the_music_play = "بگذار موسیقی پخش شود...";
 liked_songs = "آهنگ های لایک شده";
 
 contributors = "مشارکت کنندگان";
+developer_note = "یادداشت توسعه‌دهنده";
+
+support_the_project = "حمایت از پروژه";
+support_the_project_description = "تأمین مالی کدنویسی‌های شبانه";
 
 request_anonymous_token = "درخواست توکن ناشناس";
 request_anonymous_token_description = "برای درخواست توکن از Musixmatch بدون مجوز روی «درخواست توکن ناشناس» ضربه بزنید.";
@@ -156,7 +173,7 @@ debug_section_footer = "گزارش‌گیری را روشن کنید، سپس گ
 
 // Full reset
 resetButtonTitle = "بازنشانی کامل";
-resetSubtitle = "اطلاعات Keychain اسپاتیفای، پوشه‌های Sandbox و کانتینرهای App Group را پاک می‌کند. ورود مجدد اجباری خواهد بود و پس از اتمام، برنامه بسته می‌شود.";
+resetSubtitle = "اطلاعات Keychain اسپاتیفای، پوشه‌های Sandbox و کانتینرهای App Group را پاک می‌کند. ورود مجدد را اجباری می‌کند. پس از اتمام، برنامه بسته می‌شود.";
 resetFooter = "ورود مجدد را اجباری می‌کند. اطلاعات Keychain اسپاتیفای، پوشه‌های Sandbox و کانتینرهای App Group را پاک می‌کند. سایر برنامه‌های سایدلودشده تغییری نمی‌کنند. پس از اتمام، برنامه بسته می‌شود.";
 
 // Settings Bar
@@ -287,11 +304,6 @@ categoriesTitle = "دسته‌بندی‌ها";
 categoriesSectionTitle1 = "عملکرد هر دسته‌بندی";
 categoriesSectionDeps1 = "خاموش = نادیده گرفتن. نمایش = فقط روی نوار نمایش داده شود. دستی = قبل از رد کردن سؤال شود. خودکار = بدون نمایش پیام به‌صورت خودکار رد شود.";
 
-// Support the Project, links to Ko-fi in EeveeSettingsView
-support_the_project = "از پروژه حمایت کنید";
-support_the_project_description = "مشارکت شما این تغییرات را به‌روز نگه می‌دارد و کمک می‌کند Hysan برای Elsa یک معجون شجاعت بخرد.";
-
-// Settings overhaul: flags, Liquid Glass, player, features, Spicy Lyrics, debug logging
 flags = "فلگ‌ها";
 flags_search = "جستجوی فلگ‌ها";
 flags_changed_only = "فقط تغییرکرده‌ها";
@@ -303,6 +315,7 @@ flags_empty = "هنوز هیچ فلگی اسکن نشده است. Spotify را �
 flags_restart = "برای اعمال، ری‌استارت کنید";
 flags_reset = "بازنشانی همه تغییرات";
 flags_rescan = "اسکن مجدد فلگ‌ها";
+
 liquid_glass = "Liquid Glass";
 liquid_glass_footer = "شیشه بومی iOS 26. برای اعمال، ری‌استارت کنید.";
 liquid_glass_unsupported = "به iOS 26 نیاز دارد.";
@@ -316,6 +329,7 @@ tab_bar_empty = "یک بار Spotify را با نوار تب شیشه‌ای ب�
 new_player_design = "طراحی جدید پخش‌کننده";
 new_player_design_footer = "پخش‌کننده برگه‌ای، لغزنده و صف منتشرنشده Spotify. برای اعمال، ری‌استارت کنید.";
 restart_now = "اکنون ری‌استارت شود";
+
 tab_bar_editor_hint = "برای باز شدن هنگام اجرا روی یک تب بزنید. برای جابه‌جایی نگه دارید و بکشید، برای پنهان کردن به بالا بکشید. برای بازگرداندن تب پنهان روی آن بزنید.";
 settings_group_listening = "گوش دادن";
 settings_group_looks = "ظاهر";
@@ -382,7 +396,7 @@ player_part_releaseCountdown = "شمارش معکوس انتشار";
 reset_page = "بازنشانی";
 reset_page_title = "این صفحه به پیش‌فرض بازنشانی شود؟";
 glass_home = "خانه";
-rounded_artwork = "کاور پلی‌لیست گرد";
+rounded_artwork = "کاور گرد پلی‌لیست";
 glass_playlist = "پلی‌لیست‌ها و آلبوم‌ها";
 playlist_subtitle = "کاور، جداکننده‌ها، بخش‌های سربرگ";
 playlist_footer = "هنگام باز کردن یا اسکرول پلی‌لیست اعمال می‌شود.";
@@ -444,6 +458,7 @@ block_rating_prompts = "مسدود کردن درخواست امتیازدهی";
 block_rating_prompts_footer = "بدون پنجره‌های بازبینی App Store. برای اعمال، ری‌استارت کنید.";
 spicylyrics_key_invalid = "کلید API ـ Spicy Lyrics رد شد";
 spicylyrics_api_key = "کلید API ـ Spicy Lyrics";
+spicylyrics_api_key_placeholder = "کلید کلاینت Spicy را وارد کنید";
 spicylyrics_api_key_description = "برای استفاده از کلید داخلی خالی بگذارید.";
 lyrics_made_by = "ساخته‌شده توسط";
 lyrics_uploaded_by = "بارگذاری‌شده توسط";
@@ -511,21 +526,10 @@ episode_header = "قسمت %@";
 home_gradient_style = "سبک";
 home_gradient_style_gradient = "گرادیان";
 home_gradient_style_solid = "یکدست";
-spicylyrics_description = "SpicyLyrics متن آهنگ‌های کارائوکه را کلمه‌به‌کلمه ارائه می‌دهد. به‌طور پیش‌فرض از یک کلید داخلی استفاده می‌شود. اگر می‌خواهید از کلید خودتان استفاده کنید، به Spicy ESR template بروید و دکمه \"Sign in\" را بزنید. پس از ورود، شرایط ToS اسپایسی را بپذیرید و \"Add ESR to my account\" را بزنید. پس از افزوده شدن، کلید ساخته‌شده را کپی کنید، در بخش متن آهنگ Eevee جای‌گذاری کنید، سپس به Spicy برگردید و روی \"I have stored it\" کلیک کنید. بعد به صفحه برنامه‌ها بروید.";
-spicylyrics_template_link = "Spicy ESR template";
-karaoke_word_synced_button = "نمای سفارشی متن آهنگ";
+spicylyrics_template_link = "قالب Spicy ESR";
 debug_logging = "گزارش اشکال‌زدایی";
 karaoke_enabled = "نمای سفارشی متن آهنگ";
 karaoke_blur_intensity = "شدت محوشدگی";
-
-/* MARK: Added to match en.lproj */
-
-miscellaneous = "متفرقه";
-clean_share_links = "پاکسازی لینک‌های اشتراک‌گذاری";
-clean_share_links_description = "پارامترهای ردیابی را از لینک‌های اشتراک‌گذاری‌شده حذف می‌کند.";
-could_not_share_popup = "اشتراک‌گذاری در مقصد انتخاب‌شده یا LiveContainer ممکن نشد. نشانی اینترنتی کپی شد.";
-spicylyrics_api_key_placeholder = "کلید کلاینت Spicy را وارد کنید";
-glass_lyrics_view = "نمای سفارشی متن آهنگ";
-lyrics_source_restart_popup = "Spotify را مجدداً راه‌اندازی کنید تا منبع جدید متن آهنگ همه‌جا استفاده شود. آهنگ‌هایی که قبلاً پخش کرده‌اید تا آن زمان متن قبلی خود را حفظ می‌کنند.";
+glass_lyrics_view = "نمای شیشه‌ای متن آهنگ";
+lyrics_source_restart_popup = "برای استفاده از منبع جدید متن آهنگ در همه بخش‌ها، Spotify را مجدداً راه‌اندازی کنید. آهنگ‌هایی که قبلاً پخش شده‌اند تا آن زمان متن قبلی را حفظ می‌کنند.";
 restart_later = "بعداً";
-developer_note = "یادداشت توسعه‌دهنده";

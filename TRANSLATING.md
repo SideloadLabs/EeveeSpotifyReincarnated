@@ -77,7 +77,7 @@ If the English value contains `\n`, `\t`, or similar, your translation must too.
 
 ### 5. Don't translate brand names or proper nouns
 
-Keep these as-is: `EeveeSpotify`, `Spotify`, `Musixmatch`, `PetitLyrics`, `LRCLIB`, `Genius`, `SponsorBlock`, `TrollStore`, `SideStore`, `CarPlay`, `Siri`, `Jam`, `AI DJ`.
+Keep these as-is: `EeveeSpotify`, `Spotify`, `Musixmatch`, `PetitLyrics`, `LRCLIB`, `Genius`, `SponsorBlock`, `TrollStore`, `SideStore`, `CarPlay`, `Siri`, `Jam`, `SpicyLyrics` `AI DJ`.
 
 ### 6. Delete nothing, reorder nothing
 

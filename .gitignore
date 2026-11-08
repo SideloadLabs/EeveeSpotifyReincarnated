@@ -38,6 +38,7 @@ Assets/AppIcon/*@3x.png
 *.log
 build_log.txt
 .vscode/
+__pycache__/
 .website/
 .github/copilot-instructions.md
 scripts/spotify_symbol_diff.py

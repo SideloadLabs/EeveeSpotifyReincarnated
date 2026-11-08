@@ -50,19 +50,28 @@ struct KaraokeLineDto {
         return result
     }
 
-    // Hebrew/Arabic blocks read RTL, basic Latin LTR; nil for lines with neither ("♪", "(2x)").
+    // Hebrew/Arabic/Syriac/Thaana blocks read RTL, Latin/Cyrillic/Greek LTR; nil for lines with neither ("♪", "(2x)").
     var strongDirection: KaraokeTextDirection? {
         for scalar in plainText.unicodeScalars {
             switch scalar.value {
-            case 0x0590...0x05FF,
-                 0x0600...0x06FF,
-                 0x0750...0x077F,
-                 0x08A0...0x08FF,
-                 0xFB1D...0xFB4F,
-                 0xFB50...0xFDFF,
-                 0xFE70...0xFEFF:
+            case 0x0590...0x05FF,  // Hebrew
+                 0x0600...0x06FF,  // Arabic (includes Persian, Urdu, etc.)
+                 0x0700...0x074F,  // Syriac
+                 0x0750...0x077F,  // Arabic Supplement
+                 0x0780...0x07BF,  // Thaana
+                 0x0800...0x085F,  // Samaritan & Mandaic
+                 0x0870...0x089F,  // Arabic Extended-B
+                 0x08A0...0x08FF,  // Arabic Extended-A
+                 0xFB1D...0xFB4F,  // Hebrew Presentation Forms
+                 0xFB50...0xFDFF,  // Arabic Presentation Forms-A
+                 0xFE70...0xFEFF,  // Arabic Presentation Forms-B
+                 0x10EC0...0x10EFF: // Arabic Extended-C
                 return .rightToLeft
-            case 0x0041...0x005A, 0x0061...0x007A:
+            case 0x0041...0x005A, 0x0061...0x007A,  // Basic Latin
+                 0x00C0...0x00D6, 0x00D8...0x00F6, 0x00F8...0x00FF, // Latin-1 Supplement
+                 0x0100...0x024F,  // Latin Extended-A & B
+                 0x0370...0x03FF,  // Greek
+                 0x0400...0x04FF:  // Cyrillic
                 return .leftToRight
             default:
                 continue

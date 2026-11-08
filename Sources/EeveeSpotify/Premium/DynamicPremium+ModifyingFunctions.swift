@@ -424,6 +424,29 @@ private func modifyAssignedValues(_ values: inout [AssignedValue]) {
             }
         }
     }
+
+    for index in values.indices {
+        let scope = values[index].propertyID.scope.lowercased()
+        let name = values[index].propertyID.name.lowercased()
+        guard case .boolValue(let b) = values[index].structuredValue, b.value else { continue }
+        if isCohortAdOrUpsellFlag(scope: scope, name: name) {
+            values[index].boolValue = BoolValue.with { $0.value = false }
+            writeDebugLog("[ORACLE][COHORT_FLAG_KILLED] \(scope).\(name)")
+        }
+    }
+}
+
+func isCohortAdOrUpsellFlag(scope: String, name: String) -> Bool {
+    if name.hasPrefix("disable_") || name.contains("dismissible") || name.contains("skip_button") {
+        return false
+    }
+    let tokens = "\(scope).\(name)".split { !$0.isLetter && !$0.isNumber }.map(String.init)
+    let adTokens: Set<String> = [
+        "ad", "ads", "adsbase", "adsswift", "adonappopen", "instreamads",
+        "leavebehind", "leavebehinds", "leavebehindadsbase", "marquee",
+        "upsell", "upsells", "sponsored", "adssponsoredcontext", "realtimead"
+    ]
+    return tokens.contains { adTokens.contains($0) }
 }
 
 private func modifyAttributes(_ attributes: inout [String: AccountAttribute]) {
