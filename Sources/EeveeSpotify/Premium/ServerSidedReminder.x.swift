@@ -26,19 +26,48 @@ struct LocalPlaylistDownloadGroup: HookGroup {}
 
 enum LocalPlaylistDownload {
     static let launchEnabled = UserDefaults.localPlaylistDownloadEnabled
-    private static var headerKey: UInt8 = 0
     private static var downloadKey: UInt8 = 0
     private static var confirmationButtonKey: UInt8 = 0
+    private static var activeConfirmationKey: UInt8 = 0
+    private static var loggedMissingControl = false
+    private static let nativeButtonClasses: [AnyClass] = [
+        "_TtC22RemoteDownloads_ECMKit31GranularDownloadButtonContainer",
+        "_TtCOOOE32EncoreConsumerMobile_ElementsKitO19LegacyUI_ECMCoreKit10Components22GranularDownloadButton2UI7Private22GranularDownloadButton",
+        "_TtC28EncoreConsumerMobile_BaseKitP33_B18AD9CFD34D2E2EF5BE4AC1DDAEB28B14DownloadButton",
+    ].compactMap { NSClassFromString($0) }
 
-    static func updateHeader(in root: UIView) {
-        guard let header = PageLookup.cached(&headerKey, in: root, {
-            PageLookup.find("PL.Header", in: root)
-        }), let download = PageLookup.cached(&downloadKey, in: header, {
-            PageLookup.find("Components.UI.DownloadButton", in: header)
-        }) else { return }
+    private static func findDownload(in root: UIView) -> UIView? {
+        let header = PageLookup.find("PL.Header", in: root)
+        if let header, let button = PageLookup.find("Components.UI.DownloadButton", in: header) {
+            return button
+        }
+        return root.eeveeFirst(UIView.self) { view in
+            let id = view.accessibilityIdentifier
+            if id == "Components.UI.DownloadButton" || id == "spotify:playlist:download_button" {
+                return true
+            }
+            return nativeButtonClasses.contains { view.isKind(of: $0) }
+        }
+    }
+
+    static func updateHeader(in root: UIView, reportMissing: Bool = false) {
+        let previous = objc_getAssociatedObject(root, &activeConfirmationKey) as? UIButton
+        guard let download = PageLookup.cached(&downloadKey, in: root, {
+            findDownload(in: root)
+        }), let parent = download.superview else {
+            previous?.removeFromSuperview()
+            if reportMissing, !loggedMissingControl {
+                loggedMissingControl = true
+                writeDebugLog("[LOCAL_SYNC] Playlist appeared but download control was not found")
+            }
+            return
+        }
 
         guard launchEnabled else {
-            if !download.isHidden { download.isHidden = true }
+            if !download.isHidden {
+                download.isHidden = true
+                writeDebugLog("[LOCAL_SYNC] Hid playlist download control")
+            }
             return
         }
 
@@ -47,27 +76,32 @@ enum LocalPlaylistDownload {
 
         let confirmation = (objc_getAssociatedObject(download, &confirmationButtonKey) as? UIButton) ?? {
             let button = UIButton(type: .custom)
-            button.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-            button.addAction(UIAction { [weak download, weak button] _ in
-                showPlaylistDownloadingPopUp(true) { [weak download, weak button] in
-                    guard let download, let button, download.window != nil, !download.isHidden else { return }
-                    // Replay Spotify's action without finding our own control.
-                    button.removeFromSuperview()
-                    defer { download.addSubview(button) }
+            button.addAction(UIAction { [weak download] _ in
+                showPlaylistDownloadingPopUp(true) { [weak download] in
+                    guard let download, download.window != nil, !download.isHidden else { return }
                     if !EeveeFireTap(download) {
                         writeDebugLog("[LOCAL_SYNC] Could not forward playlist download tap")
                     }
                 }
             }, for: .primaryActionTriggered)
-            button.frame = download.bounds
-            download.addSubview(button)
             download.isAccessibilityElement = false
-            download.accessibilityElements = [button]
+            download.accessibilityElementsHidden = true
             objc_setAssociatedObject(download, &confirmationButtonKey, button, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+            writeDebugLog("[LOCAL_SYNC] Attached playlist download reminder to \(type(of: download))")
             return button
         }()
 
-        confirmation.frame = download.bounds
+        if previous !== confirmation {
+            previous?.removeFromSuperview()
+            objc_setAssociatedObject(root, &activeConfirmationKey, confirmation, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+        }
+        // A sibling receives the tap before Spotify's button or its gesture recognizers.
+        if confirmation.superview !== parent {
+            parent.insertSubview(confirmation, aboveSubview: download)
+        }
+        confirmation.frame = download.frame
+        confirmation.isHidden = download.isHidden
+        confirmation.alpha = download.alpha
         confirmation.isEnabled = (download as? UIControl)?.isEnabled ?? download.isUserInteractionEnabled
         let label = download.accessibilityLabel ?? "download_local_playlist".localized
         if confirmation.accessibilityLabel != label {
@@ -79,6 +113,13 @@ enum LocalPlaylistDownload {
 class LocalPlaylistDownloadHeaderHook: ClassHook<UIViewController> {
     typealias Group = LocalPlaylistDownloadGroup
     static let targetName = GlassPlaylistHook.targetName
+
+    func viewDidAppear(_ animated: Bool) {
+        orig.viewDidAppear(animated)
+        if let root = target.viewIfLoaded {
+            LocalPlaylistDownload.updateHeader(in: root, reportMissing: true)
+        }
+    }
 
     func viewDidLayoutSubviews() {
         orig.viewDidLayoutSubviews()
