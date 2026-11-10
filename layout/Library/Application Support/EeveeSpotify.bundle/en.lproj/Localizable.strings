@@ -110,6 +110,8 @@ have_premium_popup = "It looks like you have an active Premium subscription, so 
 high_audio_quality_popup = "Very high audio quality is server-sided and is not available with this tweak.";
 playlist_downloading_popup = "Native playlist downloading is server-sided and is not available with this tweak. You can download podcast episodes and local playlists though.";
 download_local_playlist = "Download local playlist";
+local_playlist_download_button = "Show playlist download button";
+local_playlist_download_setting_hint = "This playlist button syncs only local files over Wi-Fi. You can hide it in EeveeSpotify Settings → Miscellaneous → Show playlist download button.";
 
 //
 

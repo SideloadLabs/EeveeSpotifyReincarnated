@@ -234,6 +234,10 @@ struct EeveeSpotify: Tweak {
         activateHomeGradient()
         activateArtistHides()
         activatePlaylistHides()
+        if UserDefaults.patchType.isPatching,
+           NSClassFromString(LocalPlaylistDownloadHeaderHook.targetName) != nil {
+            LocalPlaylistDownloadGroup().activate()
+        }
         HideJam.activate()
         activateRemoteFlags()
         activateRatingPromptBlock()

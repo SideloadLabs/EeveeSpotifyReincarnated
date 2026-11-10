@@ -16,6 +16,12 @@ extension UserDefaults {
     private static let cachedCustomizeDataKey = "eeveeCachedCustomizeData"
     private static let iconNamePrettifyKey = "iconNamePrettify"
     private static let cleanShareLinksKey = "cleanShareLinks"
+    private static let localPlaylistDownloadEnabledKey = "localPlaylistDownloadEnabled"
+
+    static var localPlaylistDownloadEnabled: Bool {
+        get { container.object(forKey: localPlaylistDownloadEnabledKey) as? Bool ?? true }
+        set { container.set(newValue, forKey: localPlaylistDownloadEnabledKey) }
+    }
 
     static var musixmatchToken: String {
         get {
