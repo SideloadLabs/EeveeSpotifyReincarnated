@@ -1,4 +1,3 @@
-import EeveeSpotifyC
 import Orion
 import ObjectiveC.runtime
 import UIKit
@@ -26,88 +25,23 @@ struct LocalPlaylistDownloadGroup: HookGroup {}
 
 enum LocalPlaylistDownload {
     static let launchEnabled = UserDefaults.localPlaylistDownloadEnabled
-    static weak var visiblePlaylist: UIViewController?
-    private static var downloadKey: UInt8 = 0
-    private static var confirmationButtonKey: UInt8 = 0
-    private static var activeConfirmationKey: UInt8 = 0
-    private static var loggedMissingControl = false
-    private static let nativeButtonClasses: [AnyClass] = [
-        "_TtC22RemoteDownloads_ECMKit31GranularDownloadButtonContainer",
-        "_TtCOOOE32EncoreConsumerMobile_ElementsKitO19LegacyUI_ECMCoreKit10Components22GranularDownloadButton2UI7Private22GranularDownloadButton",
-        "_TtC28EncoreConsumerMobile_BaseKitP33_B18AD9CFD34D2E2EF5BE4AC1DDAEB28B14DownloadButton",
-    ].compactMap { NSClassFromString($0) }
+    private static let actionViewClass = NSClassFromString(
+        "_TtC35ListUXPlatform_FreeTierPlaylistImplP33_0FBF7F603415652909A2EEC13496CA7D10ActionView"
+    )
 
-    private static func findDownload(in root: UIView) -> UIView? {
-        let header = PageLookup.find("PL.Header", in: root)
-        if let header, let button = PageLookup.find("Components.UI.DownloadButton", in: header) {
-            return button
+    static func isDownloadButton(_ button: UIButton) -> Bool {
+        guard let actionViewClass else { return false }
+        var current: UIView? = button
+        var hasDownloadText = false
+        while let view = current {
+            hasDownloadText = hasDownloadText ||
+                view.accessibilityLabel?.caseInsensitiveCompare("Download") == .orderedSame ||
+                view.accessibilityHint?.range(of: "tap to download and make available offline", options: .caseInsensitive) != nil
+            if view.isKind(of: actionViewClass) { return hasDownloadText }
+            if view is UIStackView { return false }
+            current = view.superview
         }
-        return root.eeveeFirst(UIView.self) { view in
-            let id = view.accessibilityIdentifier
-            if id == "Components.UI.DownloadButton" || id == "spotify:playlist:download_button" {
-                return true
-            }
-            return nativeButtonClasses.contains { view.isKind(of: $0) }
-        }
-    }
-
-    static func updateHeader(in root: UIView, reportMissing: Bool = false) {
-        let previous = objc_getAssociatedObject(root, &activeConfirmationKey) as? UIButton
-        guard let download = PageLookup.cached(&downloadKey, in: root, {
-            findDownload(in: root)
-        }), let parent = download.superview else {
-            previous?.removeFromSuperview()
-            if reportMissing, !loggedMissingControl {
-                loggedMissingControl = true
-                writeDebugLog("[LOCAL_SYNC] Playlist appeared but download control was not found")
-            }
-            return
-        }
-
-        guard launchEnabled else {
-            if !download.isHidden {
-                download.isHidden = true
-                writeDebugLog("[LOCAL_SYNC] Hid playlist download control")
-            }
-            return
-        }
-
-        // When the legacy reminder is hooked, the native tap already shows it.
-        guard !LatestPremiumPatchingGroup.isActive, !IOS14And15PremiumPatchingGroup.isActive else { return }
-
-        let confirmation = (objc_getAssociatedObject(download, &confirmationButtonKey) as? UIButton) ?? {
-            let button = UIButton(type: .custom)
-            button.addAction(UIAction { [weak download] _ in
-                showPlaylistDownloadingPopUp(true) { [weak download] in
-                    guard let download, download.window != nil, !download.isHidden else { return }
-                    if !EeveeFireTap(download) {
-                        writeDebugLog("[LOCAL_SYNC] Could not forward playlist download tap")
-                    }
-                }
-            }, for: .primaryActionTriggered)
-            download.isAccessibilityElement = false
-            download.accessibilityElementsHidden = true
-            objc_setAssociatedObject(download, &confirmationButtonKey, button, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
-            writeDebugLog("[LOCAL_SYNC] Attached playlist download reminder to \(type(of: download))")
-            return button
-        }()
-
-        if previous !== confirmation {
-            previous?.removeFromSuperview()
-            objc_setAssociatedObject(root, &activeConfirmationKey, confirmation, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
-        }
-        // A sibling receives the tap before Spotify's button or its gesture recognizers.
-        if confirmation.superview !== parent {
-            parent.insertSubview(confirmation, aboveSubview: download)
-        }
-        confirmation.frame = download.frame
-        confirmation.isHidden = download.isHidden
-        confirmation.alpha = download.alpha
-        confirmation.isEnabled = (download as? UIControl)?.isEnabled ?? download.isUserInteractionEnabled
-        let label = download.accessibilityLabel ?? "download_local_playlist".localized
-        if confirmation.accessibilityLabel != label {
-            confirmation.accessibilityLabel = label
-        }
+        return false
     }
 }
 
@@ -115,55 +49,36 @@ class LocalPlaylistDownloadHeaderHook: ClassHook<UIViewController> {
     typealias Group = LocalPlaylistDownloadGroup
     static let targetName = GlassPlaylistHook.targetName
 
-    func viewDidAppear(_ animated: Bool) {
-        orig.viewDidAppear(animated)
-        LocalPlaylistDownload.visiblePlaylist = target
-        if let root = target.viewIfLoaded {
-            LocalPlaylistDownload.updateHeader(in: root, reportMissing: true)
-        }
-    }
-
-    func viewDidDisappear(_ animated: Bool) {
-        orig.viewDidDisappear(animated)
-        if LocalPlaylistDownload.visiblePlaylist === target {
-            LocalPlaylistDownload.visiblePlaylist = nil
-        }
-    }
-
     func viewDidLayoutSubviews() {
         orig.viewDidLayoutSubviews()
-        if let root = target.viewIfLoaded {
-            LocalPlaylistDownload.updateHeader(in: root)
-        }
+        // A warm launch can still use Spotify's previously cached account configuration.
+        guard !LocalPlaylistDownload.launchEnabled,
+              let root = target.viewIfLoaded,
+              let button = root.eeveeFirst(UIButton.self, where: LocalPlaylistDownload.isDownloadButton) else { return }
+        if !button.isHidden { button.isHidden = true }
     }
 }
 
-// Temporary diagnostic for finding the native playlist download control.
-class LocalPlaylistDownloadTouchProbe: ClassHook<UIWindow> {
+class LocalPlaylistDownloadActionHook: ClassHook<UIButton> {
     typealias Group = LocalPlaylistDownloadGroup
 
-    func sendEvent(_ event: UIEvent) {
-        if UserDefaults.debugLoggingEnabled,
-           LocalPlaylistDownload.visiblePlaylist?.viewIfLoaded?.window === target,
-           let touch = event.allTouches?.first(where: { $0.phase == .ended }),
-           let hit = touch.view {
-            var path: [String] = []
-            var current: UIView? = hit
-            while let view = current, path.count < 16 {
-                let typeName = NSStringFromClass(type(of: view))
-                let actions = (view as? UIControl).map { control in
-                    let events: [UIControl.Event] = [.primaryActionTriggered, .touchUpInside]
-                    let names = control.allTargets.flatMap { target in
-                        events.flatMap { control.actions(forTarget: target.base, forControlEvent: $0) ?? [] }
-                    }
-                    return Set(names).sorted().joined(separator: ",")
-                } ?? ""
-                path.append(actions.isEmpty ? typeName : "\(typeName) {\(actions)}")
-                current = view.superview
-            }
-            writeDebugLog("[LOCAL_SYNC] Playlist tap: " + path.joined(separator: " → "))
+    func sendAction(_ action: Selector, to recipient: Any?, forEvent event: UIEvent?) {
+        guard action == NSSelectorFromString("performAction"),
+              LocalPlaylistDownload.isDownloadButton(target) else {
+            orig.sendAction(action, to: recipient, forEvent: event)
+            return
         }
-        orig.sendEvent(event)
+
+        guard LocalPlaylistDownload.launchEnabled else { return }
+        if LatestPremiumPatchingGroup.isActive || IOS14And15PremiumPatchingGroup.isActive {
+            orig.sendAction(action, to: recipient, forEvent: event)
+            return
+        }
+
+        showPlaylistDownloadingPopUp(true) {
+            guard self.target.window != nil else { return }
+            self.orig.sendAction(action, to: recipient, forEvent: nil)
+        }
     }
 }
 
