@@ -26,6 +26,7 @@ struct LocalPlaylistDownloadGroup: HookGroup {}
 
 enum LocalPlaylistDownload {
     static let launchEnabled = UserDefaults.localPlaylistDownloadEnabled
+    static weak var visiblePlaylist: UIViewController?
     private static var downloadKey: UInt8 = 0
     private static var confirmationButtonKey: UInt8 = 0
     private static var activeConfirmationKey: UInt8 = 0
@@ -116,8 +117,16 @@ class LocalPlaylistDownloadHeaderHook: ClassHook<UIViewController> {
 
     func viewDidAppear(_ animated: Bool) {
         orig.viewDidAppear(animated)
+        LocalPlaylistDownload.visiblePlaylist = target
         if let root = target.viewIfLoaded {
             LocalPlaylistDownload.updateHeader(in: root, reportMissing: true)
+        }
+    }
+
+    func viewDidDisappear(_ animated: Bool) {
+        orig.viewDidDisappear(animated)
+        if LocalPlaylistDownload.visiblePlaylist === target {
+            LocalPlaylistDownload.visiblePlaylist = nil
         }
     }
 
@@ -126,6 +135,35 @@ class LocalPlaylistDownloadHeaderHook: ClassHook<UIViewController> {
         if let root = target.viewIfLoaded {
             LocalPlaylistDownload.updateHeader(in: root)
         }
+    }
+}
+
+// Temporary diagnostic for finding the native playlist download control.
+class LocalPlaylistDownloadTouchProbe: ClassHook<UIWindow> {
+    typealias Group = LocalPlaylistDownloadGroup
+
+    func sendEvent(_ event: UIEvent) {
+        if UserDefaults.debugLoggingEnabled,
+           LocalPlaylistDownload.visiblePlaylist?.viewIfLoaded?.window === target,
+           let touch = event.allTouches?.first(where: { $0.phase == .ended }),
+           let hit = touch.view {
+            var path: [String] = []
+            var current: UIView? = hit
+            while let view = current, path.count < 16 {
+                let typeName = NSStringFromClass(type(of: view))
+                let actions = (view as? UIControl).map { control in
+                    let events: [UIControl.Event] = [.primaryActionTriggered, .touchUpInside]
+                    let names = control.allTargets.flatMap { target in
+                        events.flatMap { control.actions(forTarget: target.base, forControlEvent: $0) ?? [] }
+                    }
+                    return Set(names).sorted().joined(separator: ",")
+                } ?? ""
+                path.append(actions.isEmpty ? typeName : "\(typeName) {\(actions)}")
+                current = view.superview
+            }
+            writeDebugLog("[LOCAL_SYNC] Playlist tap: " + path.joined(separator: " → "))
+        }
+        orig.sendEvent(event)
     }
 }
 
