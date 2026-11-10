@@ -615,4 +615,12 @@ private func modifyAttributes(_ attributes: inout [String: AccountAttribute]) {
             attributes.removeValue(forKey: name)
         }
     }
+
+    // Spotify uses this client flag to show the playlist download control.
+    // Enable it where Eevee can intercept the tap and offer local Wi-Fi sync.
+    if UserDefaults.patchType.isPatching,
+       EeveeSpotify.hookTarget == .v91,
+       ContentOffliningUIHelperImplementationModernHook.isAvailable {
+        attributes["offline"] = AccountAttribute.with { $0.boolValue = true }
+    }
 }

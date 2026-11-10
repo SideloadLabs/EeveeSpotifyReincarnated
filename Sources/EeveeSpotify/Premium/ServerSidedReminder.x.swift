@@ -1,4 +1,5 @@
 import Orion
+import ObjectiveC.runtime
 import UIKit
 
 private func showHighQualityPopUp() {
@@ -84,6 +85,14 @@ class ContentOffliningUIHelperImplementationHook: ClassHook<NSObject> {
 class ContentOffliningUIHelperImplementationModernHook: ClassHook<NSObject> {
     typealias Group = LatestPremiumPatchingGroup
     static let targetName = "Offline_ContentOffliningUIImpl.ContentOffliningUIHelperImplementation"
+
+    static var isAvailable: Bool {
+        let selector = Selector((
+            "downloadToggledWithCurrentAvailability:addAction:removeAction:pageIdentifier:pageURI:interactionID:"
+        ))
+        guard let cls = NSClassFromString(targetName) else { return false }
+        return class_getInstanceMethod(cls, selector) != nil
+    }
     
     func downloadToggledWithCurrentAvailability(
         _ availability: NSInteger,

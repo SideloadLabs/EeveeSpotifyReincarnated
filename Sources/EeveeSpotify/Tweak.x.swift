@@ -40,13 +40,7 @@ struct LatestPremiumPatchingGroup: HookGroup { }
 
 // Early 9.1.x builds dropped the offline helper; newer ones bring it back.
 func activateV91ServerSidedReminderIfAvailable() {
-    let className = ContentOffliningUIHelperImplementationModernHook.targetName
-    let selector = Selector((
-        "downloadToggledWithCurrentAvailability:addAction:removeAction:pageIdentifier:pageURI:interactionID:"
-    ))
-
-    guard let cls = NSClassFromString(className),
-          class_getInstanceMethod(cls, selector) != nil else {
+    guard ContentOffliningUIHelperImplementationModernHook.isAvailable else {
         writeDebugLog("[INIT] Server-sided download reminder unavailable on this 9.1.x build")
         return
     }
@@ -63,6 +57,7 @@ func activatePremiumPatchingGroup() {
     }
     else if EeveeSpotify.hookTarget == .v91 {
         NonIOS14PremiumPatchingGroup().activate()
+        activateV91ServerSidedReminderIfAvailable()
         // Removed in 9.1.28; hooking a missing method is fatal.
         let trackRowsSel = Selector(("initWithViewURI:onDemandSet:onDemandTrialService:trackRowsEnabled:productState:"))
         if UIView.instancesRespond(to: trackRowsSel) {
