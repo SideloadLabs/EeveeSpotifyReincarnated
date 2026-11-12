@@ -19,5 +19,7 @@ void EeveePixieUpdateArtistDownloads(UIView *header, UIButton *_Nullable externa
 NSString *_Nullable EeveePixieArtistURIForHeader(UIView *header);
 void EeveePixieInstallArtistFollow(void);
 NSInteger EeveePixieArtistFollowing(UIView *header, void (^changed)(void));
+// 1 saved, 0 not saved, -1 not known yet. `changed` runs when Spotify reports a new state.
+NSInteger EeveePixieSavedState(UIView *page, NSString *uri, void (^changed)(void));
 
 NS_ASSUME_NONNULL_END
