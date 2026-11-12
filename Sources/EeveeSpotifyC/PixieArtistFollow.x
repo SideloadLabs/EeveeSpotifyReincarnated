@@ -190,10 +190,13 @@ static void subscribe(EeveePixieFollowWatch *watch, id provider) {
     }];
 }
 
-static BOOL readArtistFollowing(UIView *page, NSString *moreIdentifier, BOOL *following, void (^changed)(void)) {
+static char kSavedWatchKey;
+
+// Saved-in-library state of `uri`, delivered by Spotify itself: one subscription per page, and `changed`
+// runs when Spotify reports a new state.
+static BOOL readSavedState(UIView *page, NSURL *uri, const void *key, BOOL *following, void (^changed)(void)) {
     if (!page) return NO;
-    EeveePixieFollowWatch *watch = objc_getAssociatedObject(page, &kWatchKey);
-    NSURL *uri = artistURI(page, moreIdentifier);
+    EeveePixieFollowWatch *watch = objc_getAssociatedObject(page, key);
     if (!watch || ![watch.uri isEqual:uri]) {
         if (!uri) {
             static __weak UIView *loggedPage;
@@ -206,7 +209,7 @@ static BOOL readArtistFollowing(UIView *page, NSString *moreIdentifier, BOOL *fo
         watch = [EeveePixieFollowWatch new];
         watch.uri = uri;
         watch.following = -1;
-        objc_setAssociatedObject(page, &kWatchKey, watch, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        objc_setAssociatedObject(page, key, watch, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
     watch.changed = changed;
     id provider = watch.subscribed ? nil : currentProvider();
@@ -214,6 +217,10 @@ static BOOL readArtistFollowing(UIView *page, NSString *moreIdentifier, BOOL *fo
     if (watch.following < 0) return NO;
     if (following) *following = watch.following == 1;
     return YES;
+}
+
+static BOOL readArtistFollowing(UIView *page, NSString *moreIdentifier, BOOL *following, void (^changed)(void)) {
+    return readSavedState(page, artistURI(page, moreIdentifier), &kWatchKey, following, changed);
 }
 
 %end
@@ -226,4 +233,10 @@ void EeveePixieInstallArtistFollow(void) {
 NSInteger EeveePixieArtistFollowing(UIView *header, void (^changed)(void)) {
     BOOL following = NO;
     return readArtistFollowing(header, nil, &following, changed) ? (following ? 1 : 0) : -1;
+}
+
+NSInteger EeveePixieSavedState(UIView *page, NSString *uri, void (^changed)(void)) {
+    NSURL *url = uri.length ? [NSURL URLWithString:uri] : nil;
+    BOOL saved = NO;
+    return url && readSavedState(page, url, &kSavedWatchKey, &saved, changed) ? (saved ? 1 : 0) : -1;
 }
