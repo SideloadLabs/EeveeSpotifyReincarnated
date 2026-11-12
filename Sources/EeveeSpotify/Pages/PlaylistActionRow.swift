@@ -1,15 +1,23 @@
 import EeveeSpotifyC
 import UIKit
 
-// Glass shuffle / Play / add row over Spotify's hidden header controls, which still receive every tap.
+// Glass header controls forwarding to Spotify, with a native horizontal action strip.
 @available(iOS 26.0, *)
 final class PlaylistActionRow: UIView {
     static weak var current: PlaylistActionRow?
+    private(set) weak var download: UIView?
     weak var shuffle: UIView?
     weak var play: UIView?
     weak var add: UIView?
     weak var share: UIView?
     weak var explore: UIView?
+    private(set) weak var sourceRoot: UIView?
+    private var previewSize = CGSize.zero
+    private var preservesPreviewLayout = false
+    private weak var mountedDownload: UIView?
+    private weak var mountedPreview: UIView?
+    private var previewObservations = [NSKeyValueObservation]()
+    private var previewUpdatePending = false
     weak var followControl: UIView?
     weak var anchor: UIView?
     // Spotify's single play button moves into the nav bar once its row collapses; ours steps aside and lets it show there.
@@ -18,6 +26,49 @@ final class PlaylistActionRow: UIView {
     private var scrollObservation: NSKeyValueObservation?
     private weak var followed: UIScrollView?
     private var faded = false
+    private let actions = PlaylistActionsScrollView()
+
+    // Resolve a cached native download control, including granular state IDs.
+    static func downloadControl(in root: UIView) -> UIView? {
+        PlaylistDownloadControl.resolve(in: root)
+    }
+
+    func hosts(_ source: UIView?) -> Bool { source?.superview === actions }
+
+    // Mount each native control once per binding. Spotify keeps its original
+    // button, icon subtree and action. The shared scroller owns row geometry.
+    func bindNative(download: UIView?, preview: UIView?, root: UIView, preservePreviewLayout: Bool = false) {
+        let previewChanged = sourceRoot !== root || explore !== preview || preservesPreviewLayout != preservePreviewLayout
+        preservesPreviewLayout = preservePreviewLayout
+        let changed = previewChanged || self.download !== download
+        if previewChanged { previewObservations.removeAll() }
+        if sourceRoot !== root { mountedDownload = nil; mountedPreview = nil }
+        if self.download !== download, let old = self.download, hosts(old) { old.removeFromSuperview() }
+        if explore !== preview, let old = explore, hosts(old) { old.removeFromSuperview() }
+        sourceRoot = root
+        self.download = download
+        explore = preview
+        if let download, mountedDownload !== download {
+            PlaylistDownloadControl.style(download)
+            PlaylistDownloadControl.hosted(download, from: root)
+            download.translatesAutoresizingMaskIntoConstraints = true
+            actions.addSubview(download)
+            mountedDownload = download
+            setNeedsLayout()
+        }
+        if previewChanged, let preview {
+            // Spotify initially exposes a hidden, 8-point placeholder. Its
+            // component fills and unhides it asynchronously, without another
+            // controller layout. Watch only that pending component, then stop.
+            previewObservations = [
+                preview.observe(\.isHidden) { [weak self] _, _ in self?.previewBecameReady() },
+                preview.observe(\.bounds) { [weak self] _, _ in self?.previewBecameReady() },
+                preview.observe(\.center) { [weak self] _, _ in self?.previewBecameReady() }
+            ]
+        }
+        mountPreviewIfReady()
+        if changed { actions.contentOffset = .zero; setNeedsLayout() }
+    }
 
     // Hosted outside Spotify's header (adding views there stalls its layout), so it follows the header's scroll itself.
     func follow(_ scrollView: UIScrollView?) {
@@ -62,18 +113,11 @@ final class PlaylistActionRow: UIView {
         dot.isHidden = true
         return dot
     }()
+    private let artistDownloadButton = PlaylistActionRow.circle("arrow.down")
     private let addButton = PlaylistActionRow.circle("plus")
+    private weak var artistHeader: UIView?
     private let followButton: UIButton = {
-        var config = UIButton.Configuration.glass()
-        config.cornerStyle = .capsule
-        config.baseForegroundColor = .white
-        config.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 18, bottom: 0, trailing: 18)
-        config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer {
-            var attributes = $0
-            attributes.font = .systemFont(ofSize: 15, weight: .semibold)
-            return attributes
-        }
-        let button = UIButton(configuration: config)
+        let button = PlaylistActionRow.circle("person.badge.plus")
         button.isHidden = true
         return button
     }()
@@ -95,6 +139,8 @@ final class PlaylistActionRow: UIView {
 
     private static let playImage = UIImage(systemName: "play.fill", withConfiguration: UIImage.SymbolConfiguration(pointSize: 15, weight: .bold))
     private static let pauseImage = UIImage(systemName: "pause.fill", withConfiguration: UIImage.SymbolConfiguration(pointSize: 15, weight: .bold))
+    private static let followImage = UIImage(systemName: "person.badge.plus", withConfiguration: UIImage.SymbolConfiguration(pointSize: 17, weight: .semibold))
+    private static let followedImage = UIImage(systemName: "person.fill.checkmark", withConfiguration: UIImage.SymbolConfiguration(pointSize: 17, weight: .semibold))
     private static let plusImage = UIImage(systemName: "plus", withConfiguration: UIImage.SymbolConfiguration(pointSize: 17, weight: .semibold))
     private static let checkImage = UIImage(systemName: "checkmark", withConfiguration: UIImage.SymbolConfiguration(pointSize: 17, weight: .semibold))
     private static let playTitle = "playlist_play".localized
@@ -111,7 +157,23 @@ final class PlaylistActionRow: UIView {
     override init(frame: CGRect) {
         super.init(frame: frame)
         overrideUserInterfaceStyle = .dark
-        [shuffleButton, playButton, addButton, shareButton, followButton].forEach(addSubview)
+        actions.accessibilityIdentifier = "Eevee.Playlist.Actions"
+        actions.showsHorizontalScrollIndicator = false
+        actions.alwaysBounceVertical = false
+        actions.isDirectionalLockEnabled = true
+        actions.delaysContentTouches = false
+        actions.contentInsetAdjustmentBehavior = .never
+        addSubview(actions)
+        addSubview(playButton)
+        artistDownloadButton.accessibilityIdentifier = "Eevee.Artist.Download"
+        artistDownloadButton.accessibilityLabel = "Artist downloads"
+        artistDownloadButton.isHidden = true
+        actions.addSubview(artistDownloadButton)
+        for (button, name) in [(shuffleButton,"Shuffle"),(addButton,"Add"),(shareButton,"Share"),(followButton,"Follow")] {
+            button.accessibilityIdentifier = "Eevee.Playlist." + name
+            actions.addSubview(button)
+        }
+        playButton.accessibilityIdentifier = "Eevee.Playlist.Play"
         shuffleButton.addSubview(shuffleDot)
         shuffleButton.addAction(UIAction { [weak self] _ in self?.forward(self?.shuffle, "shuffle") }, for: .primaryActionTriggered)
         playButton.addAction(UIAction { [weak self] _ in self?.forward(self?.play, "play") }, for: .primaryActionTriggered)
@@ -129,30 +191,102 @@ final class PlaylistActionRow: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        let side: CGFloat = 48, gap: CGFloat = 12
+        let side: CGFloat = 48, gap: CGFloat = 12, edge: CGFloat = 16
         let y = (bounds.height - side) / 2
-        var playWidth: CGFloat = 140
-        if let explore, explore.window != nil, explore.bounds.width > 0 {
-            let clear = explore.convert(explore.bounds, to: self).maxX + 8
-            playWidth = max(96, min(playWidth, 2 * (bounds.midX - clear - side - gap)))
+        let playWidth = min(max(140, playButton.sizeThatFits(CGSize(width: 220, height: side)).width), max(96, bounds.width * 0.45))
+        let playFrame = CGRect(x: bounds.width - edge - playWidth, y: y, width: playWidth, height: side)
+        if playButton.frame != playFrame { playButton.frame = playFrame }
+        let start = preservesPreviewLayout ? nativePreviewEnd(in: self).map { max(edge, $0 + gap) } ?? edge : edge
+        let stripFrame = CGRect(x: start, y: y, width: max(0, playFrame.minX - gap - start), height: side)
+        if actions.frame != stripFrame { actions.frame = stripFrame }
+        var x: CGFloat = 0
+        for native in [explore, download].compactMap({ $0 }) where hosts(native) && !native.isHidden {
+            let size = native === explore ? previewSize : CGSize(width: side, height: side)
+            let frame = CGRect(x: x, y: (side-size.height)/2, width: size.width, height: size.height)
+            if native.frame != frame { native.frame = frame }
+            x += size.width + gap
         }
-        playButton.frame = CGRect(x: bounds.midX - playWidth / 2, y: y, width: playWidth, height: side)
-        shuffleButton.frame = CGRect(x: playButton.frame.minX - gap - side, y: y, width: side, height: side)
-        shuffleDot.center = CGPoint(x: side / 2, y: side - 7)
-        var x = playButton.frame.maxX + gap
-        for button in [addButton, shareButton, followButton] where !button.isHidden {
-            let width = button === followButton ? max(side, button.intrinsicContentSize.width) : side
-            button.frame = CGRect(x: x, y: y, width: width, height: side)
+        for button in [shuffleButton, artistDownloadButton, addButton, shareButton, followButton] where !button.isHidden {
+            let width = side
+            let frame = CGRect(x: x, y: 0, width: width, height: side)
+            if button.frame != frame { button.frame = frame }
             x += width + gap
+        }
+        shuffleDot.center = CGPoint(x: side / 2, y: side - 7)
+        let size = CGSize(width: max(0, x - gap), height: side)
+        if actions.contentSize != size { actions.contentSize = size }
+        let offset = max(0, min(actions.contentOffset.x, size.width - actions.bounds.width))
+        if actions.contentOffset.x != offset { actions.contentOffset.x = offset }
+    }
+
+    private func previewBecameReady() {
+        guard !previewUpdatePending else { return }
+        previewUpdatePending = true
+        // Complete Spotify's current native component/layout update first.
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.previewUpdatePending = false
+            if self.preservesPreviewLayout {
+                self.place()
+                self.sync()
+                self.setNeedsLayout()
+            } else {
+                self.mountPreviewIfReady()
+            }
         }
     }
 
+    // Artist previews belong to Spotify's asynchronous Element/OverflowStack
+    // layout. Keep their hierarchy and geometry entirely under native ownership.
+    private func nativePreviewEnd(in host: UIView) -> CGFloat? {
+        guard let preview = explore, preview.window != nil else { return nil }
+        var ancestor: UIView? = preview
+        while let node = ancestor, node !== superview {
+            if node.isHidden || node.alpha < 0.01 { return nil }
+            ancestor = node.superview
+        }
+        var box = preview.convert(preview.bounds, to: host)
+        // Native artwork/hit areas may extend outside their small layout shell.
+        var queue = preview.subviews
+        var index = 0
+        while index < queue.count {
+            let child = queue[index]; index += 1
+            guard !child.isHidden, child.alpha > 0.01 else { continue }
+            if child is UIControl || child is UIImageView {
+                box = box.union(child.convert(child.bounds, to: host))
+            }
+            queue += child.subviews
+        }
+        return box.isEmpty ? nil : box.maxX
+    }
+
+    private func mountPreviewIfReady() {
+        guard !preservesPreviewLayout, let preview = explore, mountedPreview !== preview,
+              !preview.isHidden, preview.bounds.width > 1, preview.bounds.height > 1 else { return }
+        previewSize = preview.bounds.size
+        previewObservations.removeAll()
+        preview.translatesAutoresizingMaskIntoConstraints = true
+        actions.addSubview(preview)
+        mountedPreview = preview
+        setNeedsLayout()
+        }
+
     private func forward(_ source: UIView?, _ name: String) {
         guard let source else { return }
-        let control = (source as? UIControl) ?? source.eeveeFirst(UIControl.self)
-        let fired = control.map { EeveeFireTap($0) } ?? false
+        let fired = EeveeFireTap(source)
         if !fired { eeveeLog("[EeveeSpotify][Glass] Playlist %@ tap FAILED", name) }
         for delay in [0.4, 1.2, 2.5] { DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in self?.sync() } }
+    }
+
+    func bindArtistDownloads(header: UIView?) {
+        artistHeader = header
+        guard let header else {
+            if !artistDownloadButton.isHidden { artistDownloadButton.isHidden = true; setNeedsLayout() }
+            return
+        }
+        let wasHidden = artistDownloadButton.isHidden
+        EeveePixieUpdateArtistDownloads(header, artistDownloadButton)
+        if wasHidden != artistDownloadButton.isHidden { setNeedsLayout() }
     }
 
     func sync() {
@@ -160,12 +294,17 @@ final class PlaylistActionRow: UIView {
             addButton.isHidden = add == nil
             setNeedsLayout()
         }
-        let followTitle = followControl?.eeveeFirst(UILabel.self)?.text
+        let followVisible = followControl != nil
         var followConfig = followButton.configuration
-        followConfig?.title = followTitle
-        if followButton.configuration != followConfig || followButton.isHidden != (followTitle == nil) {
+        let state = artistHeader.map { header in
+            EeveePixieArtistFollowing(header) { [weak self] in self?.sync() }
+        } ?? -1
+        followConfig?.image = state == 1 ? Self.followedImage : Self.followImage
+        followConfig?.baseForegroundColor = state == 1 ? Theme.accent : .white
+        followButton.accessibilityLabel = followControl?.accessibilityLabel ?? followControl?.eeveeFirst(UILabel.self)?.text
+        if followButton.configuration != followConfig || followButton.isHidden == followVisible {
             followButton.configuration = followConfig
-            followButton.isHidden = followTitle == nil
+            followButton.isHidden = !followVisible
             setNeedsLayout()
         }
         if shareButton.isHidden != (share == nil) {
@@ -195,5 +334,14 @@ final class PlaylistActionRow: UIView {
         shuffleDot.isHidden = !shuffled
         shuffleDot.backgroundColor = Theme.accent
         if shuffleButton.configuration != shuffleConfig { shuffleButton.configuration = shuffleConfig }
+    }
+}
+
+// The standard scroll-view cancellation policy lets a swipe starting on a
+// button cancel its tap, while the Play button stays outside the scroll view.
+@available(iOS 26.0, *)
+private final class PlaylistActionsScrollView: UIScrollView {
+    override func touchesShouldCancel(in view: UIView) -> Bool {
+        view is UIControl || super.touchesShouldCancel(in: view)
     }
 }

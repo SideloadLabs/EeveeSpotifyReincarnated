@@ -194,13 +194,20 @@ extension GlassPlaylist {
         return found
     }
 
-    static func actionRow(host: UIView, controls: UIView, scroll: UIScrollView? = nil) -> Bool {
-        guard let shuffle = PageLookup.find("Components.UI.ShuffleButton", in: controls),
-              let play = PageLookup.find("header-play-button", in: controls) else { return false }
-        let add = PageLookup.find("Components.UI.AddToButton", in: controls)
-        let share = PageLookup.find("Components.UI.ShareButton", in: controls)
-        let explore = PageLookup.find("Components.UI.WatchFeedEntityExplorerButton", in: controls)
-        let follow = PageLookup.find("Curation.FollowButtonElementKit.FollowButton", in: controls)
+    static func actionRow(host: UIView, controls: UIView, scroll: UIScrollView? = nil, preservePreviewLayout: Bool = false) -> Bool {
+        let cached = objc_getAssociatedObject(host, &rowKey) as? PlaylistActionRow
+        func source(_ identifier: String, previous: UIView?) -> UIView? {
+            if let found = PageLookup.find(identifier, in: controls) { return found }
+            guard cached?.sourceRoot === controls, let previous,
+                  previous.isDescendant(of: controls) else { return nil }
+            return previous
+        }
+        let sourceShuffle = source("Components.UI.ShuffleButton", previous: cached?.shuffle)
+        let sourcePlay = source("header-play-button", previous: cached?.play)
+        guard let shuffle = sourceShuffle, let play = sourcePlay else { return false }
+        let add = source("Components.UI.AddToButton", previous: cached?.add)
+        let share = source("Components.UI.ShareButton", previous: cached?.share)
+        let follow = source("Curation.FollowButtonElementKit.FollowButton", previous: cached?.followControl)
 
         for control in [shuffle, add, share, follow].compactMap({ $0 }) {
             guard let holder = holder(of: control) else { continue }
@@ -212,13 +219,16 @@ extension GlassPlaylist {
             objc_setAssociatedObject(host, &rowKey, row, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
             return row
         }()
+        let download = PlaylistDownloadControl.resolve(in: controls)
+        let explore = row.sourceRoot === controls && row.hosts(row.explore) ? row.explore : PageLookup.find("Components.UI.WatchFeedEntityExplorerButton", in: controls)
         if row.superview !== host || host.subviews.last !== row { host.addSubview(row) }
+        row.bindNative(download: download, preview: explore, root: controls, preservePreviewLayout: preservePreviewLayout)
         row.shuffle = shuffle
         row.play = play
         row.add = add
         row.share = share
-        row.explore = explore
         row.followControl = follow
+        row.bindArtistDownloads(header: host.accessibilityIdentifier == "creator-page" ? controls : nil)
         row.anchor = add ?? shuffle
         row.playHolder = holder(of: play)
         row.controlsRow = wideAncestor(of: shuffle, below: host)
@@ -230,6 +240,7 @@ extension GlassPlaylist {
         if host.window != nil { PlaylistActionRow.current = row }
         return true
     }
+
 
     static func row(near view: UIView) -> PlaylistActionRow? {
         if let row = (objc_getAssociatedObject(view, &nearRowKey) as? PageLookup.WeakView)?.view as? PlaylistActionRow { return row }
