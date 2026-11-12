@@ -37,17 +37,9 @@ lyrics_source_description = "Možete odabrati željeni izvor tekstova.
 
 Genius: Nudi najbolju kvalitetu tekstova, pruža najviše pjesama i najbrže ažurira tekstove. Nije i nikada neće biti sinkroniziran s vremenom.
 
-LRCLIB: Najotvorenija usluga, nudi sinkronizirane tekstove. Međutim, nedostaju tekstovi za mnoge pjesme.
-
-Musixmatch: Usluga koju koristi Spotify. Pruža sinkronizirane tekstove za mnoge pjesme, ali potreban vam je korisnički token za korištenje ovog izvora.";
+LRCLIB: Najotvorenija usluga, nudi sinkronizirane tekstove. Međutim, nedostaju tekstovi za mnoge pjesme.";
 lyrics_additional_info = "Ako EeveeSpotify ne može pronaći pjesmu ili obraditi tekstove, vidjet ćete poruku 'Nije moguće učitati tekstove za ovu pjesmu'. Tekstovi mogu biti pogrešni za neke pjesme kada se koristi Genius zbog načina na koji tweak pretražuje pjesme. U većini slučajeva sam to uspio riješiti.";
 petitlyrics_description = "PetitLyrics: Nudi mnoštvo sinkroniziranih japanskih i nekih međunarodnih tekstova.";
-
-musixmatch_user_token = "Musixmatch korisnički token";
-user_token_placeholder = "Unesite korisnički token ili zalijepite informacije za otklanjanje pogrešaka";
-
-enter_user_token = "Unesite korisnički token";
-enter_user_token_message = "Da biste koristili Musixmatch, morate preuzeti svoj korisnički token iz službene aplikacije. Preuzmite Musixmatch iz App Store-a, prijavite se, zatim idite na Postavke > Dobij pomoć > Kopiraj informacije za otklanjanje pogrešaka i zalijepite ih ovdje. Također možete izdvojiti token koristeći MITM.";
 
 genius_fallback = "Povrat na Genius";
 genius_fallback_description = "Učitaj tekstove s Geniusa ako postoji problem s %@.";
@@ -56,9 +48,6 @@ show_fallback_reasons = "Prikaži razloge povrata";
 
 romanized_lyrics = "Romanizirani tekstovi";
 romanized_lyrics_description = "Prikaži romanizirane tekstove za japanski, korejski i kineski jezik.";
-
-musixmatch_language = "Jezik tekstova Musixmatch";
-musixmatch_language_description = "Možete unijeti dvopročitni kod jezika Musixmatch i vidjeti prevedene tekstove na Musixmatchu ako su dostupni.";
 
 // Korisničko sučelje
 
@@ -88,14 +77,9 @@ download_local_playlist = "Preuzmi lokalni popis za reprodukciju";
 fallback_attribute = "Povrat";
 romanized_attribute = "Romanizirano";
 
-musixmatch_unauthorized_popup = "Tweak ne može učitati tekstove s Musixmatcha zbog greške u autorizaciji. Provjerite ili ažurirajte svoj Musixmatch token. Ako koristite iPad, token biste trebali preuzeti iz Musixmatch aplikacije za iPad.";
-musixmatch_restricted_popup = "Tweak ne može učitati tekstove s Musixmatcha jer su ograničeni. Vjerojatno je riječ o problemu s autorskim pravima zbog američke IP adrese, pa biste je trebali promijeniti ako ste u SAD-u ili koristiti VPN.";
-
 // Naslovi pogrešaka
 
 no_such_song = "Pjesma nije pronađena";
-musixmatch_restricted = "Ograničeno";
-invalid_musixmatch_token = "Neovlašteno";
 decoding_error = "Greška u dekodiranju";
 no_current_track = "Nema instance pjesme";
 unknown_error = "Nepoznata pogreška";
@@ -110,9 +94,6 @@ let_the_music_play = "Pustite glazbu da svira...";
 liked_songs = "Omiljene pjesme";
 
 contributors = "Suradnici";
-
-request_anonymous_token = "Zatraži anonimni token";
-request_anonymous_token_description = "Dodirnite 'Zatraži anonimni token' za zahtjev tokena od Musixmatcha bez autorizacije.";
 
 lrclib_api = "Adresa poslužitelja";
 

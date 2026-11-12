@@ -32,19 +32,11 @@ lyrics_source_description = "Du chasch d'Quelle uswähle, vo wo d'Lyrics cho sö
 
 Genius: Biätet de bescht Qualität, het de meiste Lieder und aktualisiert d'Lyrics am schnellste. Bütet aber kei Ziit synchronisierti Lyrics a.
 
-LRCLIB: Isch diä meischt offeni Quelle, wo Ziit synchronisierti Lyrics abütet. Het aber nid für alli Lieder Lyrics.
-
-Musixmatch: Isch d'Quelle, wo Spotify benutzt. Bütet Ziit synchronisierti Lyrics für meh Lieder a, aber du bruchsch en Token, um die Quelle z'nutze.";
+LRCLIB: Isch diä meischt offeni Quelle, wo Ziit synchronisierti Lyrics abütet. Het aber nid für alli Lieder Lyrics.";
 
 lyrics_additional_info = "Wänn de tweak keis lied oder the lyrics nid finde chan, wird en \"Chan kei Lyrics für das Lied lade\" Nachricht usgäh. Die Lyrics chönd falsch sii für einigi Lieder wäg de art wiä de tweak lieder suecht. Ich ha's aber i de meischte Fäll zum laufe bracht.";
 
 petitlyrics_description = "PetitLyrics: Bütet viel Ziit synchronisierti japanischi und internationali Lyrics a.";
-
-musixmatch_user_token = "Musixmatch Token";
-user_token_placeholder = "Duen din Musixmatch token oder d debugg info da ine";
-
-enter_user_token = "Duen de User Token da iigäh";
-enter_user_token_message = "Damit du Musixmatch nutze chasch, muesch du din User Token vo de offizielle App hole. Lade Musixmatch vom App Store abe, mäld di a, gang zu Einstellige > Get Help > Debug Info kopiers und füegs da i. Du chasch de Token au mit MITM uslese.";
 
 genius_fallback = "Genius Fallback";
 genius_fallback_description = "Lade Lyrics vo Genius, wänn es Problem mit %@ git.";
@@ -53,9 +45,6 @@ show_fallback_reasons = "Zeig Fallback Reasons";
 
 romanized_lyrics = "Romanisierti Lyrics";
 romanized_lyrics_description = "Zeig romanisierti Lyrics für Japanisch, Koreanisch und Chinesisch a.";
-
-musixmatch_language = "Musixmatch Lyrics Language";
-musixmatch_language_description = "Du chasch en 2-Buchstabe Musixmatch Sprachcode iigäh und übersetzti Lyrics uf Musixmatch luege, wänn sie verfüegbar sind.";
 
 // UI
 
@@ -84,14 +73,9 @@ playlist_downloading_popup = "Native Playlist-Download isch serverseitig und isc
 fallback_attribute = "Fallback";
 romanized_attribute = "Romanisiert";
 
-musixmatch_unauthorized_popup = "De tweak cha kei Lyrics vo Musixmatch lade wäg em \"Unauthorized\" Fehler. Bitte überprüf oder aktualisiere din Musixmatch Token. Wänn du en iPad bruchsch, söllsch de Token vo de Musixmatch App für iPad hole.";
-musixmatch_restricted_popup = "De tweak cha kei Lyrics vo Musixmatch lade wäg em \"Restricted\" Fehler. Es isch wahrschinlich es Copyright-Problem wäg de US IP-Adresse, drum söllsch du die ändere, wänn du i de USA bisch oder en VPN bruchsch.";
-
 // Errors Titles
 
 no_such_song = "Keis Lied gfunde";
-musixmatch_restricted = "Restricted";
-invalid_musixmatch_token = "nöd Authorisiert";
 decoding_error = "Decoding Error";
 no_current_track = "Kei track instanz";
 unknown_error = "Unbekannte Error";
@@ -361,8 +345,6 @@ could_not_share_popup = "Couldn’t share to the selected destination or LiveCon
 liked_songs = "Liked songs";
 contributors = "Contributors";
 developer_note = "Developer's Note";
-request_anonymous_token = "Request Anonymous Token";
-request_anonymous_token_description = "Tap “Request Anonymous Token” to request a token from Musixmatch without authorization.";
 lrclib_api = "Server Address";
 ad_free_music_listening = "Ad-free music listening";
 play_songs_in_any_order = "Play songs in any order";

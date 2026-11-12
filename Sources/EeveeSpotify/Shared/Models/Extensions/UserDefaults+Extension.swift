@@ -3,7 +3,6 @@ import Foundation
 extension UserDefaults {
     static var container: UserDefaults = .standard
     
-    private static let musixmatchTokenKey = "musixmatchToken"
     private static let darkPopUpsKey = "darkPopUps"
     private static let debugLoggingEnabledKey = "debugLoggingEnabled"
     private static let patchTypeKey = "patchType"
@@ -16,15 +15,6 @@ extension UserDefaults {
     private static let cachedCustomizeDataKey = "eeveeCachedCustomizeData"
     private static let iconNamePrettifyKey = "iconNamePrettify"
     private static let cleanShareLinksKey = "cleanShareLinks"
-
-    static var musixmatchToken: String {
-        get {
-            container.string(forKey: musixmatchTokenKey) ?? ""
-        }
-        set (token) {
-            container.set(token, forKey: musixmatchTokenKey)
-        }
-    }
 
     static var darkPopUps: Bool {
         get {

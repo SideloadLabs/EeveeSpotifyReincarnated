@@ -37,17 +37,9 @@ lyrics_source_description = "Du kannst die gewünschte Lyrics-Quelle auswählen.
 
 Genius: Bietet qualitativ hochwertige Lyrics, deckt die meisten Songs ab und aktualisiert Lyrics am schnellsten. Keine und niemals zeitsynchronisierte Lyrics.
 
-LRCLIB: Der offenste Dienst, der zeitsynchronisierte Lyrics bietet. Hat jedoch bei vielen Songs keine Lyrics.
-
-Musixmatch: Der von Spotify verwendete Dienst. Bietet zeitsynchronisierte Lyrics für viele Songs, erfordert jedoch einen Benutzertoken, um diese Quelle zu verwenden.";
+LRCLIB: Der offenste Dienst, der zeitsynchronisierte Lyrics bietet. Hat jedoch bei vielen Songs keine Lyrics.";
 lyrics_additional_info = "Wenn EeveeSpotify keinen Song findet oder die Lyrics nicht verarbeiten kann, wird die Meldung „Die Lyrics für diesen Song konnten nicht geladen werden“ angezeigt. Bei Genius könnten einige Lyrics falsch sein, da der Tweak Songs auf eine bestimmte Weise durchsucht. In den meisten Fällen funktioniert es jedoch.";
 petitlyrics_description = "PetitLyrics: Bietet viele zeitsynchronisierte japanische und einige internationale Lyrics.";
-
-musixmatch_user_token = "Musixmatch-Benutzertoken";
-user_token_placeholder = "Benutzertoken eingeben oder Debug-Infos einfügen";
-
-enter_user_token = "Benutzertoken eingeben";
-enter_user_token_message = "Um Musixmatch zu verwenden, musst du deinen Benutzertoken aus der offiziellen App abrufen. Lade Musixmatch aus dem App Store herunter, melde dich an, gehe zu Einstellungen > Hilfe > Debug-Infos kopieren und füge sie hier ein. Alternativ kannst du den Token mit MITM extrahieren.";
 
 genius_fallback = "Genius Fallback";
 genius_fallback_description = "Lade Lyrics von Genius, falls ein Problem mit %@ auftritt.";
@@ -59,9 +51,6 @@ hide_lyrics_on_error_description = "Liedtextanzeige entfernen, wenn das Laden fe
 
 romanized_lyrics = "Romanisierte Lyrics";
 romanized_lyrics_description = "Zeige romanisierte Lyrics für japanische, koreanische und chinesische Songs.";
-
-musixmatch_language = "Musixmatch-Lyricssprache";
-musixmatch_language_description = "Du kannst einen zweibuchstabigen Musixmatch-Sprachcode eingeben, um übersetzte Lyrics auf Musixmatch zu sehen, falls verfügbar.";
 
 // UI
 
@@ -101,14 +90,9 @@ could_not_share_popup = "Teilen an das gewünschte Ziel oder dem LiveContainer i
 fallback_attribute = "Fallback";
 romanized_attribute = "Romanisiert";
 
-musixmatch_unauthorized_popup = "Der Tweak kann keine Lyrics von Musixmatch laden, da ein Fehler „Nicht autorisiert“ aufgetreten ist. Überprüfe deinen Musixmatch-Token oder aktualisiere ihn. Falls du ein iPad benutzt, solltest du den Token aus der Musixmatch-iPad-App abrufen.";
-musixmatch_restricted_popup = "Der Tweak kann keine Lyrics von Musixmatch laden, da diese eingeschränkt sind. Wahrscheinlich liegt dies an einem Urheberrechtsproblem aufgrund einer US-IP-Adresse. Ändere sie oder verwende einen VPN, falls du in den USA bist.";
-
 // Errors Titles
 
 no_such_song = "Kein Song gefunden";
-musixmatch_restricted = "Eingeschränkt";
-invalid_musixmatch_token = "Nicht autorisiert";
 decoding_error = "Dekodierungsfehler";
 no_current_track = "Keine Track-Instanz";
 unknown_error = "Unbekannter Fehler";
@@ -123,9 +107,6 @@ let_the_music_play = "Lass die Musik spielen...";
 liked_songs = "Lieblingssongs";
 
 contributors = "Collaborator";
-
-request_anonymous_token = "Anonymes Token anfordern";
-request_anonymous_token_description = "Tippe auf „Anonymes Token anfordern“, um ein Token von Musixmatch ohne Autorisierung anzufordern.";
 
 lrclib_api = "Server Adresse";
 

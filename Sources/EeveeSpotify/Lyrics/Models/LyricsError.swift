@@ -3,8 +3,6 @@ import Foundation
 enum LyricsError: Error, CustomStringConvertible {
     case noCurrentTrack
     case trackMismatch
-    case musixmatchRestricted
-    case invalidMusixmatchToken
     case decodingError
     case noSuchSong
     case unknownError
@@ -16,10 +14,6 @@ enum LyricsError: Error, CustomStringConvertible {
         switch self {
         case .noSuchSong:
             return "no_such_song".localized
-        case .musixmatchRestricted:
-            return "musixmatch_restricted".localized
-        case .invalidMusixmatchToken:
-            return "invalid_musixmatch_token".localized
         case .decodingError:
             return "decoding_error".localized
         case .unknownError:

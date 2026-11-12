@@ -38,17 +38,9 @@ lyrics_source_description = "Tapai le man parne lyrics ko source chhannu saknuhu
 
 Genius: Sabai bhanda ramro lyric source, dherai geet haru ko lyrics dincha, ra sabai bhanda chito update garcha. Tara time-synced kaile hudaina.
 
-LRCLIB: Sabai bhanda khulla service, time-synced lyrics dincha. Tara, dherai geet haru ko lyrics hudaina.
-
-Musixmatch: Yo Service Spotify le use garcha. Dherai geet haru ko time-synced lyrics dincha, tara yo source use garna user token chahinchha.";
+LRCLIB: Sabai bhanda khulla service, time-synced lyrics dincha. Tara, dherai geet haru ko lyrics hudaina.";
 lyrics_additional_info = "Yadi EeveeSpotify le kunai geet khojna nasake ya lyrics process garna nasake, tapai le 'Yo geet ko lyrics load garna sakiyena' vanera message dekhnuhunechha. Genius prayog garda kunai kunai geet haru ko lyrics galat huna sakcha tweak le kasari khojcha bhanne kurama adharit hunale. Maile yo sakesamma kaam garne banayeko chu.";
 petitlyrics_description = "PetitLyrics: Dherai Japanese ra kehi international geet haru ko time-synced lyrics dincha.";
-
-musixmatch_user_token = "Musixmatch ko User Token";
-user_token_placeholder = "User Token halnus ya Debug Info paste garnuhos";
-
-enter_user_token = "User Token Halnus";
-enter_user_token_message = "Musixmatch prayog garnu ko lagi, tapai le official app bata user token lina parcha. App Store bata Musixmatch download garera, sign up garnuhos, tespachi Settings > Get help > Copy debug info ma januhos ra yaha paste garnuhos. Yo token tapai le MITM bata ni nikalna saknuhunchha.";
 
 genius_fallback = "Genius Fallback";
 genius_fallback_description = "Yadi %@ ma samasya aayo bhane Genius bata lyrics load garney.";
@@ -60,9 +52,6 @@ hide_lyrics_on_error_description = "Lyrics load vayena vaney Lyrics component la
 
 romanized_lyrics = "Romanized Lyrics";
 romanized_lyrics_description = "Japanese, Korean, ra Chinese language ka geet haru ko Romanized lyrics dekhaune.";
-
-musixmatch_language = "Musixmatch Lyrics ko Language";
-musixmatch_language_description = "Tapai le 2-letter Musixmatch language code halera translated lyrics herna saknuhunchha.";
 
 // UI
 
@@ -104,14 +93,9 @@ could_not_share_popup = "Selected destination wa LiveContainer ma share garna mi
 fallback_attribute = "Fallback";
 romanized_attribute = "Romanized";
 
-musixmatch_unauthorized_popup = "Musixmatch bata lyrics load garna tweak le sakena Unauthorized error le garda. Kripaya tapai ko Musixmatch token Change ya update garnuhos.";
-musixmatch_restricted_popup = "Musixmatch bata lyrics load garna sakiyena kinabhane restricted chha. Sambhavit rupma yo copyright samasya ho US IP address le garda, tesaile tapai le IP change garnu parcha ya VPN prayog garnu saknuhunchha.";
-
 // Errors Titles
 
 no_such_song = "Kunai Geet Paayena";
-musixmatch_restricted = "Restricted";
-invalid_musixmatch_token = "Unauthorized";
 decoding_error = "Decoding Error";
 no_current_track = "No Track Instance";
 unknown_error = "Unknown Error";
@@ -126,9 +110,6 @@ let_the_music_play = "Geet bajna dinuhos...";
 liked_songs = "Man Parne Geet";
 
 contributors = "Contributors";
-
-request_anonymous_token = "Anonymous Token request garne";
-request_anonymous_token_description = "Anonymous Token magna 'Anonymous Token request garne' tap garnuhos.";
 
 lrclib_api = "Server ko Address";
 

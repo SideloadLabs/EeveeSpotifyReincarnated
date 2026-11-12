@@ -43,18 +43,10 @@ lyrics_source_description = "Możesz wybrać źródło które najbardziej Tobie 
 
 Genius: Najlepsza jakość, najczęściej aktualizowane źródło. Nie jest i nigdy nie będzie zsynchronizowane z utworem.
 
-LRCLIB: Najbardziej otwarte źródło, oferuje zsynchronizowane teksty. Brakuje w nim jednak wielu utworów.
-
-Musixmatch: Używane przez Spotify, oferuje zsynchronizowane teksty dla wielu utworów. Wymaga tokenu użytkownika.";
+LRCLIB: Najbardziej otwarte źródło, oferuje zsynchronizowane teksty. Brakuje w nim jednak wielu utworów.";
 lyrics_additional_info = "Jeśli EeveeSpotify nie znajdzie utworu lub tekstu, pojawi się komunikat \"Nie udało się załadować tekstu\". Teksty z Genius mogą być błędne z powodu sposobu wyszukiwania utworów. W większości przypadków działa to poprawnie.";
 spicylyrics_description = "SpicyLyrics dostarcza teksty karaoke słowo po słowie. Domyślnie używany jest wbudowany klucz. Jeśli chcesz użyć własnego klucza, przejdź do Spicy ESR template i naciśnij „Sign in”. Po zalogowaniu zaakceptuj ToS Spicy i naciśnij „Add ESR to my account”. Po dodaniu skopiuj wygenerowany klucz, wklej go w sekcji tekstów Eevee, wróć do Spicy i kliknij „I have stored it”. Następnie przejdź do strony aplikacji.";
 petitlyrics_description = "PetitLyrics: Oferuje wiele zsynchronizowanych tekstów japońskich, ale niewiele międzynarodowych.";
-
-musixmatch_user_token = "Token użytkownika Musixmatch";
-user_token_placeholder = "Podaj token lub dane debugowania";
-
-enter_user_token = "Podaj token użytkownika";
-enter_user_token_message = "Aby korzystać z Musixmatch, musisz uzyskać swój token użytkownika z oficjalnej aplikacji. Pobierz Musixmatch z App Store, zarejestruj się, a następnie przejdź do Ustawienia > Uzyskaj pomoc > Kopiuj informacje debugowania i wklej je tutaj. Możesz również wyodrębnić token za pomocą MITM.";
 
 genius_fallback = "Fallback do Genius";
 genius_fallback_description = "Wczytuje tekst z usługi Genius, jeśli wystąpi problem z %@.";
@@ -66,9 +58,6 @@ hide_lyrics_on_error_description = "Usuń kartę tekstu piosenki, jeśli nie uda
 
 romanized_lyrics = "Zromanizowane teksty";
 romanized_lyrics_description = "Wyświetla zromanizowane teksty dla japońskiego, koreańskiego i chińskiego.";
-
-musixmatch_language = "Język tekstów z Musixmatch";
-musixmatch_language_description = "Możesz wprowadzić 2-literowy kod języka Musixmatch. Zobaczysz przetłumaczone teksty Musixmatch, jeśli będą one dostępne.";
 
 // UI
 
@@ -118,14 +107,9 @@ could_not_share_popup = "Nie udało się udostępnić do wybranego miejsca lub L
 fallback_attribute = "Fallback";
 romanized_attribute = "Zromanizowany tekst";
 
-musixmatch_unauthorized_popup = "Modyfikacja nie może załadować tekstów z Musixmatch z powodu błędu autoryzacji. Sprawdź lub zaktualizuj swój token Musixmatch. Jeśli używasz iPada, uzyskaj token z aplikacji Musixmatch na iPady.";
-musixmatch_restricted_popup = "Modyfikacja nie jest w stanie załadować tekstów z Musixmatch, ponieważ są one ograniczone. Jest to prawdopodobnie kwestia praw autorskich ze względu na amerykański adres IP, spróbuj go zmienić, jeśli znajdujesz się w USA lub korzystasz z VPN.";
-
 // Errors Titles
 
 no_such_song = "Nie znaleziono utworu";
-musixmatch_restricted = "Ograniczone";
-invalid_musixmatch_token = "Brak autoryzacji";
 decoding_error = "Błąd dekodowania";
 no_current_track = "Brak instancji piosenki";
 unknown_error = "Nieznany błąd";
@@ -141,9 +125,6 @@ liked_songs = "Polubione utwory";
 
 contributors = "Współtwórcy";
 developer_note = "Notatka dewelopera";
-
-request_anonymous_token = "Poproś o anonimowy token";
-request_anonymous_token_description = "Wybierz „Poproś o anonimowy token”, aby zażądać token Musixmatch bez autoryzacji";													   
 
 lrclib_api = "Adres serwera";
 

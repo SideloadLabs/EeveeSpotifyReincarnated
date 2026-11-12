@@ -43,18 +43,10 @@ lyrics_source_description = "You can select the lyrics source you prefer.
 
 Genius: Offers the best quality lyrics, provides the most songs, and updates lyrics the fastest. Does not and will never be time-synced.
 
-LRCLIB: The most open service, offering time-synced lyrics. However, it lacks lyrics for many songs.
-
-Musixmatch: The service Spotify uses. Provides time-synced lyrics for many songs, but you'll need a user token to use this source.";
+LRCLIB: The most open service, offering time-synced lyrics. However, it lacks lyrics for many songs.";
 lyrics_additional_info = "If EeveeSpotify is unable to find a song or process the lyrics, you'll see a \"Couldn't load the lyrics for this song\" message. The lyrics might be wrong for some songs when using Genius due to how the tweak searches songs. I've made it work in most cases.";
 spicylyrics_description = "SpicyLyrics provides word-by-word karaoke lyrics. A built-in key is used by default. If you want to use your own key, go to Spicy ESR template, then press the Sign in button. After you sign in, agree to the ToS of Spicy and press Add ESR to my account. After it's added, copy the generated key, paste it into the Eevee lyrics section, then go back to Spicy and click I have stored it. Go to the apps page.";
 petitlyrics_description = "PetitLyrics: Offers plenty of time-synced Japanese and some international lyrics.";
-
-musixmatch_user_token = "Musixmatch User Token";
-user_token_placeholder = "Enter User Token or Paste Debug Info";
-
-enter_user_token = "Enter User Token";
-enter_user_token_message = "In order to use Musixmatch, you need to retrieve your user token from the official app. Download Musixmatch from the App Store, sign up, then go to Settings > Get help > Copy debug info, and paste it here. You can also extract the token using MITM.";
 
 genius_fallback = "Genius Fallback";
 genius_fallback_description = "Load lyrics from Genius if there is a problem with %@.";
@@ -66,9 +58,6 @@ hide_lyrics_on_error_description = "Remove the lyrics component if lyrics fail t
 
 romanized_lyrics = "Romanized Lyrics";
 romanized_lyrics_description = "Display romanized lyrics for Japanese, Korean, and Chinese.";
-
-musixmatch_language = "Musixmatch Lyrics Language";
-musixmatch_language_description = "You can enter a 2-letter Musixmatch language code and see translated lyrics on Musixmatch if they are available.";
 
 karaoke_word_synced_button = "Custom Lyrics view";
 
@@ -120,14 +109,9 @@ could_not_share_popup = "Couldn’t share to the selected destination or LiveCon
 fallback_attribute = "Fallback";
 romanized_attribute = "Romanized";
 
-musixmatch_unauthorized_popup = "The tweak is unable to load lyrics from Musixmatch due to Unauthorized error. Please check or update your Musixmatch token. If you use an iPad, you should get the token from the Musixmatch app for iPad.";
-musixmatch_restricted_popup = "The tweak is unable to load lyrics from Musixmatch because they are restricted. It's likely a copyright issue due to the US IP address, so you should change it if you're in the US or use a VPN.";
-
 // Errors Titles
 
 no_such_song = "No Song Found";
-musixmatch_restricted = "Restricted";
-invalid_musixmatch_token = "Unauthorized";
 decoding_error = "Decoding Error";
 no_current_track = "No Track Instance";
 unknown_error = "Unknown Error";
@@ -146,9 +130,6 @@ developer_note = "Developer's Note";
 
 support_the_project = "Support the Project";
 support_the_project_description = "Fuel late-night code";
-
-request_anonymous_token = "Request Anonymous Token";
-request_anonymous_token_description = "Tap “Request Anonymous Token” to request a token from Musixmatch without authorization.";
 
 lrclib_api = "Server Address";
 

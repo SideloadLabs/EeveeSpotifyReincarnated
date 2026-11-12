@@ -37,17 +37,9 @@ lyrics_source_description = "Kiválaszthatja a kívánt szövegforrást.
 
 Genius: A legjobb minőségű dalszövegeket kínálja, a legtöbb dalt tartalmazza, és a leggyorsabban frissíti a dalszövegeket. Nem rendelkezik és soha nem is fog időszinkronizálni.
 
-LRCLIB: A legnyitottabb szolgáltatás, amely időszinkronizált dalszövegeket kínál. Sok dalhoz azonban nincs dalszöveg.
-
-Musixmatch: A Spotify által használt szolgáltatás. Sok dalhoz kínál időszinkronizált dalszövegeket, de ennek a forrásnak a használatához felhasználói tokenre van szükség.";
+LRCLIB: A legnyitottabb szolgáltatás, amely időszinkronizált dalszövegeket kínál. Sok dalhoz azonban nincs dalszöveg.";
 lyrics_additional_info = "Ha az EeveeSpotify nem talál egy dalt vagy nem tudja feldolgozni a dalszövegeket, akkor a \„Nem sikerült betölteni a dalszövegeket\” üzenet jelenik meg. A Genius használatakor előfordulhat, hogy a dalszövegek nem megfelelőek egyes dalok esetében, mivel a tweak a dalok keresése miatt nem találja meg a dalszövegeket. A legtöbb esetben sikerült megoldanom.";
 petitlyrics_description = "PetitLyrics: Rengeteg időszinkronizált japán és néhány nemzetközi dalszöveget kínál.";
-
-musixmatch_user_token = "Musixmatch felhasználói token";
-user_token_placeholder = "Felhasználói azonosító megadása vagy hibakeresési információ beillesztése";
-
-enter_user_token = "Felhasználói azonosító megadása";
-enter_user_token_message = "A Musixmatch használatához le kell kérnie a felhasználói tokenjét a hivatalos alkalmazásból. Töltse le a Musixmatch-et az App Store-ból, regisztráljon, majd menjen a Beállítások > Segítség lekérése > Hibakereső információ másolása menüpontra, és illessze be ide. A tokent a MITM segítségével is kinyerheted.";
 
 genius_fallback = "Genius probléma";
 genius_fallback_description = "Szövegek betöltése a Geniusból, ha probléma van a %@-val.";
@@ -56,9 +48,6 @@ show_fallback_reasons = "Hibakódok mutatása (Fallback hiba)";
 
 romanized_lyrics = "Romanizált dalszövegek";
 romanized_lyrics_description = "Japán, koreai és kínai nyelvű dalszövegek megjelenítése.";
-
-musixmatch_language = "Musixmatch dalszövegek nyelve";
-musixmatch_language_description = "Megadhat egy 2 betűs Musixmatch nyelvi kódot, és láthatja a lefordított dalszövegeket a Musixmatch-on, ha azok rendelkezésre állnak.";
 
 // UI
 
@@ -88,14 +77,9 @@ download_local_playlist = "Helyi lejátszási lista letöltése";
 fallback_attribute = "Visszalépés";
 romanized_attribute = "Romanizált";
 
-musixmatch_unauthorized_popup = "A tweak nem tudja betölteni a dalszövegeket a Musixmatch-ból a Nem engedélyezett hiba miatt. Kérjük, ellenőrizze vagy frissítse a Musixmatch tokenjét. Ha iPadet használsz, a tokent a Musixmatch app for iPad alkalmazásból kell megszerezned.";
-musixmatch_restricted_popup = "A tweak nem tudja betölteni a dalszövegeket a Musixmatch-ről, mert azok korlátozottak. Ez valószínűleg szerzői jogi probléma az amerikai IP-cím miatt, ezért érdemes megváltoztatni, ha az Egyesült Államokban tartózkodik, vagy VPN-t használni.";
-
 // Errors Titles
 
 no_such_song = "Ismeretlen dal";
-musixmatch_restricted = "Korlátozott";
-invalid_musixmatch_token = "Jogosulatlan";
 decoding_error = "Dekódolási hiba";
 no_current_track = "Nincs zeneszám példa";
 unknown_error = "Ismeretlen hiba";
@@ -110,9 +94,6 @@ let_the_music_play = "Hadd szóljon a zene...";
 liked_songs = "Kedvelt dalok";
 
 contributors = "Hozzájárulók";
-
-request_anonymous_token = "Névtelen token kérése";
-request_anonymous_token_description = "Érintse meg a „Névtelen token kérése” lehetőséget, ha engedély nélkül szeretne tokent kérni a Musixmatch-től.";
 
 // Support the Project, links to Ko-fi in EeveeSettingsView
 support_the_project = "Támogasd a projektet";

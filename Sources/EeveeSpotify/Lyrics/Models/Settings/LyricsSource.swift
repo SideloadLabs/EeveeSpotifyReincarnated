@@ -1,22 +1,21 @@
 import Foundation
 
 enum LyricsSource: Int, CaseIterable, CustomStringConvertible {
-    case genius
-    case lrclib
-    case musixmatch
-    case petit
-    case notReplaced
-    case spicylyrics
+    // Raw values are persisted in UserDefaults; keep them stable.
+    case genius = 0
+    case lrclib = 1
+    case petit = 3
+    case notReplaced = 4
+    case spicylyrics = 5
 
     public static var allCases: [LyricsSource] {
-        return [.spicylyrics, .musixmatch, .lrclib, .genius, .petit]
+        return [.spicylyrics, .lrclib, .genius, .petit]
     }
 
     var description: String {
         switch self {
         case .genius:       return "Genius"
         case .lrclib:       return "LRCLIB"
-        case .musixmatch:   return "Musixmatch"
         case .petit:        return "PetitLyrics"
         case .notReplaced:  return "Spotify"
         case .spicylyrics:  return "SpicyLyrics"
