@@ -114,11 +114,8 @@ func injectEeveeButton(into target: UIViewController) {
 
     eeveeLog("[EeveeSpotify] Creating and injecting button...")
     
-    let button = UIButton(type: .system)
     // Use system image to guarantee visibility and avoid crashes
     let image = UIImage(systemName: "gearshape.fill") ?? UIImage()
-    button.setImage(image, for: .normal)
-    button.tintColor = .white
     
     let action = UIAction { [weak target] _ in
         guard let target = target, let navigationController = target.navigationController else { 
@@ -161,12 +158,9 @@ func injectEeveeButton(into target: UIViewController) {
         navigationController.pushViewController(eeveeSettingsController, animated: true)
     }
     
-    button.addAction(action, for: .touchUpInside)
-    
-    let item = UIBarButtonItem(customView: button)
+    let item = UIBarButtonItem(image: image, primaryAction: action)
+    item.tintColor = .white
     item.tag = 1337 // Tag to prevent duplicate addition
-    item.customView?.widthAnchor.constraint(equalToConstant: 22).isActive = true
-    item.customView?.heightAnchor.constraint(equalToConstant: 22).isActive = true
     
     var items = target.navigationItem.rightBarButtonItems ?? []
     items.insert(item, at: 0) // Prepend instead of append to ensure visibility
