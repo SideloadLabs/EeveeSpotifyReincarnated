@@ -615,4 +615,11 @@ private func modifyAttributes(_ attributes: inout [String: AccountAttribute]) {
             attributes.removeValue(forKey: name)
         }
     }
+
+    // Local playlist sync uses Spotify's shared download control. Let Spotify
+    // decide how to present that control and handle downloads on this build.
+    if UserDefaults.patchType.isPatching, LocalPlaylistDownload.launchEnabled {
+        attributes["offline"] = AccountAttribute.with { $0.boolValue = true }
+        writeDebugLog("[LOCAL_SYNC] Applied offline account override")
+    }
 }
