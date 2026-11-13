@@ -195,16 +195,7 @@ struct EeveeSpotify: Tweak {
         
         eeveeLog("[EeveeSpotify] Detected Spotify version: \(version)")
         
-        switch version {
-        case "9.0.48":
-            return .lastAvailableiOS15
-        case "8.9.8":
-            return .lastAvailableiOS14
-        case _ where version.contains("9.1"):
-            return .v91
-        default:
-            return .latest
-        }
+        return VersionHookTarget.forSpotifyVersion(version)
     }
     
     // MARK: - Non-fatal hook error handling
