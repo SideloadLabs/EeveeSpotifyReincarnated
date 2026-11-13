@@ -6,7 +6,7 @@ private var shouldOverrideLocalTrackURI = false
 // SPTPlayerTrack metadata hooks not compatible with 9.1.x
 class SPTPlayerTrackHook: ClassHook<NSObject> {
     typealias Group = LyricsErrorHandlingGroup  // Not activated for 9.1.x
-    static let targetName = EeveeSpotify.hookTarget == .latest
+    static let targetName = EeveeSpotify.hookTarget == .v90
         ? "SPTPlayerTrackImplementation"
         : "SPTPlayerTrack"
 

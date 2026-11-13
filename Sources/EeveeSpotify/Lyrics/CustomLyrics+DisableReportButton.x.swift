@@ -20,7 +20,7 @@ class LyricsFullscreenViewControllerHook: ClassHook<UIViewController> {
             return
         }
         
-        if EeveeSpotify.hookTarget == .latest {
+        if EeveeSpotify.hookTarget == .v90 {
             guard let fullscreenView = WindowHelper.shared.findFirstSubview(
                 "Lyrics_FullscreenElementPageImpl.FullscreenView",
                 in: target.view

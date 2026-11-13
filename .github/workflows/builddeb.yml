@@ -89,6 +89,11 @@ jobs:
             -o "$RUNNER_TEMP/bundled-configuration-policy-tests"
           "$RUNNER_TEMP/bundled-configuration-policy-tests"
           swiftc \
+            Sources/EeveeSpotify/Shared/Models/VersionHookTarget.swift \
+            Tests/VersionHookTarget/main.swift \
+            -o "$RUNNER_TEMP/version-hook-target-tests"
+          "$RUNNER_TEMP/version-hook-target-tests"
+          swiftc \
             Tests/CustomTabsActivation/main.swift \
             -o "$RUNNER_TEMP/custom-tabs-activation-tests"
           "$RUNNER_TEMP/custom-tabs-activation-tests"
