@@ -389,7 +389,7 @@ struct EeveeSpotify: Tweak {
             BaseLyricsGroup().activate()
             LyricsErrorHandlingGroup().activate()
             
-            if EeveeSpotify.hookTarget == .latest {
+            if EeveeSpotify.hookTarget == .v90 {
                 ModernLyricsGroup().activate()
             }
             else {
