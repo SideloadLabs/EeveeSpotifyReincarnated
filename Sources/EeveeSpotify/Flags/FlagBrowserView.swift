@@ -63,7 +63,47 @@ struct FlagBrowserView: View {
                 RemoteFlags.requestCapture()
                 exitApplication()
             }
+
+            Button("Export flags.json") {
+                exportCatalog()
+            }
         }
+    }
+
+    private func exportCatalog() {
+        let source = RemoteFlags.shared.catalogFileURL
+        let destination = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Spotify-Flags-\(RemoteFlags.shared.spotifyVersion).json")
+
+        guard FileManager.default.fileExists(atPath: source.path) else {
+            showExportError("The flag catalog does not exist yet. Try rescanning first.")
+            return
+        }
+
+        do {
+            if FileManager.default.fileExists(atPath: destination.path) {
+                try FileManager.default.removeItem(at: destination)
+            }
+            try FileManager.default.copyItem(at: source, to: destination)
+
+            let share = UIActivityViewController(
+                activityItems: [destination],
+                applicationActivities: nil
+            )
+            WindowHelper.shared.present(share)
+        } catch {
+            showExportError(error.localizedDescription)
+        }
+    }
+
+    private func showExportError(_ message: String) {
+        let alert = UIAlertController(
+            title: "Export failed",
+            message: message,
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        WindowHelper.shared.present(alert)
     }
 
     private func load() {

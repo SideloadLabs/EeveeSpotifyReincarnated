@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import EeveeSpotifyC
 
 struct EeveeSettingsView: View {
     let navigationController: UINavigationController
@@ -7,6 +8,21 @@ struct EeveeSettingsView: View {
     @State private var hasShownCommonIssuesTip = UserDefaults.hasShownCommonIssuesTip
     @State private var isClearingData = false
     @State private var isPresentingDevNoteSheet = false
+    @State private var isAudioRecording = false
+    @State private var audioRecorderMessage: String?
+
+    private func toggleAudioRecording() {
+        if isAudioRecording {
+            EeveeAudioRecorderStop()
+            isAudioRecording = false
+            audioRecorderMessage = "Recording stopped. Check Documents/Recordings."
+        } else if EeveeAudioRecorderStart() {
+            isAudioRecording = true
+            audioRecorderMessage = "Recording started."
+        } else {
+            audioRecorderMessage = "Could not start recording."
+        }
+    }
 
     private func exportDebugLog() {
         guard let data = FileManager.default.contents(atPath: EeveeLog.path), !data.isEmpty else {
@@ -93,6 +109,21 @@ struct EeveeSettingsView: View {
                 }
             }
 
+            Section(header: Text("Audio Recording")) {
+                Button(action: toggleAudioRecording) {
+                    Label(
+                        isAudioRecording ? "Stop Recording" : "Start Recording",
+                        systemImage: isAudioRecording ? "stop.circle.fill" : "record.circle"
+                    )
+                }
+
+                if let message = audioRecorderMessage {
+                    Text(message)
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                }
+            }
+
             Section {
                 Button {
                     isPresentingDevNoteSheet = true
@@ -162,6 +193,7 @@ struct EeveeSettingsView: View {
 
         .onAppear {
             WindowHelper.shared.overrideUserInterfaceStyle(.dark)
+            isAudioRecording = EeveeAudioRecorderIsRecording()
         }
     }
 }

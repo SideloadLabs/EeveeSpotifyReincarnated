@@ -80,6 +80,8 @@ final class RemoteFlags {
         return catalog.flags
     }
 
+    var catalogFileURL: URL { catalogURL }
+
     // MARK: Launch side
 
     func force(_ flags: [String: Any], by owner: String) {

@@ -13,4 +13,15 @@ void EeveeColorSwapStats(long *grey, long *green, long *uiColor);
 BOOL EeveePinSetter(id object, SEL setter, id value);
 BOOL EeveeInterceptBackground(UIView *view, void (^sink)(UIColor *color));
 
+
+// Local audio recorder
+BOOL EeveeAudioRecorderStart(void);
+void EeveeAudioRecorderStop(void);
+BOOL EeveeAudioRecorderIsRecording(void);
+NSString * _Nullable EeveeAudioRecorderCurrentPath(void);
+
 NS_ASSUME_NONNULL_END
+
+#import "EVRecorder.h"
+
+#import "EVPlayback.h"
