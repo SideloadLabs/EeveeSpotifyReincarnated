@@ -2,7 +2,7 @@ import Foundation
 
 extension KaraokeLyricsDto {
     /// Builds custom-lyrics-view data from any source that only has line-level timing
-    /// (LRCLIB, Musixmatch, PetitLyrics, ...). Every word of a line lights up together
+    /// (LRCLIB, PetitLyrics, ...). Every word of a line lights up together
     /// when the line starts, the same way SpicyLyrics' line-synced songs already behave.
     ///
     /// Word-synced sources should build a `KaraokeLyricsDto` with real syllable timing

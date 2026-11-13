@@ -37,17 +37,9 @@ lyrics_source_description = "Puteți selecta sursa de versuri pe care o prefera�
 
 Genius: Oferă cea mai bună calitate a versurilor, oferă cele mai multe melodii și actualizează versurile cel mai rapid. Nu este și nu va fi niciodată sincronizat în timp.
 
-LRCLIB: Cel mai deschis serviciu, care oferă versuri sincronizate în timp. Cu toate acestea, nu oferă versuri pentru multe melodii.
-
-Musixmatch: Serviciul utilizat de Spotify. Oferă versuri sincronizate în timp pentru multe melodii, dar veți avea nevoie de un user token pentru a utiliza această sursă.";
+LRCLIB: Cel mai deschis serviciu, care oferă versuri sincronizate în timp. Cu toate acestea, nu oferă versuri pentru multe melodii.";
 lyrics_additional_info = "Dacă EeveeSpotify nu poate găsi un cântec sau procesa versurile, veți vedea un mesaj \„Couldn't load the lyrics for this song\”. Versurile pot fi greșite pentru unele melodii atunci când utilizați Genius din cauza modului în care tweak-ul caută melodii. Am făcut-o să funcționeze în majoritatea cazurilor.";
 petitlyrics_description = "PetitLyrics: Oferă o mulțime de versuri japoneze sincronizate în timp și unele versuri internaționale.";
-
-musixmatch_user_token = "Token utilizator Musixmatch";
-user_token_placeholder = "Introduceți jetonul de utilizator sau lipiți informațiile de depanare";
-
-enter_user_token = "Introduceți Token-ul utilizatorului";
-enter_user_token_message = "Pentru a utiliza Musixmatch, trebuie să vă recuperați tokenul de utilizator din aplicația oficială. Descărcați Musixmatch din App Store, înregistrați-vă, apoi mergeți la Setări > Obțineți ajutor > Copiați informațiile de depanare și lipiți-le aici. De asemenea, puteți extrage tokenul utilizând MITM.";
 
 genius_fallback = "Genius Fallback";
 genius_fallback_description = "Încărcați versurile din Genius dacă există o problemă cu %@.";
@@ -56,9 +48,6 @@ show_fallback_reasons = "Afișați motivele de rezervă";
 
 romanized_lyrics = "Versuri romanizate";
 romanized_lyrics_description = "Afișați versurile romanțate pentru japoneză, coreeană și chineză.";
-
-musixmatch_language = "Limbajul versurilor Musixmatch";
-musixmatch_language_description = "Puteți introduce un cod de limbă Musixmatch din 2 litere și puteți vedea versurile traduse pe Musixmatch, dacă acestea sunt disponibile.";
 
 // UI
 
@@ -88,14 +77,9 @@ download_local_playlist = "Descărcați lista de redare locală";
 fallback_attribute = "Fallback";
 romanized_attribute = "Romanizat";
 
-musixmatch_unauthorized_popup = "Tweak nu poate încărca versurile din Musixmatch din cauza unei erori neautorizate. Vă rugăm să verificați sau să vă actualizați token-ul Musixmatch. Dacă utilizați un iPad, ar trebui să obțineți token-ul din aplicația Musixmatch pentru iPad.";
-musixmatch_restricted_popup = "Tweak-ul nu poate încărca versurile din Musixmatch deoarece acestea sunt restricționate. Este probabil o problemă de drepturi de autor din cauza adresei IP din SUA, așa că ar trebui să o schimbați dacă vă aflați în SUA sau să utilizați un VPN.";
-
 // Errors Titles
 
 no_such_song = "Nu s-a găsit niciun cântec";
-musixmatch_restricted = "Restricționat";
-invalid_musixmatch_token = "neautorizat";
 decoding_error = "Eroare de decodare";
 no_current_track = "Nicio instanță de urmărire";
 unknown_error = "Eroare necunoscută";
@@ -110,9 +94,6 @@ let_the_music_play = "Lăsați muzica să cânte...";
 liked_songs = "Cântece apreciate";
 
 contributors = "Contributori";
-
-request_anonymous_token = "Solicitare Token anonim";
-request_anonymous_token_description = "Atingeți „Solicitare Token anonim” pentru a solicita un token de la Musixmatch fără autorizație.";
 
 // Support the Project, links to Ko-fi in EeveeSettingsView
 support_the_project = "Sprijină proiectul";

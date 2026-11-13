@@ -38,17 +38,9 @@ lyrics_source_description = "Pots seleccionar la font de lletres que prefereixis
 
 Genius: Ofereix les lletres de més qualitat, té disponibles la major part de cançons i és el que actualitza més ràpidament les lletres, però no està ni mai estarà sincronitzat amb els temps de la cançó.
 
-LRCLib: És el servei més obert, ofereix lletres sincronitzades amb els temps de les cançons. No obstant, manca les lletres per moltes cançons.
-
-Musixmatch: És el servei que utilitza Spotify. Forneix lletres sincronitzades amb el temps de moltes cançons, però necessitaràs un token d'usuari per utilitzar-lo.";
+LRCLib: És el servei més obert, ofereix lletres sincronitzades amb els temps de les cançons. No obstant, manca les lletres per moltes cançons.";
 lyrics_additional_info = "Si l'EeveeSpotify no pot trobar una cançó o processar-ne la lletra, es mostrarà el missatge «No s'ha pogut carregar la lletra d'aquesta cançó». La lletra podria ser incorrecta per algunes de les cançons quan s'utilitza Genius degut al mètode que s'utilitza per trobar les cançons. He aconseguit fer-ho funcionar per la majoria de casos.";
 petitlyrics_description = "PetitLyrics: Ofereix una abundància de lletres sincronitzades amb els temps de les cançons en japonès i per algunes lletres de cançons internacionals.";
-
-musixmatch_user_token = "Token d'usuari de Musixmatch";
-user_token_placeholder = "Introdueix el token d'usuari o enganxa la informació de depuració des del portaretalls";
-
-enter_user_token = "Introdueix el token d'usuari";
-enter_user_token_message = "Per tal d'utilitzar Musixmatch, hauràs d'obtenir el teu token d'usuari des de l'aplicaió oficial. Descarrega Musixmatch de l'App Store, registra't, i ves a Configuració > Ajuda > Copiar informació de depuració, i enganxa-ho aquí. També pots extreure el token utilitzant MITM.";
 
 genius_fallback = "Fallback amb Genius";
 genius_fallback_description = "Carrega lletres de Genius si hi ha cap problema amb %@.";
@@ -60,9 +52,6 @@ hide_lyrics_on_error_description = "Oculta el component de les lletres si no es 
 
 romanized_lyrics = "Lletres romanitzades";
 romanized_lyrics_description = "Mostra lletres romanitzades pel japonès, coreà i xinès.";
-
-musixmatch_language = "Idioma per les lletres de Musixmatch";
-musixmatch_language_description = "Pots indicar un idioma (codi internacional d'idioma de 2 lletres) per tal que el Musixmatch mostri lletres traduïdes si es troben disponibles.";
 
 // UI
 
@@ -104,14 +93,9 @@ could_not_share_popup = "No s'ha pogut compartir al destí seleccionat o LiveCon
 fallback_attribute = "Fallback";
 romanized_attribute = "Romanitzat";
 
-musixmatch_unauthorized_popup = "L'EeveeSpotify no pot carregar lletres de Musixmatch a causa d'un error d'autorització. Si us plau comprova el teu token d'usuari de Musixmatch. Si utilitzes un iPad, has d'obtenir el token de l'aplicació de Musixmatch per iPad.";
-musixmatch_restricted_popup = "L'EeveeSpotify no pot carregar lletres de Musixmatch perquè estan restringides. Aquest error pot donar-se per restriccions de copyright als Estats Units; per adreces IP dels Estats Units, cal canviar el servei de lletres o emprar una VPN.";
-
 // Errors Titles
 
 no_such_song = "No s'ha trobat la cançó";
-musixmatch_restricted = "Restringit";
-invalid_musixmatch_token = "No autoritzat";
 decoding_error = "Error de descodificació";
 no_current_track = "No s'ha trobat la pista";
 unknown_error = "Error desconegut";
@@ -126,9 +110,6 @@ let_the_music_play = "Deixa que soni la música...";
 liked_songs = "Cançons que m'agraden";
 
 contributors = "Contribucions";
-
-request_anonymous_token = "Sol·licita un token anònim";
-request_anonymous_token_description = "Pitja a «Sol·licita un token anònim» per sol·licitar un token des de Musixmatch sense autorització.";
 
 lrclib_api = "Adreça del servidor de LRCLib";
 

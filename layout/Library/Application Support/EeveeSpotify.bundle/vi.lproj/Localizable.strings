@@ -43,17 +43,9 @@ lyrics_source_description = "Bạn có thể chọn nguồn lời bài hát mà 
 
 Genius: Cung cấp lời bài hát có chất lượng tốt nhất, hỗ trợ nhiều bài hát nhất và cập nhật lời bài hát nhanh nhất, tuy nhiên lời bài hát sẽ không được đồng bộ thời gian (time-synced).
 
-LRCLIB: Dịch vụ mã nguồn mở, cung cấp lời bài hát đồng bộ thời gian. Tuy nhiên, nguồn này thiếu lời cho nhiều bài hát.
-
-Musixmatch: Dịch vụ mà Spotify sử dụng. Cung cấp lời bài hát khớp thời gian cho nhiều bài hát, nhưng bạn sẽ cần token người dùng để sử dụng nguồn này.";
+LRCLIB: Dịch vụ mã nguồn mở, cung cấp lời bài hát đồng bộ thời gian. Tuy nhiên, nguồn này thiếu lời cho nhiều bài hát.";
 lyrics_additional_info = "Nếu EeveeSpotify không thể tìm thấy bài hát hoặc xử lý lời bài hát, bạn sẽ thấy thông báo \"Không thể tải lời bài hát cho bài hát này\". Lời bài hát có thể bị sai đối với một số bài hát khi sử dụng Genius do cách bản vá tìm kiếm bài hát. Tôi đã tối ưu để nó hoạt động tốt trong hầu hết các trường hợp.";
 petitlyrics_description = "PetitLyrics: Cung cấp nhiều lời bài hát tiếng Nhật và một số bài hát quốc tế đồng bộ thời gian.";
-
-musixmatch_user_token = "Mã token người dùng Musixmatch";
-user_token_placeholder = "Nhập mã token người dùng hoặc dán thông tin gỡ lỗi";
-
-enter_user_token = "Nhập mã token người dùng";
-enter_user_token_message = "Để sử dụng Musixmatch, bạn cần lấy mã token người dùng từ ứng dụng chính thức. Vui lòng tải ứng dụng Musixmatch từ App Store, đăng ký, sau đó vào Cài đặt > Nhận trợ giúp > Sao chép thông tin gỡ lỗi, và dán vào đây. Bạn cũng có thể trích xuất mã token bằng cách sử dụng MITM.";
 
 genius_fallback = "Dự phòng bằng Genius";
 genius_fallback_description = "Sử dụng lời bài hát từ Genius nếu có sự cố với %@.";
@@ -65,9 +57,6 @@ hide_lyrics_on_error_description = "Gỡ bỏ thành phần lời bài hát nế
 
 romanized_lyrics = "Lời bài hát phiên âm (Romanized)";
 romanized_lyrics_description = "Hiển thị lời bài hát phiên âm cho tiếng Nhật, tiếng Hàn và tiếng Trung.";
-
-musixmatch_language = "Ngôn ngữ lời bài hát Musixmatch";
-musixmatch_language_description = "Bạn có thể nhập mã ngôn ngữ gồm 2 chữ cái của Musixmatch và xem lời bài hát đã được dịch trên Musixmatch nếu có sẵn.";
 
 // UI
 
@@ -109,14 +98,9 @@ could_not_share_popup = "Không thể chia sẻ tới điểm đến đã chọn
 fallback_attribute = "Dự phòng";
 romanized_attribute = "Phiên âm";
 
-musixmatch_unauthorized_popup = "Bản vá không thể tải lời bài hát từ Musixmatch do lỗi Không được phép (Unauthorized). Vui lòng kiểm tra hoặc cập nhật mã token Musixmatch của bạn. Nếu bạn sử dụng iPad, bạn nên lấy mã token từ ứng dụng Musixmatch dành cho iPad.";
-musixmatch_restricted_popup = "Bản vá không thể tải lời bài hát từ Musixmatch vì chúng bị hạn chế. Đây có thể là vấn đề bản quyền do địa chỉ IP của Mỹ, vì vậy bạn nên thay đổi nó nếu bạn đang ở Mỹ hoặc sử dụng VPN.";
-
 // Errors Titles
 
 no_such_song = "Không tìm thấy bài hát";
-musixmatch_restricted = "Bị hạn chế";
-invalid_musixmatch_token = "Không được phép";
 decoding_error = "Lỗi giải mã";
 no_current_track = "Không có phiên bài hát";
 unknown_error = "Lỗi không xác định";
@@ -131,9 +115,6 @@ let_the_music_play = "Hãy để âm nhạc vang lên...";
 liked_songs = "Bài hát đã thích";
 
 contributors = "Người đóng góp";
-
-request_anonymous_token = "Yêu cầu mã token ẩn danh";
-request_anonymous_token_description = "Nhấn “Yêu cầu mã token ẩn danh” để yêu cầu một mã token từ Musixmatch mà không cần ủy quyền.";
 
 lrclib_api = "Địa chỉ máy chủ";
 

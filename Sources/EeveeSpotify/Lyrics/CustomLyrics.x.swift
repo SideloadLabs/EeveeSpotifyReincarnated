@@ -11,8 +11,6 @@ struct LyricsErrorHandlingGroup: HookGroup { }  // not activated on 9.1.x
 
 var lyricsState = LyricsLoadingState()
 
-var hasShownRestrictedPopUp = false
-var hasShownUnauthorizedPopUp = false
 
 private let geniusLyricsRepository = GeniusLyricsRepository()
 private let petitLyricsRepository = PetitLyricsRepository()
@@ -110,8 +108,6 @@ private func loadCustomLyricsForTrackId(_ trackId: String) throws -> Lyrics {
         repository = geniusLyricsRepository
     case .lrclib:
         repository = LrclibLyricsRepository.shared
-    case .musixmatch:
-        repository = MusixmatchLyricsRepository.shared
     case .petit:
         repository = petitLyricsRepository
     case .spicylyrics:
@@ -134,33 +130,6 @@ private func loadCustomLyricsForTrackId(_ trackId: String) throws -> Lyrics {
     catch let error {
         if let lyricsError = error as? LyricsError {
             lyricsState.fallbackError = lyricsError
-
-            switch lyricsError {
-            case .invalidMusixmatchToken:
-                if !hasShownUnauthorizedPopUp {
-                    DispatchQueue.main.async {
-                        PopUpHelper.showPopUp(
-                            delayed: false,
-                            message: "musixmatch_unauthorized_popup".localized,
-                            buttonText: "OK".uiKitLocalized
-                        )
-                    }
-                    hasShownUnauthorizedPopUp = true
-                }
-            case .musixmatchRestricted:
-                if !hasShownRestrictedPopUp {
-                    DispatchQueue.main.async {
-                        PopUpHelper.showPopUp(
-                            delayed: false,
-                            message: "musixmatch_restricted_popup".localized,
-                            buttonText: "OK".uiKitLocalized
-                        )
-                    }
-                    hasShownRestrictedPopUp = true
-                }
-            default:
-                break
-            }
         } else {
             lyricsState.fallbackError = .unknownError
         }
@@ -235,8 +204,6 @@ private func loadCustomLyricsForCurrentTrack() throws -> Lyrics {
         repository = geniusLyricsRepository
     case .lrclib:
         repository = LrclibLyricsRepository.shared
-    case .musixmatch:
-        repository = MusixmatchLyricsRepository.shared
     case .petit:
         repository = petitLyricsRepository
     case .spicylyrics:
@@ -259,34 +226,6 @@ private func loadCustomLyricsForCurrentTrack() throws -> Lyrics {
     catch let error {
         if let error = error as? LyricsError {
             lyricsState.fallbackError = error
-            
-            switch error {
-                
-            case .invalidMusixmatchToken:
-                if !hasShownUnauthorizedPopUp {
-                    PopUpHelper.showPopUp(
-                        delayed: false,
-                        message: "musixmatch_unauthorized_popup".localized,
-                        buttonText: "OK".uiKitLocalized
-                    )
-                    
-                    hasShownUnauthorizedPopUp.toggle()
-                }
-            
-            case .musixmatchRestricted:
-                if !hasShownRestrictedPopUp {
-                    PopUpHelper.showPopUp(
-                        delayed: false,
-                        message: "musixmatch_restricted_popup".localized,
-                        buttonText: "OK".uiKitLocalized
-                    )
-                    
-                    hasShownRestrictedPopUp.toggle()
-                }
-                
-            default:
-                break
-            }
         }
         else {
             lyricsState.fallbackError = .unknownError
@@ -350,8 +289,7 @@ func invalidateLyricsForSourceChange() {
     prefetchedResult = nil
     prefetchingTrackId = nil
     KaraokeLyricsStore.shared.clear()
-    MusixmatchLyricsRepository.shared.clearCache()
-    writeDebugLog("[Lyrics] provider changed — cleared prefetch, custom lyrics view and Musixmatch caches")
+    writeDebugLog("[Lyrics] provider changed — cleared prefetch and custom lyrics view caches")
 }
 
 /// Kicks off a background lyrics fetch for `trackId` so the result is ready
@@ -418,7 +356,7 @@ func prefetchLyricsIfNeeded(trackId: String) {
 
 /// Returns a serialized empty `Lyrics` protobuf payload.
 /// Used as a fallback when every lyrics source (including Genius fallback) fails,
-/// so we show "no lyrics" instead of leaking Spotify's own Musixmatch response.
+/// so we show "no lyrics" instead of leaking Spotify's own response.
 func emptyLyricsData(originalLyrics: Lyrics? = nil) -> Data? {
     let emptyDto = LyricsDto(lines: [], timeSynced: false, romanization: .original, translation: nil)
     var lyrics = Lyrics.with {
