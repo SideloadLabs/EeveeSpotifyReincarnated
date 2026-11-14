@@ -90,6 +90,7 @@ KNOWN_NON_LOAD_HOOKED_SERVICES = {
     "_TtC35AdsPlatform_AdsIdentityTrackingImpl37AdsIdentityPermissionRequestorService",
     "_TtC36AdsPlatform_AdsContextMenuButtonImpl31AdsContextMenuButtonServiceImpl",
     "_TtC36AdsPlatform_AdsPreferencesConfigImpl31AdsPreferencesConfigServiceImpl",
+    "_TtC40AdsPlatform_AdsPreferencesDataLoaderImpl35AdsPreferencesDataLoaderServiceImpl",
     "_TtC40PremiumUpsell_PremiumDestinationPageImpl29PremiumDestinationServiceImpl",
 }
 
@@ -230,6 +231,10 @@ def parse_tweak_hooks(sources_dir):
     lookup_pat = re.compile(
         r'(?:findTweakClass|NSClassFromString)\(\s*"([A-Za-z_][A-Za-z0-9_.]*)"\s*\)'
     )
+    # classNameFallback("A", "B") hooks whichever name this Spotify build has,
+    # so Audit 1 passes when any one of them is present.
+    fallback_pat = re.compile(r'classNameFallback\(((?:\s*"[A-Za-z_][A-Za-z0-9_.]*"\s*,?)+)\s*\)')
+    fallback_name_pat = re.compile(r'"([A-Za-z_][A-Za-z0-9_.]*)"')
     oracle_marker_pat = re.compile(r"(\[ORACLE\]\[[A-Z0-9_]+\])")
 
     all_hooked = set()
@@ -254,6 +259,21 @@ def parse_tweak_hooks(sources_dir):
             if marker not in seen_markers:
                 seen_markers.add(marker)
                 oracle_markers.append((rel_path, marker))
+
+        fallbacks = [
+            tuple(fallback_name_pat.findall(group))
+            for group in fallback_pat.findall(text)
+        ]
+        for names in fallbacks:
+            for t in names:
+                all_hooked.add(t)
+                mangled = mangle_dotted_swift_class(t)
+                if mangled:
+                    all_hooked.add(mangled)
+                if base_name in CORE_CHOKEPOINT_FILES or base_name in CUMULATIVE_BLOCKER_FILES:
+                    cumulative_superset_targets.append((rel_path, t))
+            if base_name in CORE_CHOKEPOINT_FILES:
+                core_chokepoint_targets.append((rel_path, names))
 
         targets = target_pat.findall(text) + lookup_pat.findall(text)
         if not targets:
@@ -353,11 +373,16 @@ def main():
     ) = parse_tweak_hooks(args.sources)
 
     # Audit 1: Core Chokepoint Hooks (must exist in every IPA)
+    def in_binary(target):
+        mangled = mangle_dotted_swift_class(target)
+        return (target in all_strings) or (mangled is not None and mangled in all_strings)
+
     broken_hooks = []
     for rel_path, target in core_chokepoint_targets:
-        mangled = mangle_dotted_swift_class(target)
-        present = (target in all_strings) or (mangled is not None and mangled in all_strings)
-        if not present:
+        if isinstance(target, tuple):
+            if not any(in_binary(t) for t in target):
+                broken_hooks.append((rel_path, " or ".join(target)))
+        elif not in_binary(target):
             broken_hooks.append((rel_path, target))
 
     active_superset_in_ipa = sum(

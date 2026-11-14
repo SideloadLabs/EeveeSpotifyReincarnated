@@ -273,7 +273,7 @@ struct EeveeSpotify: Tweak {
             ("SPTAuthSessionImplementation", "SPTAuthSession"),
             ("_TtC24Connectivity_SessionImpl18SessionServiceImpl", "SessionServiceImpl"),
             ("SPTAuthLegacyLoginControllerImplementation", "LegacyLoginController"),
-            ("_TtC24Connectivity_SessionImplP33_831B98CC28223E431E21CD27ADD20AF222OauthAccessTokenBridge", "OauthAccessTokenBridge"),
+            (OauthAccessTokenBridgeHook.targetName, "OauthAccessTokenBridge"),
             ("ARTWebSocketTransport", "AblyWebSocket"),
             ("ARTSRWebSocket", "AblySRWebSocket"),
         ]
