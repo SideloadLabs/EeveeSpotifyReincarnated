@@ -581,7 +581,7 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
     CGFloat clearance=[self.bottomChrome coverageInView:host]+12;
     if(visible && fabs(self.exportToolbarBottom.constant+clearance)>.5) {
         self.exportToolbarBottom.constant=-clearance;
-        // Player layout events occur inside Vitrine's own animation transaction.
+        // Player layout events occur inside the host tweak's own animation transaction.
         // Laying out here joins that transaction, rather than starting a timer.
         [host layoutIfNeeded];
     }

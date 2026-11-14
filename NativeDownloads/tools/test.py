@@ -93,8 +93,6 @@ FIXTURES = (
     Fixture("download_compatibility", "devices", ("OfflineCompatibilityChecks.m", "WireProto.m", "download_compatibility.m"), diagnostics=True),
     Fixture("offline_devices", "devices", ("OfflineDeviceManager.m", "WireProto.m", "offline_devices.m"), diagnostics=True),
     Fixture("offline_devices_eevee_auth", "devices", ("OfflineDeviceManager.m", "WireProto.m", "offline_devices.m"), diagnostics=True, defines=("SAP_REAL_EEVEE_AUTH",)),
-    Fixture("offline_devices_vitrine", "devices", ("OfflineDeviceManager.m", "WireProto.m", "offline_devices_vitrine.m"), diagnostics=True),
-    Fixture("offline_devices_vitrine_auth", "devices", ("OfflineDeviceManager.m", "WireProto.m", "offline_devices_vitrine.m"), diagnostics=True, defines=("SAP_VITRINE_AUTH_ASYNC",)),
 )
 GROUP_FALLBACKS = {
     "manual_download": ("ManualTrackDownload.m",),
@@ -216,7 +214,7 @@ def run_fixture(test: Fixture, build: Path, sanitize: bool):
 def run_script(name: str, build: Path):
     folder = build / name
     folder.mkdir(parents=True)
-    paths = {"export_artwork_cache": ROOT / "tools/test_export_artwork_cache.py", "track_export": ROOT / "tools/test_audio_export.py", "m4a_codec": ROOT / "tools/test_m4a_export.py", "offline_library_package": ROOT / "tests/test_offline_library_package.py", "export_patch": ROOT / "tests/export_patch.py", "native_restrictions": ROOT / "tools/test_native_restrictions.py", "native_trace_abi": ROOT / "tests/native_trace_patch.py", "signing_metadata": ROOT / "tests/signing_metadata.py", "sideload_dependencies": ROOT / "tests/sideload_dependencies.py"}
+    paths = {"export_artwork_cache": ROOT / "tools/test_export_artwork_cache.py", "track_export": ROOT / "tools/test_audio_export.py", "m4a_codec": ROOT / "tools/test_m4a_export.py", "offline_library_package": ROOT / "tests/test_offline_library_package.py", "export_patch": ROOT / "tests/export_patch.py", "native_restrictions": ROOT / "tools/test_native_restrictions.py", "native_trace_abi": ROOT / "tests/native_trace_patch.py", "signing_metadata": ROOT / "tests/signing_metadata.py"}
     env = dict(os.environ, PIXIE_TEST_BUILD_DIR=str(folder), PYTHONDONTWRITEBYTECODE="1")
     with (folder / "output.log").open("w") as log:
         execute((sys.executable, paths[name]), log, env)
@@ -231,7 +229,7 @@ def main():
     parser.add_argument("--no-sanitize", action="store_true", help="Disable AddressSanitizer/UBSan for a diagnostic run")
     parser.add_argument("--list", action="store_true")
     args = parser.parse_args()
-    scripted = {"export_artwork_cache": "export", "track_export": "export", "m4a_codec": "export", "offline_library_package": "library", "export_patch": "packaging", "native_restrictions": "packaging", "native_trace_abi": "packaging", "signing_metadata": "packaging", "sideload_dependencies": "packaging"}
+    scripted = {"export_artwork_cache": "export", "track_export": "export", "m4a_codec": "export", "offline_library_package": "library", "export_patch": "packaging", "native_restrictions": "packaging", "native_trace_abi": "packaging", "signing_metadata": "packaging"}
     jobs = [(f.name, f.suite, f) for f in FIXTURES] + [(n, s, None) for n, s in scripted.items()]
     all_names = {n for n, _, _ in jobs}
     if args.fixture and set(args.fixture) - all_names:

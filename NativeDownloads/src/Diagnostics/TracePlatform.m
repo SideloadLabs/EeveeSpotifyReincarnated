@@ -50,7 +50,7 @@ void SAPTraceCaptureRuntimeManifest(const char *reason) {
     NSMutableArray *images=[NSMutableArray array];
     for(uint32_t i=0;i<_dyld_image_count();i++) {
         const char *name=_dyld_get_image_name(i);if(!name)continue;NSString *path=@(name),*base=path.lastPathComponent;
-        if(![@[@"Spotify",@"SpotifyAudioProbe.dylib",@"spotifyglass.dylib",@"EeveeSpotify.dylib",@"LiveContainer"]containsObject:base])continue;
+        if(![@[@"Spotify",@"SpotifyAudioProbe.dylib",@"EeveeSpotify.dylib",@"LiveContainer"]containsObject:base])continue;
         const struct mach_header_64 *h=(void *)_dyld_get_image_header(i);if(h->magic!=MH_MAGIC_64||h->sizeofcmds>1048576||h->ncmds>1024)continue;
         const uint8_t *cursor=(void *)(h+1),*end=cursor+h->sizeofcmds;NSString *uuid=@"unavailable";NSMutableDictionary *fingerprints=[NSMutableDictionary dictionary];
         for(unsigned n=0;n<h->ncmds && cursor+sizeof(struct load_command)<=end;n++) {
@@ -74,7 +74,7 @@ void SAPTraceCaptureRuntimeManifest(const char *reason) {
         [images addObject:image];
     }
     SAP_TRACE("runtime","manifest",0,@{@"reason":reason?@(reason):@"unknown",@"images":images,@"hooks":SAPTraceHookManifest(),@"key_mode":SAPKeyRequestModeReport(),
-        @"pixie_revision":@SAP_BUILD_REVISION,@"vitrine_source_commit":@SAP_VITRINE_SOURCE_COMMIT,
+        @"pixie_revision":@SAP_BUILD_REVISION,
         @"native_key_boundaries":SAPNativeKeyTraceReport(),
         @"os_version":NSProcessInfo.processInfo.operatingSystemVersionString,@"foreground_state":@(UIApplication.sharedApplication.applicationState),
         @"low_power_mode":@(NSProcessInfo.processInfo.lowPowerModeEnabled),@"route":route(),@"pre_library_calls_observed":@NO});

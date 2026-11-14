@@ -153,7 +153,7 @@ static NSDictionary *SAPSourceReport(void) {
     NSArray *ports = [AVAudioSession.sharedInstance.currentRoute.outputs valueForKey:@"portName"];
     NSString *route = [ports componentsJoinedByString:@", "];
     NSDictionary *report = @{
-        @"probe_version": @91,@"pixie_build":@SAP_BUILD_LABEL,@"audio_export":SAPTrackExportReport(),@"pixie_revision":@SAP_BUILD_REVISION,@"vitrine_source_commit":@SAP_VITRINE_SOURCE_COMMIT,
+        @"probe_version": @91,@"pixie_build":@SAP_BUILD_LABEL,@"audio_export":SAPTrackExportReport(),@"pixie_revision":@SAP_BUILD_REVISION,
         @"diagnostics_enabled":@(SAPDiagnosticsEnabled()), @"backend_ready": @(s.backendReady), @"pcm_confirmed": @(s.pcmConfirmed),
         @"au_set_calls": @(s.setPropertyCalls), @"au_callback_attempts": @(s.callbackAttempts),
         @"au_last_scope": @(s.lastCallbackScope), @"au_last_type": fourcc(s.lastComponentType),

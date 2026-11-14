@@ -23,7 +23,7 @@
 - (void)URLSession:(id)session task:(id)task didCompleteWithError:(NSError *)error { self.completions++; self.error = error; }
 @end
 
-// Vitrine holds the body, then delivers its full rewritten/cached response by
+// The host tweak holds the body, then delivers its full rewritten/cached response by
 // calling the delegate selector again during completion or a 304 response.
 @interface SPTDataLoaderService : NSObject
 @property(nonatomic,strong) NSMutableData *received,*held;
@@ -158,16 +158,16 @@ int main(void) { @autoreleasepool {
     [delegate URLSession:nil dataTask:t didReceiveData:customize];
     [delegate URLSession:nil task:t didCompleteWithError:nil];assert([delegate.received isEqual:customize]);
     puts("PASS: cached positive/negative HTTP classifications follow redirects");
-    SPTDataLoaderService *vitrine=[SPTDataLoaderService new];
+    SPTDataLoaderService *loader=[SPTDataLoaderService new];
     t=task(@"https://spclient.wg.spotify.com/ucs/v1/customize",200);
-    [vitrine URLSession:nil dataTask:t didReceiveData:customize];
-    [vitrine URLSession:nil task:t didCompleteWithError:nil];
-    assert(vitrine.completions==1 && [vitrine.received isEqual:SAPRewriteOfflineConfig(customize,NO)]);
-    vitrine=[SPTDataLoaderService new];vitrine.cached=customize;
+    [loader URLSession:nil dataTask:t didReceiveData:customize];
+    [loader URLSession:nil task:t didCompleteWithError:nil];
+    assert(loader.completions==1 && [loader.received isEqual:SAPRewriteOfflineConfig(customize,NO)]);
+    loader=[SPTDataLoaderService new];loader.cached=customize;
     t=task(@"https://spclient.wg.spotify.com/ucs/v1/customize",304);
-    [vitrine URLSession:nil dataTask:t didReceiveResponse:t.response completionHandler:nil];
-    [vitrine URLSession:nil task:t didCompleteWithError:nil];
-    assert(vitrine.completions==1 && [vitrine.received isEqual:SAPRewriteOfflineConfig(customize,NO)]);
-    puts("PASS: Vitrine's full-body and cached-304 reentrant deliveries reach Spotify once with offline attributes");
+    [loader URLSession:nil dataTask:t didReceiveResponse:t.response completionHandler:nil];
+    [loader URLSession:nil task:t didCompleteWithError:nil];
+    assert(loader.completions==1 && [loader.received isEqual:SAPRewriteOfflineConfig(customize,NO)]);
+    puts("PASS: The host tweak's full-body and cached-304 reentrant deliveries reach Spotify once with offline attributes");
     puts("PASS: exact bootstrap/customize wire paths; original value types and unknown/unrelated fields; malformed/overflow passthrough; chunk reassembly; errors/304; 4 MiB cap; no network calls/timers");
 } }

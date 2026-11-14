@@ -299,7 +299,7 @@ int main(void) { @autoreleasepool {
     }
     assert(coverFound);
     puts("PASS: verified native album GID, every disc/track GID and canonical URI; duplicate tracks deduplicated; mismatched or missing identities prevent downloads; async track list callback on main");
-    puts("PASS: cover and cover_group image IDs decoded, deduplicated and mapped to Vitrine's existing Spotify image CDN format in diagnostics");
+    puts("PASS: cover and cover_group image IDs decoded, deduplicated and mapped to the existing Spotify image CDN format in diagnostics");
 
     // Catalog hydration must expose bounded membership from its existing reply,
     // including a clear unavailable result when Spotify returns no member list.

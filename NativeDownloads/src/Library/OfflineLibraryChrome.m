@@ -15,7 +15,7 @@ static void followLayout(Class cls,SEL selector) {
     if([installed containsObject:key])return;
     Method method=class_getInstanceMethod(cls,selector);if(!method)return;
     IMP original=method_getImplementation(method);
-    // Override this exact Spotify/Vitrine class only. Preserve its full mod chain,
+    // Override this exact Spotify class only. Preserve its full mod chain,
     // including inherited implementations; never replace UIView/UIViewController.
     IMP replacement=imp_implementationWithBlock(^(id object){
         ((void(*)(id,SEL))original)(object,selector);

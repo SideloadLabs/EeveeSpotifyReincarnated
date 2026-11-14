@@ -5,7 +5,7 @@ int main(void) {@autoreleasepool {
     NSURL *folder=[NSURL fileURLWithPath:[NSTemporaryDirectory()stringByAppendingPathComponent:NSUUID.UUID.UUIDString] isDirectory:YES];
     [NSFileManager.defaultManager createDirectoryAtURL:folder withIntermediateDirectories:YES attributes:nil error:NULL];
     NSMutableArray *files=[NSMutableArray array];
-    for(NSString *name in @[@"PixieActions.log",@"SpotifyAudioProbeJournal.log",@"vitrine-diagnostics.txt"]) {
+    for(NSString *name in @[@"PixieActions.log",@"SpotifyAudioProbeJournal.log"]) {
         NSURL *url=[folder URLByAppendingPathComponent:name];
         [@"line 1\nUnicode: ✓\n" writeToURL:url atomically:YES encoding:NSUTF8StringEncoding error:NULL];
         NSDictionary *entry=SAPSupportLogReadFile(url);assert([entry[@"content"]isEqual:@"line 1\nUnicode: ✓\n"]);[files addObject:entry];

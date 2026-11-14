@@ -21,7 +21,6 @@ static const void *SAPAttachmentKey=&SAPAttachmentKey;
 static void *SAPContentSizeContext=&SAPContentSizeContext;
 static void (*originalSettingsLoad)(id,SEL);
 static void (*originalSettingsLayout)(id,SEL);
-static id (*originalVitrinePageInit)(id,SEL,id,id,id,id);
 static BOOL settingsInstalled;
 static NSString *settingsInstallStatus=@"not_attempted";
 NSDictionary *SAPDownloadSettingsInstallReport(void) {
@@ -685,40 +684,16 @@ static void SAPAttachSettings(UIViewController *host) {
 }
 static void SAPSettingsLoaded(id self,SEL selector) {originalSettingsLoad(self,selector);SAPAttachSettings(self);}
 static void SAPSettingsLayout(id self,SEL selector) {originalSettingsLayout(self,selector);SAPAttachSettings(self);}
-static id SAPVitrinePageInit(id self,SEL selector,NSString *title,NSString *intro,NSArray *sections,NSString *footer) {
-    if([title isEqualToString:@"Vitrine"]) {
-        id (*pageRow)(NSString *,UIViewController *(^)(void))=dlsym(RTLD_DEFAULT,"SGPageRow");
-        id (*withTile)(id,NSString *,UIColor *)=dlsym(RTLD_DEFAULT,"SGWithTile");
-        id (*section)(NSString *,NSArray *)=dlsym(RTLD_DEFAULT,"SGSection");
-        if(pageRow && withTile && section) {
-            id row=pageRow(SAPL(@"Менеджер загрузок Pixie",@"Pixie Download Manager"),^UIViewController *{return [SAPDownloadsSettings new];});
-            row=withTile(row,@"arrow.down.circle.fill",UIColor.systemGreenColor);
-            id group=section(nil,@[row]);
-            if(group){sections=[sections arrayByAddingObject:group];SAP_TRACE("ui","pixie_rows_added_to_vitrine",0,@{@"added_rows":@1,@"root_title":title});}
-        }else {
-            settingsInstallStatus=@"vitrine_row_factories_unavailable";
-        }
-    }
-    return originalVitrinePageInit(self,selector,title,intro,sections,footer);
-}
 void SAPInstallDownloadSettings(void) {
     if(!NSThread.isMainThread){dispatch_async(dispatch_get_main_queue(),^{SAPInstallDownloadSettings();});return;}
     if(settingsInstalled)return;
-    Class vitrine=NSClassFromString(@"SGModPage");
-    SEL init=NSSelectorFromString(@"initWithTitle:intro:sections:footer:");
-    Method method=vitrine?class_getInstanceMethod(vitrine,init):NULL;
-    if(method&&method_getNumberOfArguments(method)==6) {
-        originalVitrinePageInit=(void *)method_getImplementation(method);
-        class_replaceMethod(vitrine,init,(IMP)SAPVitrinePageInit,method_getTypeEncoding(method));
-        settingsInstalled=YES;settingsInstallStatus=@"vitrine_page_hook_installed";return;
-    }
         #ifdef SAP_UI_FIXTURE
         Class cls=NSClassFromString(@"SAPFixtureEeveeSettingsViewController");
 #else
         Class cls=NSClassFromString(@"EeveeSpotify.EeveeSettingsViewController");
 #endif
         if(!cls)cls=NSClassFromString(@"_TtC12EeveeSpotify27EeveeSettingsViewController");
-        if(!cls){settingsInstallStatus=vitrine?@"vitrine_page_signature_unavailable":@"settings_host_not_loaded";return;}
+        if(!cls){settingsInstallStatus=@"settings_host_not_loaded";return;}
         SEL load=@selector(viewDidLoad),layout=@selector(viewDidLayoutSubviews);
         Method lm=class_getInstanceMethod(cls,load),dm=class_getInstanceMethod(cls,layout);
         if(!lm || !dm || method_getNumberOfArguments(lm)!=2 || method_getNumberOfArguments(dm)!=2){settingsInstallStatus=@"settings_host_signature_mismatch";return;}

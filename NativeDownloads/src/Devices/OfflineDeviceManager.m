@@ -108,7 +108,7 @@ static void withHeaders(SAPSlotRequest *op,void (^ready)(SAPSlotRequest *)) {
     void (^received)(NSDictionary *)=^(NSDictionary *headers){
         dispatch_async(dispatch_get_main_queue(),^{
             SAPSlotRequest *op=weakOp;if(!op||op.finished||op.headers)return;
-            if(![headers isKindOfClass:NSDictionary.class]){[op finish:nil error:@"Vitrine returned invalid authenticated headers. No device request was sent."];return;}
+            if(![headers isKindOfClass:NSDictionary.class]){[op finish:nil error:@"The authenticated request provider returned invalid headers. No device request was sent."];return;}
             NSMutableDictionary *allowed=[NSMutableDictionary dictionary];
             NSSet *names=[NSSet setWithArray:@[@"authorization",@"client-token",@"spotify-app-version",@"app-platform",@"user-agent"]];
             for(id key in headers)if([key isKindOfClass:NSString.class]&&[names containsObject:[key lowercaseString]]&&[headers[key]isKindOfClass:NSString.class])allowed[key]=headers[key];
@@ -122,8 +122,6 @@ static void withHeaders(SAPSlotRequest *op,void (^ready)(SAPSlotRequest *)) {
 #ifdef SAP_TESTING
     if(testHeaders){testHeaders(received);return;}
 #endif
-    void (*provider)(void (^)(NSDictionary *))=dlsym(RTLD_DEFAULT,"SGSpclientHeaders");
-    if(provider){provider(received);return;}
     // The Eevee build carrying the original Pixie ("Sprite") integration exposes the
     // same existing headers as a class method (EeveeSpotify.SpriteAuthentication).
     Class eevee=NSClassFromString(@"SpriteAuthentication");
@@ -138,7 +136,7 @@ static void withHeaders(SAPSlotRequest *op,void (^ready)(SAPSlotRequest *)) {
     }
     SAP_TRACE("offline_devices","authentication_provider_resolved",op.traceOperation,
         @{@"provider":valid?@"Eevee.SpriteAuthentication":@"none",@"class_present":@(eevee!=Nil),@"signature_valid":@(valid),@"credentials_logged":@NO});
-    if(!valid){[op finish:nil error:@"The authenticated request provider (Vitrine or Eevee) is unavailable. Play one track online on this device, then refresh."];return;}
+    if(!valid){[op finish:nil error:@"The authenticated request provider (EeveeSpotify) is unavailable. Play one track online on this device, then refresh."];return;}
     ((void (*)(id,SEL,void (^)(NSDictionary *)))objc_msgSend)(eevee,selector,received);
 }
 static NSArray *activeDevices(NSArray *devices) {

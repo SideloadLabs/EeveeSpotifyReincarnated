@@ -9,7 +9,7 @@
 static atomic_uint_fast64_t requests, patched, unchanged, oversized, failedTasks, emptyTasks;
 static atomic_uint_fast64_t cachedBodies, cachedChanges, responses304;
 static atomic_uint_fast64_t reentrantBodies,reentrantChanges;
-// Vitrine delivers a complete synthesized body synchronously from its response
+// The host tweak delivers a complete synthesized body synchronously from its response
 // and completion handlers. Re-buffering that delivery would consume the body
 // without ever passing it to Spotify. This marks only the current task/call.
 static _Thread_local const void *forwardingTask;

@@ -57,12 +57,6 @@ void SAPExportSupportLog(NSDictionary *native,void (^completion)(NSURL *,NSError
                     NSURL *url=[SAPDocuments() URLByAppendingPathComponent:name];
                     [files addObject:SAPSupportLogReadFile(url)];
                 }
-                NSURL *(*vitrineReport)(void)=dlsym(RTLD_DEFAULT,"SGWriteDiagnosticsFile");
-                if(vitrineReport) {
-                    NSURL *url=vitrineReport();
-                    if([url isKindOfClass:NSURL.class])[files addObject:SAPSupportLogReadFile(url)];
-                    else [files addObject:@{@"name":@"vitrine-diagnostics.txt",@"read_status":@"unavailable",@"error":@"Vitrine did not produce a diagnostics file"}];
-                }else [files addObject:@{@"name":@"vitrine-diagnostics.txt",@"read_status":@"unavailable",@"error":@"Vitrine diagnostics exporter is not loaded"}];
                 NSURL *eeveeLog=[NSURL fileURLWithPath:[NSTemporaryDirectory() stringByAppendingPathComponent:@"eeveespotify_debug.log"]];
                 [files addObject:SAPSupportLogReadFile(eeveeLog)];
                 NSError *error=nil;

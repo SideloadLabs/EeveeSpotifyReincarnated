@@ -132,5 +132,5 @@ NSDictionary *SAPOfflineFlagsReport(void) {
     return @{@"enabled": @YES, @"client_flags": flags ?: @{}, @"installed_hooks": installed ?: @[],
         @"core_values_unmodified_getter": actual,
         @"forced_reads": @(atomic_load(&forcedReads)), @"patched_dictionaries": @(atomic_load(&patchedDictionaries)),
-        @"reminder_disabled_in_package": @NO, @"host_mod": @"Vitrine"};
+        @"reminder_disabled_in_package": @NO, @"host_mod": @"EeveeSpotify"};
 }
