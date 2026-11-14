@@ -40,7 +40,7 @@ def main():
         with (output / "eevee-build.log").open("w") as log:
             subprocess.run([make, f"-j{args.jobs}", "all", "FINALPACKAGE=1",
                             f"THEOS_PROJECT_DIR={alias}",
-                            "REPO_SLUG=Glongq/EeveeSpotifyReincarnated", "BRANCH_NAME=Master"],
+                            "REPO_SLUG=SideloadLabs/EeveeSpotifyReincarnated", "BRANCH_NAME=Master"],
                            cwd=alias, env=env, stdout=log, stderr=subprocess.STDOUT, check=True)
     eevee = ROOT.parent / ".theos/obj/EeveeSpotify.dylib"
     subprocess.run(["codesign", "--force", "--sign", "-", "--timestamp=none", str(eevee)], check=True)
