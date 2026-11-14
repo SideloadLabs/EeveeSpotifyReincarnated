@@ -81,6 +81,7 @@ enum SpotifyResponsePatcher {
 
         return (shouldReplaceLyrics && url.isLyrics)
             || (shouldPatchPremium && (
+                url.isNebulaAttributes ||
                 url.isBootstrap || url.isCustomize ||
                 url.isPremiumPlanRow || url.isPremiumBadge || url.isPlanOverview ||
                 isDAC
@@ -124,6 +125,7 @@ enum SpotifyResponsePatcher {
         case planOverview = "PlanOverview"
         case dacEmpty    = "dac"
         case casitaStrip = "casitaStrip"
+        case nebulaAttributes = "nebulaAttributes"
     }
 
     struct PatchResult {
@@ -132,6 +134,14 @@ enum SpotifyResponsePatcher {
     }
 
     static func patch(url: URL, buffer: Data) throws -> PatchResult? {
+        // nebula/v1/configuration/attributes is what feeds product state into the
+        // core on 9.2. It normally answers 304 with no body; the request hook in
+        // NebulaAttributes drops the cache validators so a real
+        // AccountAttributesResponse arrives here and can be rewritten to Premium.
+        if url.isNebulaAttributes {
+            guard let rewritten = rewriteAccountAttributesData(buffer) else { return nil }
+            return PatchResult(data: rewritten, tag: .nebulaAttributes)
+        }
         if url.isPremiumPlanRow {
             return PatchResult(
                 data: try getPremiumPlanRowData(

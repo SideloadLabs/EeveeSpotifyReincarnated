@@ -69,6 +69,13 @@ class SPTDataLoaderServiceHook: ClassHook<NSObject>, SpotifySessionDelegate {
             } else {
                 // Consumers crash on completion without a prior didReceiveData.
                 writeDebugLog("[DL] Missing buffered body for \(url.absoluteString) (taskId=\(task.taskIdentifier))")
+                if url.isNebulaAttributes {
+                    // Never hand the core an empty attributes body: leaving it to
+                    // its cache is better than clearing the product state.
+                    writeDebugLog("[DL] No attributes body to rewrite; left untouched")
+                    orig.URLSession(session, task: task, didCompleteWithError: error)
+                    return
+                }
                 orig.URLSession(session, dataTask: task, didReceiveData: Data())
                 orig.URLSession(session, task: task, didCompleteWithError: error)
             }

@@ -220,6 +220,10 @@ struct EeveeSpotify: Tweak {
         // Local-only premium force; independent of patching, so premium UI survives everything else being off.
         activateEeveePremiumForce()
 
+        // Must run before Spotify issues its first attributes request, which it
+        // does within a second of launch.
+        activateNebulaAttributes()
+
         activateTelemetryBlock()
         activateTheme()
         activateLiquidGlass()
@@ -248,9 +252,11 @@ struct EeveeSpotify: Tweak {
         // UIPasteboard.general is a private subclass whose setters bypass the base-class hooks.
         PasteboardConcreteSwizzler.install()
 
-        // Full protection crashes some 9.1.x builds.
+        // Full protection crashes some 9.1.x builds, but it is fine on 9.2.0
+        // (verified on device), and 9.2 needs the auth hooks for the product
+        // state the core pushes a second into the session.
         if EeveeSpotify.hookTarget == .v91 {
-            activateSessionLogoutProtection(minimal: true)
+            activateSessionLogoutProtection(minimal: EeveeSpotify.spotifyVersion.hasPrefix("9.1."))
         } else {
             activateSessionLogoutProtection(minimal: false)
         }
