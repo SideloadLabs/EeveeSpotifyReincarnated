@@ -122,9 +122,9 @@ static void withHeaders(SAPSlotRequest *op,void (^ready)(SAPSlotRequest *)) {
 #ifdef SAP_TESTING
     if(testHeaders){testHeaders(received);return;}
 #endif
-    // The Eevee build carrying the original Pixie ("Sprite") integration exposes the
-    // same existing headers as a class method (EeveeSpotify.SpriteAuthentication).
-    Class eevee=NSClassFromString(@"SpriteAuthentication");
+    // EeveeSpotify exposes the headers it already observes as a class method
+    // (EeveeSpotify.PixieAuthentication).
+    Class eevee=NSClassFromString(@"PixieAuthentication");
     SEL selector=NSSelectorFromString(@"headersWithCompletion:");
     Method method=eevee?class_getClassMethod(eevee,selector):NULL;
     char resultType[8]={0},callbackType[8]={0};
@@ -135,7 +135,7 @@ static void withHeaders(SAPSlotRequest *op,void (^ready)(SAPSlotRequest *)) {
         valid=resultType[0]=='v' && callbackType[0]=='@' && callbackType[1]=='?';
     }
     SAP_TRACE("offline_devices","authentication_provider_resolved",op.traceOperation,
-        @{@"provider":valid?@"Eevee.SpriteAuthentication":@"none",@"class_present":@(eevee!=Nil),@"signature_valid":@(valid),@"credentials_logged":@NO});
+        @{@"provider":valid?@"Eevee.PixieAuthentication":@"none",@"class_present":@(eevee!=Nil),@"signature_valid":@(valid),@"credentials_logged":@NO});
     if(!valid){[op finish:nil error:@"The authenticated request provider (EeveeSpotify) is unavailable. Play one track online on this device, then refresh."];return;}
     ((void (*)(id,SEL,void (^)(NSDictionary *)))objc_msgSend)(eevee,selector,received);
 }

@@ -204,7 +204,7 @@ def run_fixture(test: Fixture, build: Path, sanitize: bool):
     with (folder / "output.log").open("w") as log:
         if "SAP_REAL_EEVEE_AUTH" in test.defines:
             bridge = folder / "libEeveeAuthenticationFixture.dylib"
-            execute(("xcrun", "swiftc", "-parse-as-library", "-emit-library", "-module-name", "PixieAuthenticationFixture", PROJECT / "Sources/EeveeSpotify/SpriteAuthentication.swift", source("eevee_auth_headers.swift"), "-o", bridge), log, env)
+            execute(("xcrun", "swiftc", "-parse-as-library", "-emit-library", "-module-name", "PixieAuthenticationFixture", PROJECT / "Sources/EeveeSpotify/PixieAuthentication.swift", source("eevee_auth_headers.swift"), "-o", bridge), log, env)
             command.append(bridge)
         execute(command, log, env)
         for args in test.scenarios:

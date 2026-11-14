@@ -11,7 +11,7 @@ var spotifyAccessToken: String? {
 
 func captureAccessToken(from request: URLRequest?, session: URLSession? = nil) {
     // The Pixie companion reads these already-observed headers for its offline device manager.
-    SpriteAuthentication.capture(request, session: session)
+    PixieAuthentication.capture(request, session: session)
     guard let auth = request?.value(forHTTPHeaderField: "Authorization"), auth.hasPrefix("Bearer ") else { return }
     let token = String(auth.dropFirst(7))
     accessTokenLock.lock()

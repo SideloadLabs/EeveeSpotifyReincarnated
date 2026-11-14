@@ -16,10 +16,10 @@ static NSInteger failAfterPost=-1;
 // Exercise the production Eevee selector bridge instead of the injected test-header shortcut.
 static id eeveeHeaderSnapshot;
 static NSUInteger eeveeProviderCalls;
-@interface SpriteAuthentication : NSObject
+@interface PixieAuthentication : NSObject
 + (void)headersWithCompletion:(void (^)(NSDictionary *))completion;
 @end
-@implementation SpriteAuthentication
+@implementation PixieAuthentication
 + (void)headersWithCompletion:(void (^)(NSDictionary *))completion {
     eeveeProviderCalls++;
     completion(eeveeHeaderSnapshot);
@@ -160,7 +160,7 @@ int main(void) {@autoreleasepool {
     assert(requests.count==2);
     release(realEeveePlan,@[@"old-cache-0"],YES);
     assert(postCount==1 && freeSlots==5);
-    puts("PASS: actual Swift SpriteAuthentication -> Objective-C header bridge -> registry preview -> one verified disable; all HTTP mocked");
+    puts("PASS: actual Swift PixieAuthentication -> Objective-C header bridge -> registry preview -> one verified disable; all HTTP mocked");
 #endif
     reset(5);NSDictionary *plan=preview(YES);assert([plan[@"active_devices"]count]==5);
     assert([plan[@"active_devices"][0][@"last_seen_at"]longLongValue]==1792520000);

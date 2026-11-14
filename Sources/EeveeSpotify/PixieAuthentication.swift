@@ -2,8 +2,8 @@ import Foundation
 
 // Reuse headers already observed by Eevee's existing Spotify delegates.
 // Values stay in memory; the manager never logs or persists credentials.
-@objc(SpriteAuthentication)
-final class SpriteAuthentication: NSObject {
+@objc(PixieAuthentication)
+final class PixieAuthentication: NSObject {
     private static let lock = NSLock()
     private static var captured: [String: String] = [:]
     private static var capturedAt = Date.distantPast

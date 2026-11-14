@@ -55,7 +55,7 @@ recorded in the result. No simulator or iPhone is launched.
   preserved in-flight progress and selected artists gaining a new native track.
 - **devices**: source comparison, reviewed enable/remove operations, malformed
   HTTP and readback. The extra `offline_devices_eevee_auth` fixture compiles the
-  actual Swift `SpriteAuthentication` bridge; its seed contains test-only values.
+  actual Swift `PixieAuthentication` bridge; its seed contains test-only values.
   Every management HTTP request is intercepted by NSURLProtocol.
 - **diagnostics**: player trace, journal state/reset/off behavior, trace rotation,
   bounded queue loss, write failure and single support-log packaging.
