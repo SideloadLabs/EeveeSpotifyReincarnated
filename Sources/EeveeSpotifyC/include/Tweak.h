@@ -13,4 +13,13 @@ void EeveeColorSwapStats(long *grey, long *green, long *uiColor);
 BOOL EeveePinSetter(id object, SEL setter, id value);
 BOOL EeveeInterceptBackground(UIView *view, void (^sink)(UIColor *color));
 
+// Artist-page download button of the Pixie companion. They resolve its exported functions at
+// runtime and do nothing when the companion is not loaded.
+void EeveePixieUpdateArtistDownloads(UIView *header, UIButton *_Nullable externalButton);
+NSString *_Nullable EeveePixieArtistURIForHeader(UIView *header);
+void EeveePixieInstallArtistFollow(void);
+NSInteger EeveePixieArtistFollowing(UIView *header, void (^changed)(void));
+// 1 saved, 0 not saved, -1 not known yet. `changed` runs when Spotify reports a new state.
+NSInteger EeveePixieSavedState(UIView *page, NSString *uri, void (^changed)(void));
+
 NS_ASSUME_NONNULL_END

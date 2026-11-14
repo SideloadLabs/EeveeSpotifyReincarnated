@@ -115,7 +115,10 @@ func activateLiquidGlass() {
     if options.playlist != false {
         add("playlist", activate(GlassPlaylistGroup(), GlassPlaylistHook.targetName, PlaylistPlayStateHook.targetName, PlaylistListHook.targetName, PlaylistArtworkHook.targetName, PlaylistHeaderLayoutHook.targetName, PlaylistChipHook.targetName))
         add("album", activate(GlassAlbumGroup(), GlassAlbumHook.targetName, GlassAlbumListHook.targetName))
-        add("artist", activate(GlassArtistGroup(), GlassArtistHook.targetName))
+        if activate(GlassArtistGroup(), GlassArtistHook.targetName) {
+            EeveePixieInstallArtistFollow()
+            active.append("artist")
+        }
     }
     if tabBar || nowPlaying {
         add("transitions", activate(GlassTransitionGroup(), BarOverlayTransitionHook.targetName, CompactOverlayTransitionHook.targetName))
