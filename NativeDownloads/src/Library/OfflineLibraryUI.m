@@ -105,6 +105,7 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
 - (void)configureCell:(SAPArtistReleaseCell *)cell atIndexPath:(NSIndexPath *)path;
 - (void)configureIndicator:(SAPOfflineArtworkCell *)cell rows:(NSArray<NSDictionary *> *)rows;
 - (NSArray<NSDictionary *> *)buildReleaseSections;
+- (void)refreshCatalogProgressHeader;
 @end
 
 @interface SAPOfflineArtworkCell : SAPArtistReleaseCell
@@ -134,10 +135,11 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
     __weak typeof(self) weakSelf = self;
     self.catalogCancel = SAPFetchOfflineLibrary(^(NSUInteger done, NSUInteger total) {
         SAPOfflineLibraryState *self = weakSelf; if (!self || self.dismissed || generation != self.catalogGeneration) return;
-        self.loadCompleted=done;self.loadTotal=total;if(!self.tracks)[self.root updateLoading];
+        self.loadCompleted=done;self.loadTotal=total;if(!self.tracks)[self.root updateLoading];else [self.root refreshCatalogProgressHeader];
     }, ^(NSArray<NSDictionary *> *tracks, NSString *error) {
         SAPOfflineLibraryState *self = weakSelf; if (!self || self.dismissed || generation != self.catalogGeneration) return;
         self.catalogCancel = nil;
+        [self.root refreshCatalogProgressHeader];
         self.root.title=@"Downloaded tracks";
         if (!tracks) {
             [self refresh];
@@ -154,7 +156,7 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
         if(changed)[self refresh];else{[self.root updateLoading];[self refreshSelection];}
         if (error.length) [self showMessage:@"Some track details are unavailable" detail:error];
     });
-    [root updateLoading];
+    [root updateLoading];[root refreshCatalogProgressHeader];
 }
 - (void)refresh {
     NSMutableDictionary *byURI=NSMutableDictionary.dictionary,*byArtist=NSMutableDictionary.dictionary;
@@ -757,10 +759,28 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
     if(self.level!=1)return self.scope?:self.state.tracks;
     NSMutableArray *rows=NSMutableArray.array;for(NSDictionary *release in self.releaseSections[section][@"releases"])[rows addObjectsFromArray:release[@"tracks"]];return rows;
 }
+// "Loading X/Y" to the right of the Artists title while the catalog refreshes. Only the label is touched, so
+// the header keeps its height and nothing next to it moves: the digits have a fixed width, the change is not
+// animated, and when loading ends the label just hides.
+- (void)applyCatalogProgress:(SAPArtistCategoryHeader *)header {
+    BOOL loading=self.level==0 && self.state.catalogCancel!=nil && self.state.tracks.count>0 && self.state.loadTotal>0;
+    NSString *text=loading?[NSString stringWithFormat:@"Loading %lu/%lu",(unsigned long)MIN(self.state.loadCompleted,self.state.loadTotal),(unsigned long)self.state.loadTotal]:nil;
+    UILabel *label=header.catalogProgressLabel;
+    [UIView performWithoutAnimation:^{
+        label.font=[UIFont monospacedDigitSystemFontOfSize:[UIFont preferredFontForTextStyle:UIFontTextStyleFootnote].pointSize weight:UIFontWeightRegular];
+        if(![label.text?:@"" isEqual:text?:@""])label.text=text;
+        if(label.hidden==loading)label.hidden=!loading;
+    }];
+}
+- (void)refreshCatalogProgressHeader {
+    if(!self.isViewLoaded||self.level!=0)return;
+    SAPArtistCategoryHeader *header=(id)[self.tableView headerViewForSection:0];
+    if([header isKindOfClass:SAPArtistCategoryHeader.class])[self applyCatalogProgress:header];
+}
 - (void)configureHeader:(SAPArtistCategoryHeader *)header section:(NSInteger)section {
     NSString *title=self.level==0?@"Artists":self.level==1?self.releaseSections[section][@"category"]:@"Tracks";
     header.categoryTitle.text=[NSString stringWithFormat:@"%@ (%ld)",title,(long)[self tableView:self.tableView numberOfRowsInSection:section]];
-    header.catalogProgressLabel.hidden=YES;header.selectionButton.hidden=!self.state.selecting;header.selectionButton.tag=section;
+    [self applyCatalogProgress:header];header.selectionButton.hidden=!self.state.selecting;header.selectionButton.tag=section;
     NSArray *rows=[self rowsInSection:section];header.selectionButton.selected=rows.count>0 && SAPOfflineLibrarySelection(rows,self.state.selectedURIs,YES).count==rows.count;
     [header.selectionButton removeTarget:self action:@selector(toggleSection:) forControlEvents:UIControlEventTouchUpInside];
     [header.selectionButton addTarget:self action:@selector(toggleSection:) forControlEvents:UIControlEventTouchUpInside];

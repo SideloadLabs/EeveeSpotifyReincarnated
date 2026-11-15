@@ -65,7 +65,7 @@
 @property(nonatomic,copy) NSString *title,*pageTitle,*artistKey,*releaseKey;
 @property(nonatomic,copy) NSArray *scope,*releaseSections;
 @property(nonatomic) NSInteger level;
-@property(nonatomic) NSUInteger applications;
+@property(nonatomic) NSUInteger applications,catalogHeaderRefreshes;
 @property(nonatomic,strong) RefreshLabel *loadingLabel;
 @property(nonatomic,strong) RefreshSpinner *loadingSpinner;
 + (NSArray *)artistRowsForTracks:(NSArray *)tracks;
@@ -77,6 +77,7 @@
 - (void)updateProgressPanel;
 - (void)refreshSelection;
 - (void)refreshCatalog;
+- (void)refreshCatalogProgressHeader;
 - (void)progressActionTapped;
 - (NSArray *)selectedRows;
 - (NSArray *)newExportRows;
@@ -122,6 +123,7 @@ void SAPReleaseOfflineLibraryPackage(NSURL *url){assert(url);releasedPackages++;
 - (void)updateBottomControls {}
 - (void)updateProgressPanel {}
 - (void)refreshSelection {}
+- (void)refreshCatalogProgressHeader {self.catalogHeaderRefreshes++;}
 @end
 static void deliver(NSUInteger index,NSArray *rows,NSString *error) {
     void(^completion)(NSArray *,NSString *)=requests[index][@"completion"];completion(rows,error);
@@ -141,7 +143,8 @@ int main(void) {@autoreleasepool {
     assert(state.tracks.count==2 && state.artists.count==2 && requests.count==0);
     [root viewDidAppear:NO];assert(requests.count==1 && state.tracks.count==2 && !root.loadingSpinner.animating);
     [root viewDidAppear:NO];assert(requests.count==1);
-    deliver(0,nil,@"unavailable");assert(state.tracks.count==2 && state.messages==1);
+    assert(root.catalogHeaderRefreshes>=1);
+    deliver(0,nil,@"unavailable");assert(state.tracks.count==2 && state.messages==1 && root.catalogHeaderRefreshes>=2);
     [state.selectedURIs addObjectsFromArray:@[@"a",@"b"]];[root refreshCatalog];
     assert(requests.count==2 && state.tracks.count==2 && state.selectedURIs.count==2);
     SAPOfflineLibraryController *hidden=SAPOfflineLibraryController.new;hidden.state=state;hidden.level=1;hidden.artistKey=@"artist-a";hidden.scope=@[a];
