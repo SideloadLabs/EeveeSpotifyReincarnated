@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       ipa_url:
-        description: 'Optional HTTPS URL to the compatible Spotify 9.2.0 / EeveeSpotify 7.0.1 IPA'
+        description: 'Optional HTTPS URL to the compatible Spotify 9.2.0 / EeveeSpotify 7.5.0 IPA'
         required: false
         default: ''
         type: string
