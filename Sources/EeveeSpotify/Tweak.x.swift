@@ -29,6 +29,19 @@ func exitApplication() {
 // Split so bootstrap patching survives UI hooks breaking on a given Spotify build.
 struct PremiumBootstrapGroup: HookGroup { }
 struct PremiumUIHooksGroup: HookGroup { }
+struct OfflineHookGroup: HookGroup { }
+
+private func activateOfflineHooks() {
+    guard #available(iOS 16.0, *) else { return }
+    OfflineMenuHeaderHook.install(on: NSClassFromString("_TtC25Scannables_ScannablesImpl44ScannablesUserInterfaceFactoryImplementation"))
+    OfflineHookGroup().activate()
+    if NSClassFromString(OfflineAlbumTrackBadgeHook.targetName) != nil {
+        OfflineLegacyAlbumBadgeHookGroup().activate()
+    }
+    DownloadUpsellButtonHook.install()
+    OfflineSpotifyPlayback.installVolumeRouting()
+    DispatchQueue.main.async { _ = OfflineDownloadManager.shared }
+}
 
 struct BasePremiumPatchingGroup: HookGroup { }
 
@@ -374,6 +387,7 @@ struct EeveeSpotify: Tweak {
             activateEeveeProbes()
             activateSponsorBlock()
             activateKaraokeHooks()
+            activateOfflineHooks()
             return
         }
 
@@ -415,5 +429,6 @@ struct EeveeSpotify: Tweak {
         activateEeveeProbes()
         activateSponsorBlock()
         activateKaraokeHooks()
+        activateOfflineHooks()
     }
 }

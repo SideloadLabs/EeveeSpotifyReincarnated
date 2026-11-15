@@ -22,6 +22,12 @@ enum EeveeLog {
         queue.async { append("\(stamp.string(from: date)) \(line)\n") }
     }
 
+    static func checkpoint(_ line: String) {
+        guard UserDefaults.debugLoggingEnabled else { return }
+        let date = Date()
+        queue.sync { append("\(stamp.string(from: date)) \(line)\n") }
+    }
+
     static func clear() {
         queue.async {
             try? handle?.close()

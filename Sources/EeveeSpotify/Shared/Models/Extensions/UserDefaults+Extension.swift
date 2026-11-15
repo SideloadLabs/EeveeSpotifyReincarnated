@@ -128,4 +128,18 @@ extension UserDefaults {
         get { container.bool(forKey: "eeveeRoundedArtwork") }
         set { container.set(newValue, forKey: "eeveeRoundedArtwork") }
     }
+
+    static var offlineRegion: OfflineSearchRegion {
+        get { OfflineSearchRegion(rawValue: container.integer(forKey: "offlineRegion")) ?? .automatic }
+        set { container.set(newValue.rawValue, forKey: "offlineRegion") }
+    }
+
+    public static var offlineQuality: Int {
+        get {
+            container.integer(forKey: "offlineQuality") == 1 ? 1 : 0
+        }
+        set {
+            container.set(newValue, forKey: "offlineQuality")
+        }
+    }
 }

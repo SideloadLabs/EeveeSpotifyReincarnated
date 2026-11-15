@@ -14,6 +14,9 @@ class HttpClientURLSessionHook: ClassHook<NSObject>, SpotifySessionDelegate {
         didCompleteWithError error: Error?
     ) {
         captureAccessToken(from: task.currentRequest, session: session)
+        if #available(iOS 16.0, *), error == nil {
+            OfflineCollectionHistory.record(OfflineSpotifyIdentifier.collectionLinks(from: task.originalRequest ?? task.currentRequest))
+        }
 
         guard let url = task.currentRequest?.url else {
             orig.URLSession(session, task: task, didCompleteWithError: error)

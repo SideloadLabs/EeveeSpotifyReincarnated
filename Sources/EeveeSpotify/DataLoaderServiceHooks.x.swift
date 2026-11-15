@@ -12,7 +12,9 @@ var spotifyAccessToken: String? {
 func captureAccessToken(from request: URLRequest?, session: URLSession? = nil) {
     // The Pixie companion reads these already-observed headers for its offline device manager.
     PixieAuthentication.capture(request, session: session)
-    guard let auth = request?.value(forHTTPHeaderField: "Authorization"), auth.hasPrefix("Bearer ") else { return }
+    guard request?.url?.scheme == "https",
+          let host = request?.url?.host, host == "spotify.com" || host.hasSuffix(".spotify.com"),
+          let auth = request?.value(forHTTPHeaderField: "Authorization"), auth.hasPrefix("Bearer ") else { return }
     let token = String(auth.dropFirst(7))
     accessTokenLock.lock()
     let first = storedAccessToken == nil
@@ -35,6 +37,9 @@ class SPTDataLoaderServiceHook: ClassHook<NSObject>, SpotifySessionDelegate {
         didCompleteWithError error: Error?
     ) {
         captureAccessToken(from: task.currentRequest, session: session)
+        if #available(iOS 16.0, *), error == nil {
+            OfflineCollectionHistory.record(OfflineSpotifyIdentifier.collectionLinks(from: task.originalRequest ?? task.currentRequest))
+        }
 
         guard let url = task.currentRequest?.url else {
             orig.URLSession(session, task: task, didCompleteWithError: error)

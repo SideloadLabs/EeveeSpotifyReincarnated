@@ -67,6 +67,12 @@ Please refrain from opening issues about the following features, as they are ser
 Please check out the hyperlink above before opening an issue
 
 
+## Offline playback
+
+On iOS 16 and later, choose **Download Offline** from a track, album, or playlist menu. Open **Downloaded Tracks** in Your Library to play the files without a connection. In **EeveeSpotify → Offline Mode**, you can choose the download quality and region preference.
+
+Downloads depend on external audio sources. Availability and quality can vary by track and region. The default quality tries MP3 first and falls back to lower bitrates if needed.
+
 ## Lyrics Support
 
 EeveeSpotify replaces Spotify monthly limited lyrics with one of the following four lyrics providers:
