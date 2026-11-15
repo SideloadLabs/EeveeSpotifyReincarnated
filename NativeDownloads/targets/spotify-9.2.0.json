@@ -4,7 +4,7 @@
   "spotify_build": "920002054",
   "uuid": "b49e75781d8635d38bb57daf68fed8a8",
   "pixie_version": "1.4",
-  "eevee_version": "7.0.1",
+  "eevee_version": "7.5.0",
   "minimum_ios": "15.0",
   "preferred_address": "0x100000000",
   "native": {
@@ -228,7 +228,7 @@
     }
   ],
   "export": {
-    "comment": "Spotify 9.2.0 (Eevee 7.0.1 Patched build) sites located by structure against the 9.1.98 binary: call-graph anchors (request callback constructors, vtable slot 65, dlsym import) and normalised ARM64 matching; see PORT-9.2.0.md.",
+    "comment": "Spotify 9.2.0 (Eevee 7.5.0 Patched build) sites located by structure against the 9.1.98 binary: call-graph anchors (request callback constructors, vtable slot 65, dlsym import) and normalised ARM64 matching; see PORT-9.2.0.md.",
     "cave_base": "0x10001e000",
     "cave_stride": 512,
     "points": {
