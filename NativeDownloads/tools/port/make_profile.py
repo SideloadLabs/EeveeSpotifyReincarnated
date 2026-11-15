@@ -36,7 +36,7 @@ def main(new_path, old_path, out_path):
         if cmd == 0x1b: uuid = d[off+8:off+24].hex()
         off += size
     p["id"] = "eevee-spotify-9.2.0-pixie-1.4"; p["spotify_version"] = "9.2.0"; p["spotify_build"] = "920002054"
-    p["uuid"] = uuid; p["eevee_version"] = "7.0.1"
+    p["uuid"] = uuid; p["eevee_version"] = "7.5.0"
     n = p["native"]
     sz = {k: len(bytes.fromhex(n[k])) for k in ("setter_original", "window_original", "provider_head", "mapping_original", "dlsym_stub_head")}
     n["setter"] = h(NEW_SITES["setter"]); n["setter_original"] = new.read(NEW_SITES["setter"], sz["setter_original"]).hex()
@@ -59,7 +59,7 @@ def main(new_path, old_path, out_path):
         if k in FAR_CAVES: v["cave"] = h(FAR_CAVES[k])
     for k, v in p["export"]["windows"].items():
         v["address"] = h(NEW_SITES["windows"][k]); v["bytes"] = new.read(NEW_SITES["windows"][k], len(bytes.fromhex(v["bytes"]))).hex()
-    p["export"]["comment"] = ("Spotify 9.2.0 (Eevee 7.0.1 Patched build) sites located by structure against the 9.1.98 binary: "
+    p["export"]["comment"] = ("Spotify 9.2.0 (Eevee 7.5.0 Patched build) sites located by structure against the 9.1.98 binary: "
                               "call-graph anchors (request callback constructors, vtable slot 65, dlsym import) and normalised ARM64 matching; see PORT-9.2.0.md.")
     json.dump(p, open(out_path, "w"), indent=2); open(out_path, "a").write("\n")
     print("wrote", out_path, "uuid", uuid)
