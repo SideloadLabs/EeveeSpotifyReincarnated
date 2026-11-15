@@ -27,11 +27,6 @@ import Foundation
 // unchanged. The cost is one extra non-cached response per launch.
 
 enum NebulaAttributes {
-    private static var strippedCount = 0
-
-    private static var originalDataTask: IMP?
-    private static var originalDataTaskWithCompletion: IMP?
-
     /// A copy of `request` without the cache validators, so the server cannot
     /// answer 304 and the attributes body reaches our response hooks.
     private static func unconditional(_ request: URLRequest) -> URLRequest {
@@ -39,19 +34,17 @@ enum NebulaAttributes {
         copy.setValue(nil, forHTTPHeaderField: "If-None-Match")
         copy.setValue(nil, forHTTPHeaderField: "If-Modified-Since")
         copy.cachePolicy = .reloadIgnoringLocalCacheData
-
-        if strippedCount < 5 {
-            strippedCount += 1
-            writeDebugLog("[Nebula] Stripped cache validators from \(request.url?.path ?? "?")")
-        }
+        writeDebugLog("[Nebula] Stripped cache validators from \(request.url?.path ?? "?")")
         return copy
     }
 
+    // Every data task in the process passes through here, so check the URL on
+    // the NSURLRequest and only bridge to URLRequest for the one we rewrite.
     private static func rewriteIfNebula(_ request: AnyObject?) -> AnyObject? {
-        guard let urlRequest = request as? URLRequest,
-              let url = urlRequest.url,
+        guard let nsRequest = request as? NSURLRequest,
+              let url = nsRequest.url,
               url.isNebulaAttributes else { return request }
-        return unconditional(urlRequest) as NSURLRequest
+        return unconditional(nsRequest as URLRequest) as NSURLRequest
     }
 
     /// Swizzles the two NSURLSession task factories Spotify's HTTP client uses.
@@ -68,7 +61,6 @@ enum NebulaAttributes {
         if let method = class_getInstanceMethod(cls, selector) {
             typealias Fn = @convention(c) (AnyObject, Selector, AnyObject?) -> AnyObject?
             let original = method_getImplementation(method)
-            originalDataTask = original
             let block: @convention(block) (AnyObject, AnyObject?) -> AnyObject? = { this, request in
                 unsafeBitCast(original, to: Fn.self)(this, selector, rewriteIfNebula(request))
             }
@@ -79,7 +71,6 @@ enum NebulaAttributes {
         if let method = class_getInstanceMethod(cls, completionSelector) {
             typealias Fn = @convention(c) (AnyObject, Selector, AnyObject?, AnyObject?) -> AnyObject?
             let original = method_getImplementation(method)
-            originalDataTaskWithCompletion = original
             let block: @convention(block) (AnyObject, AnyObject?, AnyObject?) -> AnyObject? = { this, request, handler in
                 unsafeBitCast(original, to: Fn.self)(this, completionSelector, rewriteIfNebula(request), handler)
             }
@@ -90,7 +81,11 @@ enum NebulaAttributes {
     }
 }
 
+// Only 9.2 and later are known to deliver product state this way; 9.1.x and
+// older keep their tested behaviour.
 func activateNebulaAttributes() {
-    guard UserDefaults.patchType.isPatching else { return }
+    guard UserDefaults.patchType.isPatching,
+          EeveeSpotify.hookTarget == .v91,
+          !EeveeSpotify.spotifyVersion.hasPrefix("9.1.") else { return }
     NebulaAttributes.installRequestHook()
 }

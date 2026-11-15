@@ -252,11 +252,9 @@ struct EeveeSpotify: Tweak {
         // UIPasteboard.general is a private subclass whose setters bypass the base-class hooks.
         PasteboardConcreteSwizzler.install()
 
-        // Full protection crashes some 9.1.x builds, but it is fine on 9.2.0
-        // (verified on device), and 9.2 needs the auth hooks for the product
-        // state the core pushes a second into the session.
+        // Full protection crashes some 9.1.x builds.
         if EeveeSpotify.hookTarget == .v91 {
-            activateSessionLogoutProtection(minimal: EeveeSpotify.spotifyVersion.hasPrefix("9.1."))
+            activateSessionLogoutProtection(minimal: true)
         } else {
             activateSessionLogoutProtection(minimal: false)
         }
