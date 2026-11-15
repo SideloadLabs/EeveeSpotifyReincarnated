@@ -71,13 +71,7 @@ This issue is solely related to your account region. Do not enable "Overwrite Co
 
 ## Downloading
 
-Downloading is not, and will never be, implemented in EeveeSpotify. While it is technically possible to intercept the audio stream or use third-party APIs, downloading simply will not be included in EeveeSpotify.
-
-However, opening a pull request is always welcome. If you are a developer and manage to implement downloading that works flawlessly and natively (without third-party menus, UI elements, etc.), you will be considered a true legend and mentioned at the top of the README and contributors screen.
-
-You may see a "Download local playlist" option. This is specifically for downloading playlists that contain only local tracks from your PC within a Wi-Fi network.
-
-Any issues regarding downloading of any kind will be closed.
+Downloads work now. If issues happen with downloading do a clean install. (Downloads don't work if you're jailbroken and install the debs)
 
 ## Spotify Connect
 
