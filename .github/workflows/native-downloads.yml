@@ -1,0 +1,71 @@
+name: Pixie 1.4 — Spotify 9.2.0
+
+on:
+  push:
+    paths: ['NativeDownloads/**', 'Sources/**', 'Makefile', '.github/workflows/native-downloads.yml']
+  pull_request:
+    paths: ['NativeDownloads/**', 'Sources/**', 'Makefile', '.github/workflows/native-downloads.yml']
+  workflow_dispatch:
+    inputs:
+      ipa_url:
+        description: 'Optional HTTPS URL to the compatible Spotify 9.2.0 / EeveeSpotify 7.0.1 IPA'
+        required: false
+        default: ''
+        type: string
+      eevee_dylib_url:
+        description: 'HTTPS URL of EeveeSpotify.dylib rebuilt from these sources; required for packaging'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install ffmpeg for the M4A codec test
+        run: brew install ffmpeg
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+          HOMEBREW_NO_INSTALL_CLEANUP: '1'
+      - run: python3 NativeDownloads/tools/validate_eevee_9192.py
+      - run: python3 NativeDownloads/tools/test.py --build-dir outputs/ci-host-tests
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pixie-host-test-results
+          path: outputs/ci-host-tests
+          retention-days: 7
+
+  package:
+    if: github.event_name == 'workflow_dispatch' && inputs.ipa_url != ''
+    needs: validate
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Fetch supplied artifacts and package
+        env:
+          SOURCE_IPA_URL: ${{ inputs.ipa_url }}
+          EEVEE_DYLIB_URL: ${{ inputs.eevee_dylib_url }}
+        run: |
+          case "$SOURCE_IPA_URL" in https://*) ;; *) exit 1 ;; esac
+          case "$EEVEE_DYLIB_URL" in https://*) ;; *) echo 'A current Eevee library is required'; exit 1 ;; esac
+          curl --proto '=https' --proto-redir '=https' --location --fail "$SOURCE_IPA_URL" --output "$RUNNER_TEMP/source.ipa"
+          curl --proto '=https' --proto-redir '=https' --location --fail "$EEVEE_DYLIB_URL" --output "$RUNNER_TEMP/EeveeSpotify.dylib"
+          mkdir -p outputs/ci-package
+          python3 NativeDownloads/tools/build_eevee_9192.py "$RUNNER_TEMP/source.ipa" --eevee-dylib "$RUNNER_TEMP/EeveeSpotify.dylib" --output outputs/ci-package/Spotify-9.2.0-EeveeSpotify-Pixie-v1.4.ipa > outputs/ci-package/build-report.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eevee-9192-pixie-1.4
+          path: outputs/ci-package
+          if-no-files-found: error
+          retention-days: 7

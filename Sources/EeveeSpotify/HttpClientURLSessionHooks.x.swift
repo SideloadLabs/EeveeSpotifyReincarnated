@@ -13,7 +13,7 @@ class HttpClientURLSessionHook: ClassHook<NSObject>, SpotifySessionDelegate {
         task: URLSessionDataTask,
         didCompleteWithError error: Error?
     ) {
-        captureAccessToken(from: task.currentRequest)
+        captureAccessToken(from: task.currentRequest, session: session)
 
         guard let url = task.currentRequest?.url else {
             orig.URLSession(session, task: task, didCompleteWithError: error)
