@@ -12,9 +12,10 @@ enum SpotifyResponsePatcher {
     private static var _handledCustomizeTasks = Set<Int>()
 
     static var cachedCustomizeData: Data? {
-        get { lock.lock(); defer { lock.unlock() }; return _cachedCustomizeData }
+        get { lock.lock(); defer { lock.unlock() }; return PixieCustomizeRewrite.apply(_cachedCustomizeData) }
         set {
             lock.lock(); defer { lock.unlock() }
+            let newValue = PixieCustomizeRewrite.apply(newValue)
             _cachedCustomizeData = newValue
             // Mirror to disk: on a warm relaunch the customize fetch comes back
             // 304 (no body) and the in-memory cache is empty in the new process.

@@ -96,7 +96,8 @@ static NSDictionary *observedFlags(NSData *data,BOOL bootstrap) {
     }
     return @{@"recognized":@YES,@"attributes":out};
 }
-NSData *SAPRewriteOfflineConfig(NSData *data, BOOL bootstrap) {
+// Exported so Eevee can apply the same rewrite to the customize copy it saves and replays.
+__attribute__((visibility("default"))) NSData *SAPRewriteOfflineConfig(NSData *data, BOOL bootstrap) {
     // Account.pb.swift: Bootstrap[2][1][1].Customize[1].Ucs[3].Attributes(map[1]).
     const unsigned bootstrapPath[] = {2, 1, 1, 1, 3}, customizePath[] = {1, 3};
     BOOL found = NO;

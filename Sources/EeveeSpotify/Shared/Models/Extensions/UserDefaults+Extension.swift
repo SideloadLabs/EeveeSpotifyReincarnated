@@ -84,7 +84,7 @@ extension UserDefaults {
     /// gets a 304 with no body — without this persisted copy the tweak has
     /// nothing to replay and free-tier/ad flags re-enable mid-session.
     static var cachedCustomizeData: Data? {
-        get { container.data(forKey: cachedCustomizeDataKey) }
+        get { PixieCustomizeRewrite.apply(container.data(forKey: cachedCustomizeDataKey)) }
         set {
             if let newValue {
                 container.set(newValue, forKey: cachedCustomizeDataKey)

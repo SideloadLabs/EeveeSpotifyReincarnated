@@ -149,6 +149,29 @@ jobs:
           ipapatch --input "$OUT_IPA" --inplace --noconfirm \
                    --dylib packages/zxPluginsInject.dylib
 
+      - name: Add Pixie download manager (Spotify 9.2.0 only)
+        if: ${{ inputs.ipa_url != '' }}
+        run: |
+          # The download manager lives in the SpotifyAudioProbe.dylib companion, which is only
+          # built and bundled by NativeDownloads/tools/build_eevee_9192.py. Without this step the
+          # IPA has no companion and Eevee hides the "Download manager" settings row.
+          SPOT_VERSION=$(unzip -p "$OUT_IPA" 'Payload/Spotify.app/Info.plist' \
+              | plutil -extract CFBundleShortVersionString raw - 2>/dev/null || echo "unknown")
+          if [ "$SPOT_VERSION" != "9.2.0" ]; then
+            echo "::warning::Pixie download manager supports Spotify 9.2.0 only (this IPA is $SPOT_VERSION); skipping."
+            exit 0
+          fi
+          python3 NativeDownloads/tools/validate_eevee_9192.py
+          EEVEE_DYLIB=$(find "$RUNNER_TEMP/deb-extract" -name 'EeveeSpotify.dylib' | head -1)
+          PIXIE_OUT="$RUNNER_TEMP/pixie/$(basename "$OUT_IPA")"
+          mkdir -p "$(dirname "$PIXIE_OUT")"
+          python3 NativeDownloads/tools/build_eevee_9192.py "$OUT_IPA" \
+              --eevee-dylib "$EEVEE_DYLIB" --output "$PIXIE_OUT" > "$RUNNER_TEMP/pixie-report.json"
+          mv -f "$PIXIE_OUT" "$OUT_IPA"
+          unzip -l "$OUT_IPA" | grep SpotifyAudioProbe.dylib \
+              || { echo "::error::SpotifyAudioProbe.dylib missing from IPA"; exit 1; }
+          echo "Pixie companion bundled: Payload/Spotify.app/Frameworks/SpotifyAudioProbe.dylib"
+
       - name: Inject OpeninSafariSpotify extension into IPA PlugIns
         if: ${{ inputs.ipa_url != '' }}
         run: |
