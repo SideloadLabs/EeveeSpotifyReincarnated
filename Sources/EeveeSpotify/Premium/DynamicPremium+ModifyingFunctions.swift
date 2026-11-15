@@ -449,6 +449,29 @@ func isCohortAdOrUpsellFlag(scope: String, name: String) -> Bool {
     return tokens.contains { adTokens.contains($0) }
 }
 
+/// Rewrites a serialized `AccountAttributesResponse` to Premium, using the same
+/// attribute policy as every other premium patch. Returns nil when the bytes are
+/// not that proto, so the caller leaves the response untouched.
+func rewriteAccountAttributesData(_ data: Data) -> Data? {
+    guard var response = try? AccountAttributesResponse(serializedBytes: data) else { return nil }
+    guard !response.accountAttributes.isEmpty else { return nil }
+
+    func describe(_ key: String) -> String {
+        response.accountAttributes[key].map { "\($0.value.map { "\($0)" } ?? "nil")" } ?? "absent"
+    }
+    func summary() -> String {
+        "on-demand=\(describe("on-demand")) player-license=\(describe("player-license")) type=\(describe("type"))"
+    }
+
+    let before = summary()
+    modifyAttributes(&response.accountAttributes)
+    writeDebugLog(
+        "[Attributes] Rewrote \(response.accountAttributes.count) account attributes; "
+        + "before[\(before)] after[\(summary())]"
+    )
+    return try? response.serializedData()
+}
+
 private func modifyAttributes(_ attributes: inout [String: AccountAttribute]) {
     let serverAuthoritativeAttributes = Dictionary(
         uniqueKeysWithValues: ServerSidedFeaturePolicy.serverAuthoritativeAccountAttributes
