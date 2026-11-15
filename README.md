@@ -116,6 +116,8 @@ Thanks for all of the community's support, also, thanks to all the devs who work
 
 [Spikerko](https://github.com/Spikerko)
 
+[Glonq](https://github.com/Glongq)
+
 - This project is a fork of [Meeep1/EeveeSpotifyRevivedPublic](https://github.com/Meeep1/EeveeSpotifyRevivedPublic).
 
 ## Vibecoded Pull Requests & Commit Comments
