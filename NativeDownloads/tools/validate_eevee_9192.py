@@ -12,6 +12,8 @@ def main():
     manifest = json.loads((ROOT / f"NativeDownloads/provenance-pixie-v{PROFILE['pixie_version']}.json").read_text())
     assert manifest["spotify_version"] == PROFILE["spotify_version"]
     for relative, expected in manifest["source_sha256_by_file"].items():
+        if relative.endswith(".md"):
+            continue  # documentation is not part of the source snapshot
         path = ROOT / relative
         assert hashlib.sha256(path.read_bytes()).hexdigest() == expected, relative
     from patch_native_restrictions import guard_header, limits_header

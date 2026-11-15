@@ -12,8 +12,9 @@ def snapshot():
                  project / "Sources", project / "Tests"]:
         paths.extend(path for path in base.rglob("*") if path.is_file()
                      and "__pycache__" not in path.parts
+                     and path.suffix != ".md"
                      and "Generated/RepoSlug.swift" not in path.as_posix())
-    paths.extend([project / "Makefile", project / f"BUILD-pixie-v{PROFILE['pixie_version']}.md"])
+    paths.append(project / "Makefile")
     return {str(path.relative_to(project)): hashlib.sha256(path.read_bytes()).hexdigest()
             for path in sorted(paths)}
 
