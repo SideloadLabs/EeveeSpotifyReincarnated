@@ -45,7 +45,7 @@ build_arch() {
     local OBJDIR="$SRC/build-$ARCH"
     color "Compiling ${MODULE} for $ARCH"
     rm -rf "$OBJDIR"; mkdir -p "$OBJDIR"
-    swiftc -O \
+    swiftc -O -language-mode 5 \
         -target "$TRIPLE" -sdk "$SDK" \
         -emit-library -emit-module \
         -module-name "$MODULE" \
