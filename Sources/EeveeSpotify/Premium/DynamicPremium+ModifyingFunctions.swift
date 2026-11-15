@@ -638,4 +638,17 @@ private func modifyAttributes(_ attributes: inout [String: AccountAttribute]) {
             attributes.removeValue(forKey: name)
         }
     }
+
+    // Pixie companion (native offline downloads): on Spotify 9.2 the offline core reads these four
+    // entitlements from this response, not from the product-state objects Pixie also rewrites, so
+    // without them every download is answered NOT_ALLOWED. Only applied when Pixie is loaded.
+    if pixieCompanionPresent {
+        attributes["offline"] = AccountAttribute.with { $0.boolValue = true }
+        attributes["can-use-offline"] = AccountAttribute.with { $0.boolValue = true }
+        attributes["max-offline-tracks"] = AccountAttribute.with { $0.longValue = 1_000_000 }
+        attributes["max-offline-downloads-per-device"] = AccountAttribute.with { $0.longValue = 1_000_000 }
+    }
 }
+
+private let pixieCompanionPresent: Bool =
+    dlsym(UnsafeMutableRawPointer(bitPattern: -2), "SAPUpdateArtistDownloadsExternal") != nil

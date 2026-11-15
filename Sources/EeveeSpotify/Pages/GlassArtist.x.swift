@@ -22,7 +22,7 @@ class GlassArtistHook: ClassHook<UIViewController> {
                       scroll.eeveeFirst(UIView.self, where: { NSStringFromClass(type(of: $0)).hasSuffix("HeaderContainer") })
                   })
             else { return nil }
-            return GlassPlaylist.actionRow(host: page, controls: header, scroll: scroll)
+            return GlassPlaylist.actionRow(host: page, controls: header, scroll: scroll, preservePreviewLayout: true)
         }
         if !Self.logged, let row {
             Self.logged = true

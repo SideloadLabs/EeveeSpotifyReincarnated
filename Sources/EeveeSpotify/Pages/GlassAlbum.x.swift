@@ -109,7 +109,16 @@ extension GlassAlbum {
         guard let title = PageLookup.find("CreativeWorkPlatform.Components.UI.TitleRow", in: header),
               let metadata = PageLookup.find("Components.UI.MetadataRow", in: header),
               title.bounds.width > 0 else { return }
-        GlassPlaylist.center(title, box: title.bounds, in: header)
+        // The title is centred by its text, not by the row around it. Where Spotify gives the row the whole width
+        // and left-aligns the text inside, moving the row alone changes nothing.
+        let visible: (UIView) -> Bool = { !$0.isHidden && $0.alpha > 0.01 && $0.bounds.width > 0 }
+        let labels = GlassPlaylist.collect(UILabel.self, in: title).filter(visible)
+        let textViews = GlassPlaylist.collect(UITextView.self, in: title).filter(visible)
+        labels.forEach(GlassPlaylist.centerText)
+        textViews.forEach { if $0.textAlignment != .center { $0.textAlignment = .center } }
+        var titleBox = CGRect.null
+        (labels as [UIView] + textViews as [UIView]).forEach { titleBox = titleBox.union($0.convert($0.bounds, to: title)) }
+        GlassPlaylist.center(title, box: titleBox.isNull ? title.bounds : titleBox, in: header)
 
         var box = CGRect.null
         GlassPlaylist.collect(UILabel.self, in: metadata).forEach { box = box.union($0.convert($0.bounds, to: metadata)) }

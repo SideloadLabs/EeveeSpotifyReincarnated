@@ -1,0 +1,11 @@
+{
+  "UI/AudioProbeUI.m": "UI/PixieManagerActions.m",
+  "UI/DownloadSettingsUI.m": "UI/PixieManagerSettings.m",
+  "Diagnostics/Diagnostics.m": "Diagnostics/DiagnosticsPreferences.m",
+  "Diagnostics/SupportLog.m": "Diagnostics/SupportLogSerializer.m",
+  "Downloads/TrackDownload.m": "Downloads/ManualTrackDownload.m",
+  "Playlists/PlaylistDownloads.m": "Playlists/PlaylistTaskRegistry.m",
+  "Devices/DownloadCompatibility.m": "Devices/OfflineCompatibilityChecks.m",
+  "Devices/OfflineDevices.m": "Devices/OfflineDeviceManager.m",
+  "Spotify/NativeOffline.m": "Spotify/NativeOfflineAdapter.m"
+}

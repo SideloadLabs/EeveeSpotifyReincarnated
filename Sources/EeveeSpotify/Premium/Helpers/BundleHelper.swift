@@ -58,8 +58,15 @@ class BundleHelper {
             return value
         }
         
-        return enBundle?.localizedString(forKey: key, value: nil, table: nil) ?? key
+        let fallback = enBundle?.localizedString(forKey: key, value: nil, table: nil) ?? key
+        // An IPA that ships an older strings bundle than the dylib still gets readable text for new keys.
+        return fallback == key ? (Self.builtInStrings[key] ?? key) : fallback
     }
+
+    private static let builtInStrings: [String: String] = [
+        "manage_downloads": "Manage downloads",
+        "manage_downloads_subtitle": "Pixie offline downloads",
+    ]
     
     func resolveConfiguration() throws -> ResolveConfiguration {
         let spotifyVersion = Bundle.main.object(
