@@ -18,3 +18,20 @@ NSString *EeveePixieArtistURIForHeader(UIView *header) {
     dispatch_once(&once, ^{ resolve = dlsym(RTLD_DEFAULT, "SAPArtistURIForHeader"); });
     return resolve ? resolve(header) : nil;
 }
+
+// Tells the Pixie companion that this Eevee lists the download manager in its own settings.
+__attribute__((visibility("default"))) BOOL EeveePixieDownloadsRowProvided(void) { return YES; }
+
+static UIViewController *(*PixieDownloadsFactory(void))(void) {
+    static UIViewController *(*make)(void);
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ make = dlsym(RTLD_DEFAULT, "SAPCreateDownloadsSettings"); });
+    return make;
+}
+
+BOOL EeveePixieDownloadsAvailable(void) { return PixieDownloadsFactory() != NULL; }
+
+UIViewController *EeveePixieMakeDownloadsController(void) {
+    UIViewController *(*make)(void) = PixieDownloadsFactory();
+    return make ? make() : nil;
+}

@@ -18,6 +18,9 @@ BOOL EeveeInterceptBackground(UIView *view, void (^sink)(UIColor *color));
 void EeveePixieUpdateArtistDownloads(UIView *header, UIButton *_Nullable externalButton);
 NSString *_Nullable EeveePixieArtistURIForHeader(UIView *header);
 void EeveePixieInstallArtistFollow(void);
+// The Pixie download manager page in Eevee's settings list. Both do nothing when the companion is not loaded.
+BOOL EeveePixieDownloadsAvailable(void);
+UIViewController *_Nullable EeveePixieMakeDownloadsController(void);
 NSInteger EeveePixieArtistFollowing(UIView *header, void (^changed)(void));
 // 1 saved, 0 not saved, -1 not known yet. `changed` runs when Spotify reports a new state.
 NSInteger EeveePixieSavedState(UIView *page, NSString *uri, void (^changed)(void));

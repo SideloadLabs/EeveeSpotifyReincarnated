@@ -514,3 +514,5 @@ karaoke_blur_intensity = "Blur intensity";
 glass_lyrics_view = "Custom lyrics view";
 lyrics_source_restart_popup = "Restart Spotify so the new lyrics source is used everywhere. Songs you already played keep their old lyrics until then.";
 restart_later = "Later";
+manage_downloads = "Manage downloads";
+manage_downloads_subtitle = "Pixie offline downloads";

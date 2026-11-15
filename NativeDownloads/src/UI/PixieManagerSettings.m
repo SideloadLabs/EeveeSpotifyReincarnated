@@ -670,6 +670,8 @@ static UIScrollView *SAPSettingsList(UIView *root,CGFloat width,unsigned depth) 
 }
 static void SAPAttachSettings(UIViewController *host) {
     if(![host.title isEqual:@"EeveeSpotify"])return;
+    // Newer EeveeSpotify lists the download manager as a row of its own; do not add a second entry.
+    if(dlsym(RTLD_DEFAULT,"EeveePixieDownloadsRowProvided"))return;
     SAPSettingsAttachment *attachment=objc_getAssociatedObject(host,SAPAttachmentKey);
     if(attachment){[attachment layout];return;}
     UIScrollView *list=SAPSettingsList(host.view,host.view.bounds.size.width,0);if(!list)return;
@@ -684,6 +686,7 @@ static void SAPAttachSettings(UIViewController *host) {
 }
 static void SAPSettingsLoaded(id self,SEL selector) {originalSettingsLoad(self,selector);SAPAttachSettings(self);}
 static void SAPSettingsLayout(id self,SEL selector) {originalSettingsLayout(self,selector);SAPAttachSettings(self);}
+__attribute__((visibility("default"))) UIViewController *SAPCreateDownloadsSettings(void) {return [SAPDownloadsSettings new];}
 void SAPInstallDownloadSettings(void) {
     if(!NSThread.isMainThread){dispatch_async(dispatch_get_main_queue(),^{SAPInstallDownloadSettings();});return;}
     if(settingsInstalled)return;

@@ -481,3 +481,5 @@ categoriesSectionDeps1 = "Off = ignore. Show = draw on the bar only. Manual = pr
 spicylyrics_api_key_placeholder = "Enter the Spicy client key";
 lyrics_source_restart_popup = "Restart Spotify so the new lyrics source is used everywhere. Songs you already played keep their old lyrics until then.";
 restart_later = "Later";
+manage_downloads = "Manage downloads";
+manage_downloads_subtitle = "Офлайн-загрузки Pixie";
