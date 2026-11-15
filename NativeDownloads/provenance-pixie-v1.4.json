@@ -519,7 +519,7 @@
     "Sources/EeveeSpotify/Player/PlayerGestures.x.swift": "20ad02189f66ac8554f4c480b609ef8a92484ebda896a40bcb15b25c979c889a",
     "Sources/EeveeSpotify/Player/PlayerHaptics.x.swift": "72e052f9ddf42aa6ced598deadfd7be9584a9bd58ccef56e80c852af86d2e3b0",
     "Sources/EeveeSpotify/Premium/DynamicPremium+ModifyBootstrap.x.swift": "f95136373f0f5f77efdefe14a3e1e888117f1e2345b0fbb43b13385c2c9119e0",
-    "Sources/EeveeSpotify/Premium/DynamicPremium+ModifyingFunctions.swift": "447663695d99b9dbcb2548c938dc8853795ce2443c7110ae1c9d4d74da735d79",
+    "Sources/EeveeSpotify/Premium/DynamicPremium+ModifyingFunctions.swift": "dfaf0c589d88af2d84c7e880b10424f5ea31ba6db221b5c53a557385f949565d",
     "Sources/EeveeSpotify/Premium/DynamicPremium+PremiumPlanRow.swift": "9b074df60c58c6abe592a5958d5f81d00f7a9071fa5bdbd09a21ed0e9094ed41",
     "Sources/EeveeSpotify/Premium/Helpers/BrowsitaSectionStripper.swift": "80e8f35cbe8c976a8333a2abf246a6ff2fedcaa67f526a983f786c2755d52008",
     "Sources/EeveeSpotify/Premium/Helpers/BundleHelper.swift": "220fd0b4072f56bd59f5d1646dd6e2c13add0609e67bada7639f6c3a851710cb",
