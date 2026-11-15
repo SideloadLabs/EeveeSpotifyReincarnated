@@ -43,6 +43,16 @@ UIImage *EeveeEncoreIconImage(UIView *live, BOOL active) {
 }
 
 // Spotify's tab items answer a tap recognizer, so replay its target-action pairs like a real touch would.
+// A control is pressed through the actions registered on it, which is what UIKit runs after a real touch. The tap
+// recognizer a button carries belongs to the system's own machinery (pointer, focus, menus); replaying it never
+// reaches those actions.
+static BOOL EeveePressControl(UIControl *control) {
+    UIControlEvents registered = control.allControlEvents;
+    if (!control.enabled || !(registered & (UIControlEventTouchUpInside | UIControlEventPrimaryActionTriggered))) return NO;
+    [control sendActionsForControlEvents:UIControlEventTouchUpInside | UIControlEventPrimaryActionTriggered];
+    return YES;
+}
+
 BOOL EeveeFireTap(UIView *root) {
     if ([root isKindOfClass:UIControl.class]) {
         [(UIControl *)root sendActionsForControlEvents:UIControlEventTouchUpInside | UIControlEventPrimaryActionTriggered];
@@ -55,6 +65,7 @@ BOOL EeveeFireTap(UIView *root) {
         UIView *view = queue.firstObject;
         [queue removeObjectAtIndex:0];
         [queue addObjectsFromArray:view.subviews];
+        if ([view isKindOfClass:UIControl.class] && EeveePressControl((UIControl *)view)) return YES;
         for (UIGestureRecognizer *recognizer in view.gestureRecognizers) {
             if (![recognizer isKindOfClass:UITapGestureRecognizer.class] || !recognizer.enabled) continue;
             BOOL fired = NO;

@@ -87,7 +87,14 @@ final class PlaylistActionRow: UIView {
         let pinned = collapsed() || convert(bounds, to: nil).minY < (window?.safeAreaInsets.top ?? 0) + 50
         playHolder.map { holder in
             if holder.alpha != (pinned ? 1 : 0) { holder.alpha = pinned ? 1 : 0 }
-            holder.isUserInteractionEnabled = pinned
+            // A transparent view is already skipped by hit-testing. Disabling interaction as well is only safe on a
+            // wrapper: on pages where Spotify's play button has no wrapper the holder is the button itself, and
+            // switching it off would also switch off the control this row forwards taps to.
+            if holder === play {
+                if !holder.isUserInteractionEnabled { holder.isUserInteractionEnabled = true }
+            } else {
+                holder.isUserInteractionEnabled = pinned
+            }
         }
         guard pinned != faded else { return }
         faded = pinned
