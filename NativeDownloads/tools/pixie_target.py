@@ -73,4 +73,6 @@ def target_header():
             f'#define SAP_SPOTIFY_UUID_BYTES {{{array(PROFILE["uuid"])}}}\n'
             f'#define SAP_SETTER_ORIGINAL_BYTES {{{array(native["setter_original"])}}}\n'
             + "".join(f"#define SAP_TARGET_{key.upper()} UINT64_C({native[key]})\n"
-                      for key in ["setter", "manager_vtable", "provider", "render_callback"]))
+                      for key in ["setter", "manager_vtable", "provider", "render_callback"])
+            # Distance by which this build moved the manager's quota counters from the 9.1.9x layout.
+            + f'#define SAP_TARGET_MANAGER_FIELD_SHIFT {int(native.get("manager_field_shift", 0))}\n')

@@ -22,7 +22,8 @@
     "selector_cave": "0x10d11f600",
     "dlsym_stub": "0x10a7bc268",
     "dlsym_stub_head": "b09c01d010d644f900021fd6",
-    "render_callback": "0x10665852c"
+    "render_callback": "0x10665852c",
+    "manager_field_shift": 8
   },
   "groups": {
     "transport": [

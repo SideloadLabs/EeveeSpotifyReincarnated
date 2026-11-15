@@ -234,7 +234,7 @@ static BOOL nativeState(id wrapper,void **manager,uintptr_t *image,NSMutableDict
     // function (analysis/queue_track_limit.txt @0x10533b28c) compares against these same
     // limits before it returns TOO_MANY_TRACKS(19). Cross-checked against analysis/queue_restriction_refs.txt.
     uint8_t data[0x30];
-    if(!readMemory(pointer+0x2b0,data,sizeof(data)))return NO;
+    if(!readMemory(pointer+0x2b0+SAP_TARGET_MANAGER_FIELD_SHIFT,data,sizeof(data)))return NO;
     int32_t currentTracks,currentEpisodes,tracks,episodes;int64_t duration,episodeDuration,abpDuration;
     memcpy(&currentTracks,data,4);memcpy(&currentEpisodes,data+4,4);memcpy(&tracks,data+8,4);
     memcpy(&duration,data+0x10,8);memcpy(&episodes,data+0x18,4);
