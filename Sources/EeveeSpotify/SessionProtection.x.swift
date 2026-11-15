@@ -173,7 +173,12 @@ class LegacyLoginControllerHook: ClassHook<NSObject> {
 
 class OauthAccessTokenBridgeHook: ClassHook<NSObject> {
     typealias Group = SessionLogoutConnectivityHookGroup
-    static let targetName = "_TtC24Connectivity_SessionImplP33_831B98CC28223E431E21CD27ADD20AF222OauthAccessTokenBridge"
+    // Spotify 9.2.0 moved the bridge from Connectivity_SessionImpl to Authentication_AuthAPI.
+    static var targetName: String {
+        let legacy = "_TtC24Connectivity_SessionImplP33_831B98CC28223E431E21CD27ADD20AF222OauthAccessTokenBridge"
+        if objc_getClass(legacy) != nil { return legacy }
+        return "_TtC22Authentication_AuthAPIP33_51216C0E0622094D354255A3124BC44D22OauthAccessTokenBridge"
+    }
 
     func expiresAt() -> Any {
         let farFuture = Date(timeIntervalSinceNow: 365 * 24 * 60 * 60)

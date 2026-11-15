@@ -90,6 +90,8 @@ KNOWN_NON_LOAD_HOOKED_SERVICES = {
     "_TtC35AdsPlatform_AdsIdentityTrackingImpl37AdsIdentityPermissionRequestorService",
     "_TtC36AdsPlatform_AdsContextMenuButtonImpl31AdsContextMenuButtonServiceImpl",
     "_TtC36AdsPlatform_AdsPreferencesConfigImpl31AdsPreferencesConfigServiceImpl",
+    # 9.2.0: loads the ad-preferences / privacy-center settings data.
+    "_TtC40AdsPlatform_AdsPreferencesDataLoaderImpl35AdsPreferencesDataLoaderServiceImpl",
     "_TtC40PremiumUpsell_PremiumDestinationPageImpl29PremiumDestinationServiceImpl",
 }
 
