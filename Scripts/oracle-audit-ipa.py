@@ -89,6 +89,8 @@ KNOWN_NON_LOAD_HOOKED_SERVICES = {
     "_TtC35AdsPlatform_AdsIdentityTrackingImpl33AdsIdentityTrackingSessionService",
     "_TtC35AdsPlatform_AdsIdentityTrackingImpl37AdsIdentityPermissionRequestorService",
     "_TtC36AdsPlatform_AdsContextMenuButtonImpl31AdsContextMenuButtonServiceImpl",
+    # Neither preferences service has a -load to kill on 9.2.0 (verified on device:
+    # the ad blocker logs "no load selector" for both), so they stay exempt.
     "_TtC36AdsPlatform_AdsPreferencesConfigImpl31AdsPreferencesConfigServiceImpl",
     "_TtC40AdsPlatform_AdsPreferencesDataLoaderImpl35AdsPreferencesDataLoaderServiceImpl",
     "_TtC40PremiumUpsell_PremiumDestinationPageImpl29PremiumDestinationServiceImpl",
