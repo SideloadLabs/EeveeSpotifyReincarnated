@@ -3,7 +3,7 @@
   "spotify_version": "9.2.0",
   "spotify_build": "920002054",
   "spotify_uuid": "b49e75781d8635d38bb57daf68fed8a8",
-  "eevee_version": "7.0.1",
+  "eevee_version": "7.5.0",
   "pixie_version": "1.4",
   "source_sha256_by_file": {
     "Makefile": "a4ef894516d7ff5015bb79e83d1cdf123c5821957c8055c0e7a9e04890f000dc",
@@ -287,7 +287,7 @@
     "NativeDownloads/tests/track_export.m": "b970acd12dcadee620d979d85acfd00fac88744786b05f3b087a6533797dc4cf",
     "NativeDownloads/tests/track_journal.m": "23952a1074c56bbc5137c08b82461d01a86a3b5e9ec498244b6f147969e1a7cb",
     "NativeDownloads/tools/build.py": "da9d36566c418325b1c6713867586cfa99c387a1b2d7a6eba0881e2bc0cd7dc2",
-    "NativeDownloads/tools/build_eevee_9192.py": "c17d1880f2f464157b793df1da976c6ef7fc042e962da2fff7ed84ccc1ff2eb5",
+    "NativeDownloads/tools/build_eevee_9192.py": "59d0a5b23d514cdfee91e844ad0faf36596a0ee61974b1ead961a372fb07a54b",
     "NativeDownloads/tools/build_native_share.py": "b1649599049f751a2967194071cf9ae9bde0f7f0b1f9b4d550b9005963f5ebbe",
     "NativeDownloads/tools/build_pixie14_9192.py": "465a21ffdb576eef1749f39bb90b41cc4b3eb0a68c17726f07a5eda26e2b05b4",
     "NativeDownloads/tools/companion_build.py": "b4909165486a5658293a71607882e0f5f619e7b0679953723d2074523d75adb6",
