@@ -13,6 +13,7 @@ def snapshot():
         paths.extend(path for path in base.rglob("*") if path.is_file()
                      and "__pycache__" not in path.parts
                      and path.suffix != ".md"
+                     and path.name != "BuildIdentity.h"
                      and "Generated/RepoSlug.swift" not in path.as_posix())
     paths.append(project / "Makefile")
     return {str(path.relative_to(project)): hashlib.sha256(path.read_bytes()).hexdigest()
