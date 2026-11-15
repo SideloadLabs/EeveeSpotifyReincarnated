@@ -449,6 +449,29 @@ func isCohortAdOrUpsellFlag(scope: String, name: String) -> Bool {
     return tokens.contains { adTokens.contains($0) }
 }
 
+/// Rewrites a serialized `AccountAttributesResponse` to Premium, using the same
+/// attribute policy as every other premium patch. Returns nil when the bytes are
+/// not that proto, so the caller leaves the response untouched.
+func rewriteAccountAttributesData(_ data: Data) -> Data? {
+    guard var response = try? AccountAttributesResponse(serializedBytes: data) else { return nil }
+    guard !response.accountAttributes.isEmpty else { return nil }
+
+    func describe(_ key: String) -> String {
+        response.accountAttributes[key].map { "\($0.value.map { "\($0)" } ?? "nil")" } ?? "absent"
+    }
+    func summary() -> String {
+        "on-demand=\(describe("on-demand")) player-license=\(describe("player-license")) type=\(describe("type"))"
+    }
+
+    let before = summary()
+    modifyAttributes(&response.accountAttributes)
+    writeDebugLog(
+        "[Attributes] Rewrote \(response.accountAttributes.count) account attributes; "
+        + "before[\(before)] after[\(summary())]"
+    )
+    return try? response.serializedData()
+}
+
 private func modifyAttributes(_ attributes: inout [String: AccountAttribute]) {
     let serverAuthoritativeAttributes = Dictionary(
         uniqueKeysWithValues: ServerSidedFeaturePolicy.serverAuthoritativeAccountAttributes
@@ -616,10 +639,27 @@ private func modifyAttributes(_ attributes: inout [String: AccountAttribute]) {
         }
     }
 
-    // Local playlist sync uses Spotify's shared download control. Let Spotify
-    // decide how to present that control and handle downloads on this build.
-    if UserDefaults.patchType.isPatching, LocalPlaylistDownload.launchEnabled {
-        attributes["offline"] = AccountAttribute.with { $0.boolValue = true }
+// Apply offline account overrides for local playlist sync or Pixie companion
+let needsLocalSyncOffline = UserDefaults.patchType.isPatching && LocalPlaylistDownload.launchEnabled
+
+if needsLocalSyncOffline || pixieCompanionPresent {
+    attributes["offline"] = AccountAttribute.with { $0.boolValue = true }
+    
+    if needsLocalSyncOffline {
         writeDebugLog("[LOCAL_SYNC] Applied offline account override")
     }
+    
+    if pixieCompanionPresent {
+        // Pixie companion (native offline downloads): on Spotify 9.2 the offline core reads these four
+        // entitlements from this response, not from the product-state objects Pixie also rewrites.
+        attributes["can-use-offline"] = AccountAttribute.with { $0.boolValue = true }
+        attributes["max-offline-tracks"] = AccountAttribute.with { $0.longValue = 1_000_000 }
+        attributes["max-offline-downloads-per-device"] = AccountAttribute.with { $0.longValue = 1_000_000 }
+    }
 }
+
+    }
+}
+
+private let pixieCompanionPresent: Bool =
+    dlsym(UnsafeMutableRawPointer(bitPattern: -2), "SAPUpdateArtistDownloadsExternal") != nil

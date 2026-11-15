@@ -8,8 +8,4 @@ extension Data {
     var hexEncodedString: String {
         map { String(format: "%02hhx", $0) }.joined()
     }
-
-    static var musixmatchTokenPlaceholder: String {
-        "2" + self.random(53).hexEncodedString
-    }
 }

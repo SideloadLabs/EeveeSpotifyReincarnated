@@ -180,7 +180,7 @@ func eeveeEnvFlag(_ name: String) -> Bool {
 }
 
 struct EeveeSpotify: Tweak {
-    static let version = "7.0.0"
+    static let version = "7.5.0"
     static let buildNumber = "1"
     static let spotifyVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
     static let repoSlug = GeneratedConfig.repoSlug
@@ -190,16 +190,7 @@ struct EeveeSpotify: Tweak {
         
         eeveeLog("[EeveeSpotify] Detected Spotify version: \(version)")
         
-        switch version {
-        case "9.0.48":
-            return .lastAvailableiOS15
-        case "8.9.8":
-            return .lastAvailableiOS14
-        case _ where version.contains("9.1"):
-            return .v91
-        default:
-            return .latest
-        }
+        return VersionHookTarget.forSpotifyVersion(version)
     }
     
     // MARK: - Non-fatal hook error handling
@@ -223,6 +214,10 @@ struct EeveeSpotify: Tweak {
 
         // Local-only premium force; independent of patching, so premium UI survives everything else being off.
         activateEeveePremiumForce()
+
+        // Must run before Spotify issues its first attributes request, which it
+        // does within a second of launch.
+        activateNebulaAttributes()
 
         activateTelemetryBlock()
         activateTheme()
@@ -276,12 +271,13 @@ struct EeveeSpotify: Tweak {
         writeDebugLog("[INIT] tweakInitTime: \(tweakInitTime)")
 
         activateCarPlayCrashFix()
+        activatePixieAuthenticationCapture()
 
         let hookTargets: [(String, String)] = [
             ("SPTAuthSessionImplementation", "SPTAuthSession"),
             ("_TtC24Connectivity_SessionImpl18SessionServiceImpl", "SessionServiceImpl"),
             ("SPTAuthLegacyLoginControllerImplementation", "LegacyLoginController"),
-            ("_TtC24Connectivity_SessionImplP33_831B98CC28223E431E21CD27ADD20AF222OauthAccessTokenBridge", "OauthAccessTokenBridge"),
+            (OauthAccessTokenBridgeHook.targetName, "OauthAccessTokenBridge"),
             ("ARTWebSocketTransport", "AblyWebSocket"),
             ("ARTSRWebSocket", "AblySRWebSocket"),
         ]
@@ -397,7 +393,7 @@ struct EeveeSpotify: Tweak {
             BaseLyricsGroup().activate()
             LyricsErrorHandlingGroup().activate()
             
-            if EeveeSpotify.hookTarget == .latest {
+            if EeveeSpotify.hookTarget == .v90 {
                 ModernLyricsGroup().activate()
             }
             else {

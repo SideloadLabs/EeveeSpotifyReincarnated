@@ -3,7 +3,6 @@ import Foundation
 extension UserDefaults {
     static var container: UserDefaults = .standard
     
-    private static let musixmatchTokenKey = "musixmatchToken"
     private static let darkPopUpsKey = "darkPopUps"
     private static let debugLoggingEnabledKey = "debugLoggingEnabled"
     private static let patchTypeKey = "patchType"
@@ -21,15 +20,6 @@ extension UserDefaults {
     static var localPlaylistDownloadEnabled: Bool {
         get { container.object(forKey: localPlaylistDownloadEnabledKey) as? Bool ?? true }
         set { container.set(newValue, forKey: localPlaylistDownloadEnabledKey) }
-    }
-
-    static var musixmatchToken: String {
-        get {
-            container.string(forKey: musixmatchTokenKey) ?? ""
-        }
-        set (token) {
-            container.set(token, forKey: musixmatchTokenKey)
-        }
     }
 
     static var darkPopUps: Bool {

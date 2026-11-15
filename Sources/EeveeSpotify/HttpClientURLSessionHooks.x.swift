@@ -13,7 +13,7 @@ class HttpClientURLSessionHook: ClassHook<NSObject>, SpotifySessionDelegate {
         task: URLSessionDataTask,
         didCompleteWithError error: Error?
     ) {
-        captureAccessToken(from: task.currentRequest)
+        captureAccessToken(from: task.currentRequest, session: session)
 
         guard let url = task.currentRequest?.url else {
             orig.URLSession(session, task: task, didCompleteWithError: error)
@@ -54,6 +54,14 @@ class HttpClientURLSessionHook: ClassHook<NSObject>, SpotifySessionDelegate {
                 // We previously forwarded completion only, which can crash callers that
                 // assume at least one didReceiveData before completion.
                 writeDebugLog("[HCUS] Missing buffered body for \(url.absoluteString) (taskId=\(task.taskIdentifier))")
+                if url.isNebulaAttributes {
+                    // A 304 slipped past the validator strip. Handing the core an
+                    // empty attributes body would be worse than leaving it alone,
+                    // so forward completion only and let it use its cache.
+                    writeDebugLog("[HCUS] No attributes body to rewrite; left untouched")
+                    orig.URLSession(session, task: task, didCompleteWithError: error)
+                    return
+                }
                 orig.URLSession(session, dataTask: task, didReceiveData: Data())
                 orig.URLSession(session, task: task, didCompleteWithError: error)
             }

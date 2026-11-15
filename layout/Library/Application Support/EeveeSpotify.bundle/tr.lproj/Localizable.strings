@@ -43,18 +43,10 @@ lyrics_source_description = "Tercih ettiğiniz şarkı sözü kaynağını seçe
 
 Genius: En kaliteli şarkı sözlerini sunar, en fazla şarkıyı barındırır ve sözleri en hızlı günceller. Zaman senkronizasyonu yoktur ve asla olmayacaktır.
 
-LRCLIB: Zaman senkronizeli şarkı sözleri sunan en açık servistir. Ancak birçok şarkı için sözleri eksiktir.
-
-Musixmatch: Spotify'ın kullandığı servistir. Birçok şarkı için zaman senkronizeli sözler sağlar, ancak bu kaynağı kullanmak için bir kullanıcı jetonuna ihtiyacınız vardır.";
+LRCLIB: Zaman senkronizeli şarkı sözleri sunan en açık servistir. Ancak birçok şarkı için sözleri eksiktir.";
 lyrics_additional_info = "EeveeSpotify bir şarkıyı bulamazsa veya sözleri işleyemezse \"Bu şarkı için şarkı sözleri yüklenemedi\" mesajını görürsünüz. Genius kullanılırken tweak'in şarkı arama yöntemi nedeniyle bazı şarkıların sözleri yanlış olabilir. Çoğu durumda çalışacak şekilde ayarlanmıştır.";
 spicylyrics_description = "SpicyLyrics kelime kelime karaoke şarkı sözleri sunar. Varsayılan olarak yerleşik bir anahtar kullanılır. Kendi anahtarınızı kullanmak isterseniz Spicy ESR şablonu sayfasına gidin ve \"Sign in\" düğmesine basın. Giriş yaptıktan sonra Spicy'nin Hizmet Şartları'nı kabul edin ve \"Add ESR to my account\" düğmesine basın. Eklendikten sonra oluşturulan anahtarı kopyalayın, Eevee şarkı sözleri bölümüne yapıştırın, sonra Spicy'ye dönüp \"I have stored it\" düğmesine tıklayın. Ardından uygulamalar sayfasına gidin.";
 petitlyrics_description = "PetitLyrics: Bol miktarda zaman senkronizeli Japonca ve bazı uluslararası şarkı sözleri sunar.";
-
-musixmatch_user_token = "Musixmatch Kullanıcı Jetonu";
-user_token_placeholder = "Kullanıcı Jetonunu Girin veya Hata Ayıklama Bilgisini Yapıştırın";
-
-enter_user_token = "Kullanıcı Jetonunu Girin";
-enter_user_token_message = "Musixmatch kullanabilmek için resmi uygulamadan kullanıcı jetonunuzu almanız gerekir. App Store'dan Musixmatch'i indirin, kaydolun, ardından Ayarlar > Yardım Al > Hata Ayıklama Bilgisini Kopyala yolunu izleyin ve buraya yapıştırın. Jetonu MITM kullanarak da çıkarabilirsiniz.";
 
 genius_fallback = "Genius Alternatifi";
 genius_fallback_description = "%@ ile ilgili bir sorun olduğunda şarkı sözlerini Genius'tan yükler.";
@@ -66,9 +58,6 @@ hide_lyrics_on_error_description = "Şarkı sözleri yüklenemezse şarkı söz�
 
 romanized_lyrics = "Okunuş Sözleri (Romanized)";
 romanized_lyrics_description = "Japonca, Korece ve Çince için Latin alfabesiyle okunuş sözlerini gösterir.";
-
-musixmatch_language = "Musixmatch Şarkı Sözü Dili";
-musixmatch_language_description = "2 harfli bir Musixmatch dil kodu girerek varsa Musixmatch üzerindeki çevrilmiş şarkı sözlerini görebilirsiniz.";
 
 karaoke_word_synced_button = "Özel şarkı sözü görünümü";
 
@@ -120,14 +109,9 @@ could_not_share_popup = "Seçilen hedefe veya LiveContainer'a paylaşılamadı. 
 fallback_attribute = "Alternatif";
 romanized_attribute = "Okunuş";
 
-musixmatch_unauthorized_popup = "Yetkisiz Erişim (Unauthorized) hatası nedeniyle tweak Musixmatch'ten şarkı sözlerini yükleyemiyor. Lütfen Musixmatch jetonunuzu kontrol edin veya güncelleyin. iPad kullanıyorsanız jetonu iPad için Musixmatch uygulamasından almalısınız.";
-musixmatch_restricted_popup = "Tweak, kısıtlanmış olmaları nedeniyle Musixmatch'ten şarkı sözlerini yükleyemiyor. Bu durum muhtemelen ABD IP adresinden kaynaklanan bir telif hakkı sorunudur; ABD'deyseniz veya VPN kullanıyorsanız değiştirmelisiniz.";
-
 // Errors Titles
 
 no_such_song = "Şarkı Bulunamadı";
-musixmatch_restricted = "Kısıtlanmış";
-invalid_musixmatch_token = "Yetkisiz";
 decoding_error = "Kod Çözme Hatası";
 no_current_track = "Aktif Parça Yok";
 unknown_error = "Bilinmeyen Hata";
@@ -146,9 +130,6 @@ developer_note = "Geliştirici Notu";
 
 support_the_project = "Projeyi Destekle";
 support_the_project_description = "Gece geç saatlerdeki kodlamaları finanse edin";
-
-request_anonymous_token = "Anonim Jeton İste";
-request_anonymous_token_description = "Musixmatch'ten yetkilendirme olmadan jeton istemek için \"Anonim Jeton İste\" seçeneğine dokunun.";
 
 lrclib_api = "Sunucu Adresi";
 

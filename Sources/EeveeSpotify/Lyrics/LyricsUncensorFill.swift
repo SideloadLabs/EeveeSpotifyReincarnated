@@ -8,7 +8,7 @@ import Foundation
 /// hardcoded substitution would corrupt lines that never contained the
 /// guessed word at all.
 ///
-/// Genius and Musixmatch's lyrics databases are licensed/community full
+/// Genius's lyrics database is licensed/community full
 /// text, not run through a profanity filter the way chat moderation or
 /// speech-to-text services are — they're very likely to carry the actual
 /// word SpicyLyrics' specific upstream censors. LRCLIB is community-
@@ -41,7 +41,6 @@ struct LyricsUncensorFill {
 
         let fallbackSources: [LyricsRepository] = [
             LrclibLyricsRepository.shared,
-            MusixmatchLyricsRepository.shared,
             GeniusLyricsRepository.shared,
         ]
 
@@ -138,7 +137,6 @@ struct LyricsUncensorFill {
 
         let fallbackSources: [LyricsRepository] = [
             LrclibLyricsRepository.shared,
-            MusixmatchLyricsRepository.shared,
             GeniusLyricsRepository.shared,
         ]
 

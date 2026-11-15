@@ -15,19 +15,12 @@ class LyricsFullscreenViewControllerHook: ClassHook<UIViewController> {
     func viewDidLoad() {
         orig.viewDidLoad()
         
-        if UserDefaults.lyricsSource == .musixmatch
-            && lyricsState.fallbackError == nil
-            && !lyricsState.wasRomanized
-            && !lyricsState.isEmpty {
-            return
-        }
-        
         // 9.1.x has different view structure - skip headerView access
         if EeveeSpotify.hookTarget == .v91 {
             return
         }
         
-        if EeveeSpotify.hookTarget == .latest {
+        if EeveeSpotify.hookTarget == .v90 {
             guard let fullscreenView = WindowHelper.shared.findFirstSubview(
                 "Lyrics_FullscreenElementPageImpl.FullscreenView",
                 in: target.view

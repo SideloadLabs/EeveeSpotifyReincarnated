@@ -38,17 +38,9 @@ lyrics_source_description = "Du kan vælge den kilde du foretrækker.
 
 Genius: Tilbyder den højeste kvalitet af sangtekster, har flest sange, og opdaterer sangtekster hurtigst. Er ikke- og bliver aldrig tidssynkroniseret.  
 
-LRCLIB: Den mest åbne service, der tilbyder tidssynkroniserede sangtekster. Men, den mangler tekster til mange sange.
-
-Musixmatch: Servicen Spotify bruger. Tilbyder tidssynkroniserede sangtekster for mange sange, men du skal have et User Token for at bruge denne service.";
+LRCLIB: Den mest åbne service, der tilbyder tidssynkroniserede sangtekster. Men, den mangler tekster til mange sange.";
 lyrics_additional_info = "Hvis EeveeSpotify ikke er i stand til at finde en sang eller indlæse sangtekster vil du se beskeden \"Kunne ikke indlæse sangteksten til denne sang\". Sangtekster kan, for visse sange, være forkerte ved brug af Genius grundet måden dette tweak søger efter sange. Det virker dog i de fleste tilfælde.";
 petitlyrics_description = "PetitLyrics: Tilbyder mange tidssynkroniserede tekster på Japansk og enkelte internationale tekster.";
-
-musixmatch_user_token = "Musixmatch User Token";
-user_token_placeholder = "Indtast User Token eller indsæt Debug Info";
-
-enter_user_token = "Indtast User Token";
-enter_user_token_message = "For at kunne bruge Musixmatch, skal du kopiere dit User Token fra den officielle app. Download Musixmatch-appen fra App Store, opret en konto, gå herefter til Settings > Get help > Copy debug info, og indsæt det her. Du kan også finde dit User Token ved brug af MITM.";
 
 genius_fallback = "Genius fallback";
 genius_fallback_description = "Indlæs tekster fra Genius hvis der er et problem med %@.";
@@ -60,9 +52,6 @@ hide_lyrics_on_error_description = "Fjern sangtekstskomponenten hvis sangtekster
 
 romanized_lyrics = "Translittererede sangtekster";
 romanized_lyrics_description = "Vis translittererede sangtekster for sange på Japansk, Koreansk og Kinesisk.";
-
-musixmatch_language = "Musixmatch sprog";
-musixmatch_language_description = "Du kan indtaste en tobogstavskode og se oversatte sangtekster via Musixmatch hvis de er tilgængelige.";
 
 // UI
 
@@ -104,14 +93,9 @@ could_not_share_popup = "Kunne ikke dele til den valgte destination eller LiveCo
 fallback_attribute = "Fallback";
 romanized_attribute = "Translittereret";
 
-musixmatch_unauthorized_popup = "Tweaket kan ikke indlæse sangtekster fra Musixmatch grundet fejlen \"Uautoriseret\". Tjek- eller opdater dit Musixmatch User Token. Hvis du bruger en iPad, skal du bruge Musixmatch-appen til iPad til at finde dit User Token.";
-musixmatch_restricted_popup = "Tweaket kan ikke indlæse sangtekster fra Musixmatch fordi de er begrænset. Dette er højst sandsynligt et copyright-problem grundet en IP-adresse fra USA, du bør ændre denne hvis du er i USA, eller bruge en VPN-forbindelse.";
-
 // Errors Titles
 
 no_such_song = "Sang ikke fundet";
-musixmatch_restricted = "Begrænset";
-invalid_musixmatch_token = "Uautoriseret";
 decoding_error = "Afkodningsfejl";
 no_current_track = "Ingen sang afspilles";
 unknown_error = "Ukendt fejl";
@@ -126,9 +110,6 @@ let_the_music_play = "Lad musikken spille...";
 liked_songs = "Sange, du synes godt om";
 
 contributors = "Bidragydere";
-
-request_anonymous_token = "Anmod om anonymt token";
-request_anonymous_token_description = "Tryk på \"Anmod om anonymt token\" for at anmode om et token fra Musixmatch uden autorisation.";
 
 lrclib_api = "Serveradresse";
 

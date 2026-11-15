@@ -32,17 +32,9 @@ lyrics_source_description = "Можете да изберете предпочи
 
 Genius: Предлага най-качествените текстове, предоставя най-много песни и обновява текстовете най-бързо. Не е и никога няма да бъде синхронизиран с времето.
 
-LRCLIB: Най-отворената услуга, предлагаща текстове, синхронизирани с времето. Въпреки това, липсват текстове за много песни.
-
-Musixmatch: Услугата, използвана от Spotify. Предлага текстове, синхронизирани с времето, за много песни, но ще ви трябва потребителски токен, за да използвате този източник.";
+LRCLIB: Най-отворената услуга, предлагаща текстове, синхронизирани с времето. Въпреки това, липсват текстове за много песни.";
 lyrics_additional_info = "Ако туикът не може да намери песен или да обработи текстовете, ще видите съобщението \"Не може да се зареди текстът за тази песен\". Текстовете може да са грешни за някои песни при използване на Genius поради начина, по който туикът търси песни. Направих го да работи в повечето случаи.";
 petitlyrics_description = "PetitLyrics: Предлага много текстове, синхронизирани с времето, на японски и някои международни песни.";
-
-musixmatch_user_token = "Потребителски токен за Musixmatch";
-user_token_placeholder = "Въведете потребителски токен или поставете информация за отстраняване на грешки";
-
-enter_user_token = "Въведете потребителски токен";
-enter_user_token_message = "За да използвате Musixmatch, трябва да извлечете вашия потребителски токен от официалното приложение. Изтеглете Musixmatch от App Store, регистрирайте се, след това отидете в Настройки > Получаване на помощ > Копиране на информация за отстраняване на грешки и поставете тук. Можете също да извлечете токена, като използвате MITM.";
 
 genius_fallback = "Резервен вариант на Genius";
 genius_fallback_description = "Зарежда текстовете от Genius, ако има проблем с %@.";
@@ -52,9 +44,6 @@ show_fallback_reasons = "Показване на причините за рез�
 romanized_lyrics = "Романизирани текстове";
 romanized_lyrics_description = "Показване на романизирани текстове за японски, корейски и китайски.";
 
-
-musixmatch_language = "Език на текстовете в Musixmatch";
-musixmatch_language_description = "Можете да въведете 2-буквен код на език в Musixmatch и да видите преведени текстове в Musixmatch, ако са налични.";
 
 // UI
 
@@ -83,14 +72,9 @@ playlist_downloading_popup = "Нативното сваляне на плейл�
 fallback_attribute = "Резервен";
 romanized_attribute = "Романизиран";
 
-musixmatch_unauthorized_popup = "Туикът не може да зареди текстове от Musixmatch поради грешка Unauthorized. Моля, проверете или актуализирайте своя токен за Musixmatch. Ако използвате iPad, трябва да получите токена от приложението Musixmatch за iPad.";
-musixmatch_restricted_popup = "Туикът не може да зареди текстове от Musixmatch, защото са ограничени. Вероятно това е свързано с авторските права поради IP адрес в САЩ, затова трябва да го промените, ако сте в САЩ или да използвате VPN.";
-
 // Errors Titles
 
 no_such_song = "Песента не е намерена";
-musixmatch_restricted = "Ограничено";
-invalid_musixmatch_token = "Неоторизиран";
 decoding_error = "Грешка при декодиране";
 no_current_track = "Няма текуща песен";
 unknown_error = "Неизвестна грешка";
@@ -360,8 +344,6 @@ could_not_share_popup = "Couldn’t share to the selected destination or LiveCon
 liked_songs = "Liked songs";
 contributors = "Contributors";
 developer_note = "Developer's Note";
-request_anonymous_token = "Request Anonymous Token";
-request_anonymous_token_description = "Tap “Request Anonymous Token” to request a token from Musixmatch without authorization.";
 lrclib_api = "Server Address";
 ad_free_music_listening = "Ad-free music listening";
 play_songs_in_any_order = "Play songs in any order";

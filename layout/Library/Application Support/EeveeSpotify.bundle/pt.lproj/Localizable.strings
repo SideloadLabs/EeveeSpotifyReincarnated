@@ -37,17 +37,9 @@ lyrics_source_description = "Podes selecionar a fonte de letras da música que p
 
 Genius: Oferece letras de melhor qualidade, um maior número de músicas e atualiza as letras mais rapidamente. Não está, nem estará, sincronizado.
 
-LRCLIB: O serviço mais aberto, que oferece letras sincronizadas. No entanto, faltam letras para muitas músicas.
-
-Musixmatch: O serviço utilizado pelo Spotify. Fornece letras sincronizadas para muitas músicas, mas precisa de um token de utilizador para usar esta fonte.";
+LRCLIB: O serviço mais aberto, que oferece letras sincronizadas. No entanto, faltam letras para muitas músicas.";
 lyrics_additional_info = "Se o EeveeSpotify não conseguir encontrar uma música ou processar as letras, verás a mensagem \"Não foi possível carregar as letras desta música\". As letras podem estar erradas para algumas músicas ao utilizar o Genius devido à forma como a modificação pesquisa as músicas. Fiz com que funcione na maioria dos casos.";
 petitlyrics_description = "PetitLyrics: Oferece muitas letras japonesas sincronizadas e algumas internacionais.";
-
-musixmatch_user_token = "Token de Utilizador Musixmatch";
-user_token_placeholder = "Insere o token de utilizador ou cola as informações de depuração";
-
-enter_user_token = "Inserir Token de Utilizador";
-enter_user_token_message = "Para utilizar o Musixmatch, precisa de obter o token de utilizador da aplicação oficial. Descarrega o Musixmatch da App Store, registe-se, depois vá a Definições > Ajuda > Copiar informações de depuração, e cole-as aqui. Também pode extrair o token usando MITM.";
 
 genius_fallback = "Genius opção de contingência";
 genius_fallback_description = "Carrega as letras do Genius se houver um problema com %@.";
@@ -56,9 +48,6 @@ show_fallback_reasons = "Mostrar Motivos de Contingência";
 
 romanized_lyrics = "Letras Romanizadas";
 romanized_lyrics_description = "Exibe letras romanizadas para japonês, coreano e chinês.";
-
-musixmatch_language = "Idioma das Letras do Musixmatch";
-musixmatch_language_description = "Podes inserir um código de idioma de 2 letras no Musixmatch e ver as letras traduzidas, se disponíveis.";
 
 // UI
 
@@ -88,14 +77,9 @@ download_local_playlist = "Descarregar Playlist Local";
 fallback_attribute = "Contingência";
 romanized_attribute = "Romanizado";
 
-musixmatch_unauthorized_popup = "A modificação não consegue carregar as letras do Musixmatch devido a um erro de autorização. Verifica ou atualiza o teu token do Musixmatch. Se estiveres a usar um iPad, deves obter o token na aplicação Musixmatch para iPad.";
-musixmatch_restricted_popup = "A modificação não consegue carregar as letras do Musixmatch porque estão restritas. Provavelmente, é um problema de direitos de autor devido ao endereço IP dos EUA, por isso deve alterá-lo se estiver nos EUA ou usar uma VPN.";
-
 // Errors Titles
 
 no_such_song = "Nenhuma Música Encontrada";
-musixmatch_restricted = "Restrito";
-invalid_musixmatch_token = "Não Autorizado";
 decoding_error = "Erro de Decodificação";
 no_current_track = "Sem Faixa Ativa";
 unknown_error = "Erro Desconhecido";
@@ -366,8 +350,6 @@ clean_share_links = "Clean Share Links";
 clean_share_links_description = "Removes tracking parameters from shared links.";
 could_not_share_popup = "Couldn’t share to the selected destination or LiveContainer. The URL has been copied.";
 developer_note = "Developer's Note";
-request_anonymous_token = "Request Anonymous Token";
-request_anonymous_token_description = "Tap “Request Anonymous Token” to request a token from Musixmatch without authorization.";
 lrclib_api = "Server Address";
 ad_free_music_listening = "Ad-free music listening";
 play_songs_in_any_order = "Play songs in any order";

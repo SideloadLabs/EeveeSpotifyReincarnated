@@ -38,17 +38,9 @@ lyrics_source_description = "歌詞の提供元を選択できます。
 
 Genius：最高品質の歌詞を提供し、取り扱い曲数も豊富で歌詞の更新もすばやく行われますが、歌詞の同期はされません。
 
-LRCLIB：歌詞の同期はされますが、取り扱い曲数は少ないです。
-
-Musixmatch：Spotifyが使用している提供元です。取り扱い曲数が豊富ですが、使用するにはユーザートークンが必要です。";
+LRCLIB：歌詞の同期はされますが、取り扱い曲数は少ないです。";
 lyrics_additional_info = "歌詞を読み込めないときは、「この曲の歌詞を読み込めませんでした」と表示されます。検索方法のしくみの問題でGeniusを使用している場合は誤った歌詞が表示される場合があります。";
 petitlyrics_description = "PetitLyrics：日本語の歌詞が豊富で、一部の海外の曲の歌詞も表示できます。歌詞の同期もされます。";
-
-musixmatch_user_token = "Musixmatchのユーザートークン";
-user_token_placeholder = "ユーザートークン・デバッグ情報を入力";
-
-enter_user_token = "ユーザートークンを入力";
-enter_user_token_message = "Musixmatchを使用するには、公式アプリからユーザートークンを取得する必要があります。App StoreからMusixmatchをインストールして、サインインしてから、「設定」 > 「ヘルプを見る」 > 「デバッグ情報のコピー」を選択してペーストします。";
 
 genius_fallback = "Geniusを代わりに使用";
 genius_fallback_description = "%@に問題がある場合は、Geniusから歌詞を取得します。";
@@ -60,9 +52,6 @@ hide_lyrics_on_error_description = "歌詞を読み込めなかったときは�
 
 romanized_lyrics = "ローマ字の歌詞";
 romanized_lyrics_description = "日本語、中国語、韓国語のローマ字の歌詞を表示します。";
-
-musixmatch_language = "Musixmatchの歌詞の言語";
-musixmatch_language_description = "2文字のMusixmatchの言語コードを入力すると、利用可能な場合に翻訳された歌詞を表示できます。";
 
 // UI
 
@@ -104,14 +93,9 @@ could_not_share_popup = "選択した共有先やLiveContainerに共有できま
 fallback_attribute = "Geniusを使用中";
 romanized_attribute = "ローマ字";
 
-musixmatch_unauthorized_popup = "認証エラーによりMusixmatchから歌詞を読み込めません。Musixmatchのトークンを確認・更新してください。iPadを使用している場合は、iPad版のMusixmatchアプリからトークンを取得する必要があります。";
-musixmatch_restricted_popup = "Musixmatchから歌詞を読み込めません。制限されている可能性があります。";
-
 // Errors Titles
 
 no_such_song = "曲が見つかりません";
-musixmatch_restricted = "制限中";
-invalid_musixmatch_token = "認証エラー";
 decoding_error = "読み込みに失敗しました";
 no_current_track = "再生中の曲はありません";
 unknown_error = "不明なエラーが発生しました";
@@ -126,9 +110,6 @@ let_the_music_play = "音楽をお楽しみください";
 liked_songs = "お気に入りの曲";
 
 contributors = "貢献者";
-
-request_anonymous_token = "匿名のトークンをリクエスト";
-request_anonymous_token_description = "「匿名のトークンをリクエスト」を使用すると、Musixmatchから認証なしでトークンを取得できます。";
 
 lrclib_api = "サーバーアドレス";
 

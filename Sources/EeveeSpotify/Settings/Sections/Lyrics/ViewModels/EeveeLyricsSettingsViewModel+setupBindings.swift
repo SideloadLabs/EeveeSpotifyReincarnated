@@ -4,23 +4,6 @@ import Combine
 extension EeveeLyricsSettingsViewModel {
     func setupBindings() {
         $lyricsOptions
-            .map(\.musixmatchLanguage)
-            .sink { [weak self] language in
-                guard let self = self else { return }
-                
-                let isValidLanguage = language.isEmpty || language ~= "^[\\w\\d]{2}$"
-                
-                if isValidLanguage {
-                    self.showMusixmatchInvalidLanguageWarning = false
-                    MusixmatchLyricsRepository.shared.selectedLanguage = language
-                    return
-                }
-                
-                self.showMusixmatchInvalidLanguageWarning = true
-            }
-            .store(in: &cancellables)
-        
-        $lyricsOptions
             .map(\.lrclibUrl)
             .map { urlString -> AnyPublisher<LrclibURLState, Never> in
                 guard let url = URL(string: urlString) else {
@@ -43,31 +26,10 @@ extension EeveeLyricsSettingsViewModel {
             .receive(on: DispatchQueue.main)
             .assign(to: &$lrclibURLState)
         
-        $musixmatchToken
-            .dropFirst()
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] tokenString in
-                guard let self = self else { return }
-                
-                if let token = self.getMusixmatchTokenFromDebugInfo(tokenString) {
-                    self.musixmatchToken = token
-                    return
-                }
-                
-                if let token = self.getMusixmatchToken(tokenString) {
-                    UserDefaults.musixmatchToken = token
-                }
-            }
-            .store(in: &cancellables)
-        
         $lyricsSource
             .dropFirst()
             .sink { [weak self] newSource in
                 guard let self = self else { return }
-                
-                if newSource == .musixmatch && self.musixmatchToken.isEmpty {
-                    // Token field is always visible in UI - no alert needed
-                }
                 
                 if newSource == .lrclib {
                     self.lyricsOptions.lrclibUrl = LrclibLyricsRepository.originalApiUrl
@@ -76,7 +38,7 @@ extension EeveeLyricsSettingsViewModel {
                 UserDefaults.lyricsSource = newSource
 
                 // Everything cached for the old provider (prefetch, custom lyrics
-                // view data, Musixmatch cache) must go, or revisiting a song
+                // view data) must go, or revisiting a song
                 // would keep serving the old provider's lyrics.
                 invalidateLyricsForSourceChange()
 

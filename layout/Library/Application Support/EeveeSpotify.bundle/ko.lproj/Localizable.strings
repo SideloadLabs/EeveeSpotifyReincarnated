@@ -32,17 +32,9 @@ lyrics_source_description = "선호하는 가사 소스를 선택할 수 있습�
 
 Genius: 최고 품질의 가사를 제공하고, 가장 많은 노래를 제공하며, 가사를 가장 빠르게 업데이트합니다. 시간과 동기화되지 않으며 절대 동기화되지 않을 것입니다.
 
-LRCLIB: 시간 동기화된 가사를 제공하는 가장 개방적인 서비스입니다. 하지만, 많은 노래의 가사가 부족합니다.
-
-Musixmatch: 스포티파이가 사용하는 서비스입니다. 많은 노래에 시간-동기화된 가사를 제공하지만, 이 소스를 사용하려면 사용자 토큰이 필요합니다.";
+LRCLIB: 시간 동기화된 가사를 제공하는 가장 개방적인 서비스입니다. 하지만, 많은 노래의 가사가 부족합니다.";
 lyrics_additional_info = "조정이 노래를 찾거나 가사를 처리할 수 없다면, \”이 노래의 가사를 로드할 수 없습니다\“ 메시지가 표시됩니다. 트윅이 노래를 검색하는 방식 때문에 Genius를 사용할 때 일부 노래의 가사가 틀릴 수 있습니다. 저는 대부분의 경우 작동하게 만들었습니다.";
 petitlyrics_description = "PetitLyrics: 많은 시간 동기화된 일본어와 국제적인 가사를 제공합니다.";
-
-musixmatch_user_token = "Musixmatch 사용자 토큰";
-user_token_placeholder = "사용자 토큰을 입력하거나 디버그 정보를 붙여넣으세요";
-
-enter_user_token = "사용자 토큰을 입력하세요";
-enter_user_token_message = "Musixmatch를 사용하려면 공식 앱에서 사용자 토큰을 검색해야 합니다. App Store에서 Musixmatch를 다운로드하고 가입한 다음 설정 > 도움말 > 디버그 정보 복사로 이동하여 여기에 붙여넣으세요. MITM을 사용하여 토큰을 추출할 수도 있습니다.";
 
 genius_fallback = "genius 폴백";
 genius_fallback_description = "%@에 문제가 있다면 Genius의 가사를 불러오세요.";
@@ -51,9 +43,6 @@ show_fallback_reasons = "폴백 이유를 보여주기";
 
 romanized_lyrics = "로마자화된 가사";
 romanized_lyrics_description = "일본어, 한국어, 중국어의 로마자 가사를 표시하세요.";
-
-musixmatch_language = "Musixmatch 가사 언어";
-musixmatch_language_description = "2글자 Musixmatch 언어 코드를 입력하고 Musixmatch에서 번역된 가사를 볼 수 있습니다.";
 
 // UI
 
@@ -82,14 +71,9 @@ playlist_downloading_popup = "네이티브 재생 목록 다운로드는 서버 
 fallback_attribute = "폴백";
 romanized_attribute = "로마자화된";
 
-musixmatch_unauthorized_popup = "무단 오류로 인해 Musixmatch의 가사를 로드할 수 없습니다. Musixmatch 토큰을 확인하거나 업데이트하세요. iPad를 사용하는 경우, iPad용 Musixmatch 앱에서 토큰을 받아야 합니다.";
-musixmatch_restricted_popup = "트윅은 제한되어 있기 때문에 Musixmatch의 가사를 로드할 수 없습니다. 미국 IP 주소로 인해 저작권 문제일 가능성이 높으므로, 미국에 있거나 VPN을 사용하는 경우 변경해야 합니다.";
-
 // Errors Titles
 
 no_such_song = "노래를 찾을 수 없습니다.";
-musixmatch_restricted = "제한된";
-invalid_musixmatch_token = "허가받지 않은";
 decoding_error = "디코딩 오류";
 no_current_track = "트랙 인스턴스 없음";
 unknown_error = "알 수 없는 오류";
@@ -359,8 +343,6 @@ could_not_share_popup = "Couldn’t share to the selected destination or LiveCon
 liked_songs = "Liked songs";
 contributors = "Contributors";
 developer_note = "Developer's Note";
-request_anonymous_token = "Request Anonymous Token";
-request_anonymous_token_description = "Tap “Request Anonymous Token” to request a token from Musixmatch without authorization.";
 lrclib_api = "Server Address";
 ad_free_music_listening = "Ad-free music listening";
 play_songs_in_any_order = "Play songs in any order";

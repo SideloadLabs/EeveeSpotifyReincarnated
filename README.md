@@ -14,12 +14,9 @@ This tweak makes Spotify think you have a Premium subscription, granting free li
 
 **Spotify 9.1.56 and above** - Full custom lyrics functionality is available with the following providers:
 - **SpicyLyrics**
-- **Musixmatch\***
 - **LRCLIB**
 - **Genius**
 - **PetitLyrics**
-
-<sup>*Musixmatch requires you to input a user token to retrieve lyrics. EeveeSpotifyReincarnated supports requesting an Anonymous Token to retrieve this functionality.</sup>
 
 ## How to build an EeveeSpotify IPA using Github actions
 > [!NOTE]
@@ -78,9 +75,9 @@ EeveeSpotify replaces Spotify monthly limited lyrics with one of the following f
 
 - LRCLIB: The most open service, offering time-synced lyrics. However, it lacks lyrics for many songs.
 
-- Musixmatch: The service Spotify uses. Provides time-synced lyrics for many songs, but you'll need a user token to use this source. To obtain the token, download Musixmatch from the App Store, sign up, then go to Settings > Get help > Copy debug info, and paste it into EeveeSpotify alert. You can also extract the token using MITM.
-
 - PetitLyrics: Offers plenty of time-synced Japanese and some international lyrics.
+
+- SpicyLyrics : Provides word-by-word karaoke lyrics. A built-in key is used by default. You can use your own key if you want to.
 
 If the tweak is unable to find a song or process the lyrics, you'll see a "Couldn't load the lyrics for this song" message. The lyrics might be wrong for some songs when using Genius due to how the tweak searches songs. While I've made it work in most cases, kindly refrain from opening issues about it.
 

@@ -27,6 +27,7 @@ struct ScrollFeedAdServiceGroup: HookGroup {}
 struct ScrollFeedAdControllerGroup: HookGroup {}
 struct RealTimeAdControllerServiceGroup: HookGroup {}
 struct AdsBaseSwiftServiceGroup: HookGroup {}
+struct AdsBaseServiceGroup: HookGroup {}
 struct AudioAdPiPCoordinatorServiceGroup: HookGroup {}
 struct AdsInstrumentationServiceGroup: HookGroup {}
 struct AdsElementServiceGroup: HookGroup {}
@@ -328,6 +329,17 @@ class AdsBaseSwiftServiceKill: ClassHook<NSObject> {
     }
 }
 
+// Spotify 9.2 replaced AdsPlatform_AdsBaseSwiftImpl with AdsPlatform_AdsBaseImpl.
+class AdsBaseServiceKill: ClassHook<NSObject> {
+    typealias Group = AdsBaseServiceGroup
+    static let targetName =
+        "_TtC23AdsPlatform_AdsBaseImpl18AdsBaseServiceImpl"
+
+    func load() {
+        adlog("AdsBaseServiceImpl.load")
+    }
+}
+
 class AudioAdPiPCoordinatorServiceKill: ClassHook<NSObject> {
     typealias Group = AudioAdPiPCoordinatorServiceGroup
     static let targetName =
@@ -500,6 +512,7 @@ func activateEeveeAdBlockerExtended() {
         (LeavebehindAdElementProviderKill.targetName, "LeavebehindAdElementProvider", { ScrollFeedAdControllerGroup().activate() }),
         (RealTimeAdControllerServiceKill.targetName, "RealTimeAdControllerServiceImpl", { RealTimeAdControllerServiceGroup().activate() }),
         (AdsBaseSwiftServiceKill.targetName, "AdsBaseSwiftServiceImpl", { AdsBaseSwiftServiceGroup().activate() }),
+        (AdsBaseServiceKill.targetName, "AdsBaseServiceImpl", { AdsBaseServiceGroup().activate() }),
         (AudioAdPiPCoordinatorServiceKill.targetName, "AudioAdPictureInPictureCoordinatorService", { AudioAdPiPCoordinatorServiceGroup().activate() }),
         (AdsInstrumentationServiceKill.targetName, "AdsInstrumentationServiceImpl", { AdsInstrumentationServiceGroup().activate() }),
         (AdsElementServiceKill.targetName, "ElementServiceImpl", { AdsElementServiceGroup().activate() }),

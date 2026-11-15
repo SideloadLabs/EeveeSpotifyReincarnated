@@ -43,17 +43,9 @@ lyrics_source_description = "您可以選擇所喜歡的歌詞來源
 
 Genius: 最佳、最多、最新的歌詞來源，但不具備同步歌詞。
 
-LRCLIB: 最開放的歌詞來源，並且提供同步歌詞，然而缺失大量歌曲。
-
-Musixmatch: 大部分地區 Spotify 預設使用的來源。雖然提供大量的同步歌詞與翻譯，您需要擁有使用者權杖以使用。";
+LRCLIB: 最開放的歌詞來源，並且提供同步歌詞，然而缺失大量歌曲。";
 lyrics_additional_info = "若 EeveeSpotify 無法提供歌詞，則您會看到「無法加載歌詞」提示（可隱藏）。以 Genius 為來源時可能會由於 EeveeSpotify 查找歌詞方式的問題而出現曲詞對應錯誤的問題，不過在大部分情況下可以正常運作。";
 petitlyrics_description = "PetitLyrics: 日本區 Spotify 預設歌詞來源，提供大量的已同步日文歌歌詞和部分外文歌歌詞。";
-
-musixmatch_user_token = "Musixmatch 使用者權杖";
-user_token_placeholder = "在此輸入 Musixmatch 使用者權杖或貼上除錯資訊";
-
-enter_user_token = "輸入使用者權杖";
-enter_user_token_message = "欲使用 Musixmatch 作為歌詞來源，您可以於 EeveeSpotify 內直接取得（建議方案）、從 Musixmatch 應用程式中複製除錯資訊（較繁瑣）亦或是對 Musixmatch 進行 MITM（中間人攻擊）來提取使用者權杖（較困難）。";
 
 genius_fallback = "回退至 Genius";
 genius_fallback_description = "若 %@ 發生問題則回退至 Genius。";
@@ -65,9 +57,6 @@ hide_lyrics_on_error_description = "出現錯誤時（不包含回退）隱藏�
 
 romanized_lyrics = "羅馬化歌詞";
 romanized_lyrics_description = "羅馬化中、日、韓歌詞。";
-
-musixmatch_language = "Musixmatch 翻譯語言";
-musixmatch_language_description = "輸入二字 Musixmatch 語言代碼（繁中為 z1），可用時便會顯示翻譯按鈕。";
 
 // UI
 
@@ -117,14 +106,9 @@ could_not_share_popup = "無法分享至目標或 LiveContainer，連結已複�
 fallback_attribute = "回退";
 romanized_attribute = "羅馬化";
 
-musixmatch_unauthorized_popup = "從 Musixmatch 加載時發生認證錯誤，請檢查或更新 Musixmatch 權杖。不同平台上取得的使用者權杖無法互通。";
-musixmatch_restricted_popup = "從 Musixmatch 加載時發生錯誤，這可能是由於基於地區的版權限制。";
-
 // 錯誤提示
 
 no_such_song = "找不到歌曲";
-musixmatch_restricted = "版權限制";
-invalid_musixmatch_token = "認證錯誤";
 decoding_error = "解碼錯誤";
 no_current_track = "尚未播放";
 unknown_error = "未知錯誤";
@@ -139,9 +123,6 @@ let_the_music_play = "讓音樂演奏吧...";
 liked_songs = "已按讚的歌曲";
 
 contributors = "貢獻者";
-
-request_anonymous_token = "請求使用者權杖";
-request_anonymous_token_description = "點擊「請求使用者權杖」後 EeveeSpotify 將嘗試在沒有 Musixmatch 帳號的情況下取得。";
 
 lrclib_api = "伺服器";
 

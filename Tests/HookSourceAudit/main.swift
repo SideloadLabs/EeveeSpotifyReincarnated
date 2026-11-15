@@ -165,6 +165,14 @@ private func checkHookActivationRegistration() {
                 "EeveeAdBlockerExtended.x.swift must hook 9.1.88 ad service \(service)")
     }
 
+    let required920AdServices = [
+        "_TtC23AdsPlatform_AdsBaseImpl18AdsBaseServiceImpl",
+    ]
+    for service in required920AdServices {
+        require(adBlockerSource.contains("\"\(service)\""),
+                "EeveeAdBlockerExtended.x.swift must hook 9.2.0 ad service \(service)")
+    }
+
     let upsellBlockerSource = readSource("Sources/EeveeSpotify/UpsellServiceBlocker.x.swift")
     let requiredUpsellServices = [
         "_TtC28ContextualShuffle_UpsellImpl40ShuffleToggleUpsellServiceImplementation",

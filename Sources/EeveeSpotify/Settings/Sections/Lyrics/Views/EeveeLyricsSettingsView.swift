@@ -17,10 +17,6 @@ struct EeveeLyricsSettingsView: View {
                 hideOnErrorSection()
                 romanizedLyricsSection()
                 
-                if viewModel.lyricsSource == .musixmatch {
-                    musixmatchLanguageSection()
-                }
-
                 if viewModel.lyricsSource.supportsCustomLyricsView {
                     karaokeAppearanceSection()
                     SettingsResetSection(visible: karaokeOptions != KaraokeOptions()) { karaokeOptions = KaraokeOptions() }
@@ -29,11 +25,7 @@ struct EeveeLyricsSettingsView: View {
 
             SpacerView()
         }
-        .onReceive(viewModel.musixmatchTokenInputAlertPublisher) { showAnonymousTokenOption in
-            showMusixmatchTokenAlert(UserDefaults.lyricsSource, showAnonymousTokenOption)
-        }
         .eeveeSettingsStyle()
-        .disabled(viewModel.isRequestingMusixmatchToken)
         .animation(.default, value: viewModel.animationValues)
         .onChange(of: karaokeOptions) { UserDefaults.karaokeOptions = $0 }
         .onChange(of: spicyLyricsApiKey) { UserDefaults.spicyLyricsApiKey = $0 }
@@ -113,27 +105,6 @@ struct EeveeLyricsSettingsView: View {
             )
         } footer: {
             Text("hide_lyrics_on_error_description".localized)
-        }
-    }
-    
-    @ViewBuilder private func musixmatchLanguageSection() -> some View {
-        Section {
-            HStack {
-                Text("musixmatch_language".localized)
-                
-                Spacer()
-                
-                TextField("en", text: $viewModel.lyricsOptions.musixmatchLanguage)
-                    .frame(maxWidth: 20)
-                    .foregroundColor(.gray)
-            }
-            .icon(
-                "exclamationmark.triangle.fill",
-                color: .yellow,
-                when: $viewModel.showMusixmatchInvalidLanguageWarning
-            )
-        } footer: {
-            Text("musixmatch_language_description".localized)
         }
     }
 }
