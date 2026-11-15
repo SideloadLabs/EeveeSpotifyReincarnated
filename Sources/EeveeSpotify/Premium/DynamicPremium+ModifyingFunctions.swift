@@ -657,8 +657,6 @@ if needsLocalSyncOffline || pixieCompanionPresent {
         attributes["max-offline-downloads-per-device"] = AccountAttribute.with { $0.longValue = 1_000_000 }
     }
 }
-
-    }
 }
 
 private let pixieCompanionPresent: Bool =
