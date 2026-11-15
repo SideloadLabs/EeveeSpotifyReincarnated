@@ -13,6 +13,7 @@ extension UserDefaults {
     private static let hasShownCommonIssuesTipKey = "hasShownCommonIssuesTip"
     private static let hasPatchedBootstrapKey = "eeveeHasPatchedBootstrap"
     private static let cachedCustomizeDataKey = "eeveeCachedCustomizeData"
+    private static let cachedNebulaDataKey = "eeveeCachedNebulaData"
     private static let iconNamePrettifyKey = "iconNamePrettify"
     private static let cleanShareLinksKey = "cleanShareLinks"
 
@@ -77,6 +78,17 @@ extension UserDefaults {
     /// re-fetches customize with ETag revalidation on every warm relaunch and
     /// gets a 304 with no body — without this persisted copy the tweak has
     /// nothing to replay and free-tier/ad flags re-enable mid-session.
+    static var cachedNebulaData: Data? {
+        get { container.data(forKey: cachedNebulaDataKey) }
+        set {
+            if let newValue {
+                container.set(newValue, forKey: cachedNebulaDataKey)
+            } else {
+                container.removeObject(forKey: cachedNebulaDataKey)
+            }
+        }
+    }
+
     static var cachedCustomizeData: Data? {
         get { container.data(forKey: cachedCustomizeDataKey) }
         set {

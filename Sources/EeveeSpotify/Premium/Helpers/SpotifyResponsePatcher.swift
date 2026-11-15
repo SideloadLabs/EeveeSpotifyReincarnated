@@ -9,7 +9,8 @@ enum SpotifyResponsePatcher {
     // URLSession's concurrent delegate queues — all access is lock-guarded.
     private static let lock = NSLock()
     private static var _cachedCustomizeData: Data?
-    private static var _handledCustomizeTasks = Set<Int>()
+    private static var _cachedNebulaData: Data?
+    private static var _replayedTasks = Set<Int>()
 
     static var cachedCustomizeData: Data? {
         get { lock.lock(); defer { lock.unlock() }; return _cachedCustomizeData }
@@ -27,15 +28,28 @@ enum SpotifyResponsePatcher {
         }
     }
 
-    static func markCustomizeTaskHandled(_ id: Int) {
-        lock.lock(); defer { lock.unlock() }
-        _handledCustomizeTasks.insert(id)
+    // Nebula carries product state on 9.2+. Its config SDK revalidates with an
+    // ETag, so most launches get a 304 with no body and the app would fall back
+    // to its own unpatched disk copy. Replaying the last patched payload keeps
+    // Premium applied across those launches, exactly as customize does on 9.1.
+    static var cachedNebulaData: Data? {
+        get { lock.lock(); defer { lock.unlock() }; return _cachedNebulaData }
+        set {
+            lock.lock(); defer { lock.unlock() }
+            _cachedNebulaData = newValue
+            UserDefaults.cachedNebulaData = newValue
+        }
     }
 
-    // Returns true exactly once per id (the task that synthesized the replay).
-    static func consumeCustomizeTask(_ id: Int) -> Bool {
+    static func markTaskReplayed(_ id: Int) {
         lock.lock(); defer { lock.unlock() }
-        return _handledCustomizeTasks.remove(id) != nil
+        _replayedTasks.insert(id)
+    }
+
+    // Returns true exactly once per id (the task whose body we already replayed).
+    static func consumeReplayedTask(_ id: Int) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        return _replayedTasks.remove(id) != nil
     }
 
     static func shouldBlock(_ url: URL) -> Bool {
@@ -81,7 +95,7 @@ enum SpotifyResponsePatcher {
 
         return (shouldReplaceLyrics && url.isLyrics)
             || (shouldPatchPremium && (
-                url.isBootstrap || url.isCustomize ||
+                url.isBootstrap || url.isCustomize || url.isNebulaAttributes ||
                 url.isPremiumPlanRow || url.isPremiumBadge || url.isPlanOverview ||
                 isDAC
             ))
@@ -119,6 +133,7 @@ enum SpotifyResponsePatcher {
     enum PatchTag: String {
         case bootstrap   = "bootstrap"
         case customize   = "customize"
+        case nebula      = "NebulaAttributes"
         case planRow     = "PremiumPlanRow"
         case planBadge   = "YourPremiumBadge"
         case planOverview = "PlanOverview"
@@ -150,6 +165,15 @@ enum SpotifyResponsePatcher {
                 modifyRemoteConfiguration(&msg.ucsResponse)
             }
             return PatchResult(data: try msg.serializedBytes(), tag: .bootstrap)
+        }
+        if url.isNebulaAttributes {
+            guard let report = NebulaProductStateRewriter.rewriteReporting(buffer) else {
+                writeDebugLog("[NEBULA] no product-state attributes matched (size=\(buffer.count))")
+                return nil
+            }
+            writeDebugLog("[NEBULA] rewrote \(report.rewritten.count): \(report.rewritten.sorted().joined(separator: ","))")
+            cachedNebulaData = report.data
+            return PatchResult(data: report.data, tag: .nebula)
         }
         if url.isCustomize {
             var msg = try CustomizeMessage(serializedBytes: buffer)

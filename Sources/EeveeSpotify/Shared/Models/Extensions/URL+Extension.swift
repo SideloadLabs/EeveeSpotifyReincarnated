@@ -33,6 +33,12 @@ extension URL {
         self.path.contains("v1/bootstrap")
     }
 
+    // Spotify 9.2's replacement for the UCS customize endpoint: product state
+    // now arrives from Nebula, and nothing fetches bootstrap/customize anymore.
+    var isNebulaAttributes: Bool {
+        self.path.contains("nebula/v1/configuration/attributes")
+    }
+
     // Blocked endpoint matchers (session protection)
 
     var isDeleteToken: Bool {

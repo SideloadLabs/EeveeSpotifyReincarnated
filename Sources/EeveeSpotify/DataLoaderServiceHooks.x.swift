@@ -50,7 +50,7 @@ class SPTDataLoaderServiceHook: ClassHook<NSObject>, SpotifySessionDelegate {
         }
 
         // 304 already served — suppress the second completion.
-        if SpotifyResponsePatcher.consumeCustomizeTask(task.taskIdentifier) {
+        if SpotifyResponsePatcher.consumeReplayedTask(task.taskIdentifier) {
             orig.URLSession(session, task: task, didCompleteWithError: nil)
             return
         }
@@ -64,6 +64,11 @@ class SPTDataLoaderServiceHook: ClassHook<NSObject>, SpotifySessionDelegate {
             // Customize 304 has no body; a fresh process falls back to the persisted patched copy.
             if url.isCustomize, let cached = SpotifyResponsePatcher.cachedCustomizeData
                 ?? UserDefaults.cachedCustomizeData {
+                orig.URLSession(session, dataTask: task, didReceiveData: cached)
+                orig.URLSession(session, task: task, didCompleteWithError: nil)
+            } else if url.isNebulaAttributes, let cached = SpotifyResponsePatcher.cachedNebulaData
+                ?? UserDefaults.cachedNebulaData {
+                writeDebugLog("[NEBULA] replayed patched product state (\(cached.count) bytes)")
                 orig.URLSession(session, dataTask: task, didReceiveData: cached)
                 orig.URLSession(session, task: task, didCompleteWithError: nil)
             } else {
@@ -117,6 +122,18 @@ class SPTDataLoaderServiceHook: ClassHook<NSObject>, SpotifySessionDelegate {
         didReceiveResponse response: HTTPURLResponse,
         completionHandler handler: @escaping (URLSession.ResponseDisposition) -> Void
     ) {
+        if let url = task.currentRequest?.url, url.isNebulaAttributes {
+            writeDebugLog("[NEBULA] response status=\(response.statusCode)")
+            if response.statusCode == 304,
+               let cached = SpotifyResponsePatcher.cachedNebulaData ?? UserDefaults.cachedNebulaData,
+               let synthetic = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "2.0", headerFields: [:]) {
+                orig.URLSession(session, dataTask: task, didReceiveResponse: synthetic, completionHandler: handler)
+                orig.URLSession(session, dataTask: task, didReceiveData: cached)
+                SpotifyResponsePatcher.markTaskReplayed(task.taskIdentifier)
+                return
+            }
+        }
+
         if let url = task.currentRequest?.url, url.isCustomize, response.statusCode == 304 {
             // A 304 would make Spotify use its unpatched disk-cached config, so replay ours as a 200.
             if let cached = SpotifyResponsePatcher.cachedCustomizeData
@@ -124,7 +141,7 @@ class SPTDataLoaderServiceHook: ClassHook<NSObject>, SpotifySessionDelegate {
                let synthetic = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "2.0", headerFields: [:]) {
                 orig.URLSession(session, dataTask: task, didReceiveResponse: synthetic, completionHandler: handler)
                 orig.URLSession(session, dataTask: task, didReceiveData: cached)
-                SpotifyResponsePatcher.markCustomizeTaskHandled(task.taskIdentifier)
+                SpotifyResponsePatcher.markTaskReplayed(task.taskIdentifier)
                 return
             }
             orig.URLSession(session, dataTask: task, didReceiveResponse: response, completionHandler: handler)

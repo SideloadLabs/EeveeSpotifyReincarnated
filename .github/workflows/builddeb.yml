@@ -89,6 +89,11 @@ jobs:
             -o "$RUNNER_TEMP/bundled-configuration-policy-tests"
           "$RUNNER_TEMP/bundled-configuration-policy-tests"
           swiftc \
+            Sources/EeveeSpotify/Premium/Helpers/NebulaProductStateRewriter.swift \
+            Tests/NebulaProductStateRewriter/main.swift \
+            -o "$RUNNER_TEMP/nebula-product-state-rewriter-tests"
+          "$RUNNER_TEMP/nebula-product-state-rewriter-tests"
+          swiftc \
             Tests/CustomTabsActivation/main.swift \
             -o "$RUNNER_TEMP/custom-tabs-activation-tests"
           "$RUNNER_TEMP/custom-tabs-activation-tests"

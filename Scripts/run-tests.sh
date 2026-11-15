@@ -30,6 +30,9 @@ for main_swift in Tests/*/main.swift; do
         BundledConfigurationPolicy)
             extra_sources+=("Sources/EeveeSpotify/Premium/Helpers/BundledConfigurationPolicy.swift")
             ;;
+        NebulaProductStateRewriter)
+            extra_sources+=("Sources/EeveeSpotify/Premium/Helpers/NebulaProductStateRewriter.swift")
+            ;;
     esac
 
     if [ "${#extra_sources[@]}" -gt 0 ]; then
