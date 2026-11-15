@@ -13,7 +13,8 @@ def main():
     assert manifest["spotify_version"] == PROFILE["spotify_version"]
     mismatched = []
     for relative, expected in manifest["source_sha256_by_file"].items():
-        if relative.endswith(".md") or relative.endswith("BuildIdentity.h"):
+        if relative.endswith(".md") or relative.endswith("BuildIdentity.h") \
+                or relative.startswith("NativeDownloads/tools/port/"):
             continue  # documentation is not part of the source snapshot
         path = ROOT / relative
         if hashlib.sha256(path.read_bytes()).hexdigest() != expected:

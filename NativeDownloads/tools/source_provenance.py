@@ -14,6 +14,7 @@ def snapshot():
                      and "__pycache__" not in path.parts
                      and path.suffix != ".md"
                      and path.name != "BuildIdentity.h"
+                     and "NativeDownloads/tools/port/" not in path.as_posix()
                      and "Generated/RepoSlug.swift" not in path.as_posix())
     paths.append(project / "Makefile")
     return {str(path.relative_to(project)): hashlib.sha256(path.read_bytes()).hexdigest()
