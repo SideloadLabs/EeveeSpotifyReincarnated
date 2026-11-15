@@ -118,6 +118,10 @@ Thanks for all of the community's support, also, thanks to all the devs who work
 
 - This project is a fork of [Meeep1/EeveeSpotifyRevivedPublic](https://github.com/Meeep1/EeveeSpotifyRevivedPublic).
 
+## Vibecoded Pull Requests & Commit Comments
+
+Please note that there are some vibecoded pull requests and vibecoded commit comments in this repository.
+
 ## Disclaimer
 
 This project is an **independent modification (tweak)** for the Spotify app. We are **not affiliated, associated, authorized, endorsed by, or in any way officially connected with Spotify**, or any of its subsidiaries or affiliates. 
