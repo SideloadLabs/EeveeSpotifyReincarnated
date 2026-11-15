@@ -3,7 +3,7 @@
 # EeveeSpotifyReincarnated
 
 **Maintainers:** [jaydenjcpy](https://github.com/jaydenjcpy) & [faroukbmiled](https://github.com/faroukbmiled) & [Mod4](https://github.com/M0d-4) <br />
-**Last Update:** `10/5/26` **Spotify Version:** `9.1.88`
+**Last Update:** `11/15/26` **Spotify Version:** `9.2.0`
 
 This tweak makes Spotify think you have a Premium subscription, granting free listening, just like Spotilife, and provides some additional features like custom lyrics.
 
@@ -51,21 +51,17 @@ In March 2026, users of the latest EeveeSpotifyRevivedPublic release (v9.1.28) e
 
 Today, EeveeSpotifyReincarnated is maintained by [jaydenjcpy](https://github.com/jaydenjcpy), [faroukbmiled](https://github.com/faroukbmiled), and [Mod4](https://github.com/M0d-4), keeping the tweak alive as Spotify keeps changing.
 
-
-
 ## Restrictions
 
 Please refrain from opening issues about the following features, as they are server-sided and will **NEVER** work:
 
-- Very High audio quality
-- Native playlist downloading (you can download podcast episodes though)
+- Very High/Lossless audio quality
 - Jam (hosting a Spotify Jam and joining it remotely requires Premium; only joining in-person works)
 - AI DJ/Playlist
 - Spotify Connect (When using Spotify Connect, the device will act as a remote control and stream directly to the connected device. This is a server-sided limitation and is beyond the control of EeveeSpotify, so it will behave as if you have a Free subscription while using this feature.)
 
 ## [Common Issues](https://github.com/jaydenjcpy/EeveeSpotifyReincarnated/blob/Master/common_issues.md)
 Please check out the hyperlink above before opening an issue
-
 
 ## Lyrics Support
 
