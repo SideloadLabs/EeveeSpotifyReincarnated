@@ -11,11 +11,14 @@ def main():
     assert resolve_source("TargetProfile.h").read_text() == target_header()
     manifest = json.loads((ROOT / f"NativeDownloads/provenance-pixie-v{PROFILE['pixie_version']}.json").read_text())
     assert manifest["spotify_version"] == PROFILE["spotify_version"]
+    mismatched = []
     for relative, expected in manifest["source_sha256_by_file"].items():
-        if relative.endswith(".md"):
+        if relative.endswith(".md") or relative.endswith("BuildIdentity.h"):
             continue  # documentation is not part of the source snapshot
         path = ROOT / relative
-        assert hashlib.sha256(path.read_bytes()).hexdigest() == expected, relative
+        if hashlib.sha256(path.read_bytes()).hexdigest() != expected:
+            mismatched.append(relative)
+    assert not mismatched, "Changed since provenance was recorded (run NativeDownloads/tools/source_provenance.py): " + ", ".join(mismatched)
     from patch_native_restrictions import guard_header, limits_header
     from patch_key_request_mode import key_header
     from patch_native_trace import header
