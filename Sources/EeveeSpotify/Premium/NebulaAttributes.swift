@@ -27,6 +27,13 @@ import Foundation
 // unchanged. The cost is one extra non-cached response per launch.
 
 enum NebulaAttributes {
+    /// Only 9.2 and later are known to deliver product state this way, so both
+    /// the request hook and the response rewrite are limited to them; 9.1.x and
+    /// older keep their tested behaviour. Fixed for the life of the process.
+    static let isEnabled = UserDefaults.patchType.isPatching
+        && EeveeSpotify.hookTarget == .v91
+        && !EeveeSpotify.spotifyVersion.hasPrefix("9.1.")
+
     /// A copy of `request` without the cache validators, so the server cannot
     /// answer 304 and the attributes body reaches our response hooks.
     private static func unconditional(_ request: URLRequest) -> URLRequest {
@@ -47,10 +54,10 @@ enum NebulaAttributes {
         return unconditional(nsRequest as URLRequest) as NSURLRequest
     }
 
-    /// Swizzles the two NSURLSession task factories Spotify's HTTP client uses.
-    /// Orion cannot hook these: the attributes request is issued before the
-    /// tweak's hook groups for Spotify's own classes are in place, and the
-    /// factories live on NSURLSession itself rather than on a Spotify class.
+    /// Swaps the two NSURLSession task factories Spotify's HTTP client uses.
+    /// Installed directly, ahead of the Orion hook groups, so it is in place
+    /// before Spotify's first attributes request and does not depend on any
+    /// group being activated.
     static func installRequestHook() {
         guard let cls: AnyClass = NSClassFromString("NSURLSession") else {
             writeDebugLog("[Nebula] Skipped: NSURLSession not found")
@@ -81,11 +88,7 @@ enum NebulaAttributes {
     }
 }
 
-// Only 9.2 and later are known to deliver product state this way; 9.1.x and
-// older keep their tested behaviour.
 func activateNebulaAttributes() {
-    guard UserDefaults.patchType.isPatching,
-          EeveeSpotify.hookTarget == .v91,
-          !EeveeSpotify.spotifyVersion.hasPrefix("9.1.") else { return }
+    guard NebulaAttributes.isEnabled else { return }
     NebulaAttributes.installRequestHook()
 }

@@ -81,7 +81,7 @@ enum SpotifyResponsePatcher {
 
         return (shouldReplaceLyrics && url.isLyrics)
             || (shouldPatchPremium && (
-                url.isNebulaAttributes ||
+                (url.isNebulaAttributes && NebulaAttributes.isEnabled) ||
                 url.isBootstrap || url.isCustomize ||
                 url.isPremiumPlanRow || url.isPremiumBadge || url.isPlanOverview ||
                 isDAC
