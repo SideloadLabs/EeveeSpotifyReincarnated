@@ -211,6 +211,13 @@ class CoreProductStateHook: ClassHook<NSObject> {
         return enableDictRewrite ? rewritePremiumDict(d) : d
     }
 
+    // setOverrides: is rewritten on the way in; the getter is the matching read
+    // side, so a consumer reading overrides back sees the same Premium values.
+    func overrides() -> NSDictionary {
+        let d = orig.overrides()
+        return enableDictRewrite ? rewritePremiumDict(d) : d
+    }
+
     func valuesDictFromMap(_ map: UnsafeRawPointer) -> NSDictionary {
         let d = orig.valuesDictFromMap(map)
         return enableDictRewrite ? rewritePremiumDict(d) : d
@@ -254,7 +261,7 @@ private func swizzleBoolGetter(_ cls: AnyClass, _ name: String, _ value: Bool) {
 
 struct EeveePremiumForceGroup: HookGroup {}
 
-private let enableDictRewrite = false
+private let enableDictRewrite = VersionHookTarget.requiresProductStateDictRewrite(EeveeSpotify.spotifyVersion)
 private let enableDirectGetters = true
 private let enableAdsHook = true
 private let enablePassiveProductStateLog = true
