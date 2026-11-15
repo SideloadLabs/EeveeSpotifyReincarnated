@@ -639,14 +639,25 @@ private func modifyAttributes(_ attributes: inout [String: AccountAttribute]) {
         }
     }
 
-    // Pixie companion (native offline downloads): on Spotify 9.2 the offline core reads these four
-    // entitlements from this response, not from the product-state objects Pixie also rewrites, so
-    // without them every download is answered NOT_ALLOWED. Only applied when Pixie is loaded.
+// Apply offline account overrides for local playlist sync or Pixie companion
+let needsLocalSyncOffline = UserDefaults.patchType.isPatching && LocalPlaylistDownload.launchEnabled
+
+if needsLocalSyncOffline || pixieCompanionPresent {
+    attributes["offline"] = AccountAttribute.with { $0.boolValue = true }
+    
+    if needsLocalSyncOffline {
+        writeDebugLog("[LOCAL_SYNC] Applied offline account override")
+    }
+    
     if pixieCompanionPresent {
-        attributes["offline"] = AccountAttribute.with { $0.boolValue = true }
+        // Pixie companion (native offline downloads): on Spotify 9.2 the offline core reads these four
+        // entitlements from this response, not from the product-state objects Pixie also rewrites.
         attributes["can-use-offline"] = AccountAttribute.with { $0.boolValue = true }
         attributes["max-offline-tracks"] = AccountAttribute.with { $0.longValue = 1_000_000 }
         attributes["max-offline-downloads-per-device"] = AccountAttribute.with { $0.longValue = 1_000_000 }
+    }
+}
+
     }
 }
 

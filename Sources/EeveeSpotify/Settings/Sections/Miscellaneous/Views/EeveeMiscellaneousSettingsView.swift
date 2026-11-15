@@ -5,6 +5,7 @@ struct EeveeMiscellaneousSettingsView: View {
     @State private var blockTelemetry = UserDefaults.blockTelemetry
     @State private var cleanShareLinks = UserDefaults.cleanShareLinks
     @State private var blockRatingPrompts = UserDefaults.blockRatingPrompts
+    @State private var localPlaylistDownload = UserDefaults.localPlaylistDownloadEnabled
 
     var body: some View {
         List {
@@ -20,7 +21,15 @@ struct EeveeMiscellaneousSettingsView: View {
                 Toggle("clean_share_links".localized, isOn: $cleanShareLinks)
             }
 
-            RestartSection(visible: blockTelemetry != TelemetryBlock.launchEnabled || blockRatingPrompts != RatingPromptBlock.launchEnabled)
+            if UserDefaults.patchType.isPatching {
+                Section {
+                    Toggle("local_playlist_download_button".localized, isOn: $localPlaylistDownload)
+                }
+            }
+
+            RestartSection(visible: blockTelemetry != TelemetryBlock.launchEnabled ||
+                blockRatingPrompts != RatingPromptBlock.launchEnabled ||
+                localPlaylistDownload != LocalPlaylistDownload.launchEnabled)
 
             SpacerView()
         }
@@ -28,5 +37,6 @@ struct EeveeMiscellaneousSettingsView: View {
         .onChange(of: blockTelemetry) { UserDefaults.blockTelemetry = $0 }
         .onChange(of: cleanShareLinks) { UserDefaults.cleanShareLinks = $0 }
         .onChange(of: blockRatingPrompts) { UserDefaults.blockRatingPrompts = $0 }
+        .onChange(of: localPlaylistDownload) { UserDefaults.localPlaylistDownloadEnabled = $0 }
     }
 }
