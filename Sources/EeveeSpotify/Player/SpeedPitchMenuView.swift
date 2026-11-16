@@ -347,7 +347,7 @@ final class SpeedPitchMenuView: UIView {
     // the face of Spotify's own menu rows, read off them, so the row follows whatever font Spotify ships.
     private static var rowFont: UIFont?
     // until those rows are found; nil (the system font) if Spotify renames it.
-    private static let standIn = UIFont(name: "SpotifyMix-Regular", size: 16)
+    private static let standIn = UIFont(name: "SpotifyMixUI-Regular", size: 16)
 
     private func applyFonts() {
         let name = Self.font(.subheadline)
