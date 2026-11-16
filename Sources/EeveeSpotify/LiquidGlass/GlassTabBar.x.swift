@@ -274,12 +274,24 @@ enum GlassTabBar {
     // Spotify lays its iPad tab bar out as a short full-width strip, well under the height a tab bar
     // needs for an icon plus a label. Inheriting that height squashes the items, so the glass bar gets
     // a floor of its own and is centred on Spotify's strip to keep the row where it was.
-    private static let minimumBarHeight: CGFloat = 50
+    // A bare 49pt strip is not enough on iOS 26: the glass platter is 62pt and squeezes its
+    // labels into whatever height it is given. Grow upward instead of centring so banners that
+    // shrink the strip (offline/data-saver) cannot cover the labels.
+    private static let minimumBarHeight: CGFloat = 62
+
+    // How much taller the glass bar had to grow than Spotify's current strip, so the now-playing
+    // bar can move up by the same amount and keep its usual gap above the tab bar.
+    static var extraHeight: CGFloat {
+        guard let stock else { return 0 }
+        let bounds = stock.bounds
+        guard bounds.height > 0, bounds.height < minimumBarHeight else { return 0 }
+        return minimumBarHeight - bounds.height
+    }
 
     private static func barFrame(in stock: UIView) -> CGRect {
         let bounds = stock.bounds
         guard bounds.height > 0, bounds.height < minimumBarHeight else { return bounds }
-        return CGRect(x: bounds.minX, y: bounds.midY - minimumBarHeight / 2,
+        return CGRect(x: bounds.minX, y: bounds.maxY - minimumBarHeight,
                       width: bounds.width, height: minimumBarHeight)
     }
 

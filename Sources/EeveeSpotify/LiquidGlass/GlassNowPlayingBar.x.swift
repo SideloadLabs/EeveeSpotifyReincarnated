@@ -12,6 +12,7 @@ enum GlassNowPlayingBar {
     private static weak var container: UIViewController?
     private static weak var artwork: UIView?
     private static var albumColor: UIColor?
+    private static var liftKey: UInt8 = 0
     private static var misses = 0
     private static var styled: Styled?
     private static var options = UserDefaults.nowPlayingBarOptions
@@ -66,6 +67,17 @@ enum GlassNowPlayingBar {
         }
         guard let card else { return }
         if artwork?.isDescendant(of: card) != true { artwork = findArtwork(in: card) }
+        // Spotify leaves the mini player at the old tab-bar height when a banner shrinks the strip.
+        // Lift the card by the same amount the glass bar grew so the usual gap is preserved.
+        let lift = GlassTabBar.extraHeight
+        let wasLifted = objc_getAssociatedObject(card, &liftKey) != nil
+        if lift > 0 {
+            objc_setAssociatedObject(card, &liftKey, true, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+            if card.transform.ty != -lift { card.transform = CGAffineTransform(translationX: 0, y: -lift) }
+        } else if wasLifted {
+            objc_setAssociatedObject(card, &liftKey, nil, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+            card.transform = .identity
+        }
         let frame = card.convert(card.bounds, to: host)
         let fit = artwork.flatMap { artworkFit($0, in: card) }
         let now = Styled(frame: frame, artwork: fit?.cached, options: options)
