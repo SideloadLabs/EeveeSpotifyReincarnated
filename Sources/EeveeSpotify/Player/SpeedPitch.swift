@@ -53,6 +53,7 @@ enum SpeedPitch {
             eeveeLog("[EeveeSpotify][SpeedPitch] %@", message)
         }
         installed = true
+        SpeedPitchMenu.activate()
         eeveeLog("[EeveeSpotify][SpeedPitch] Active (output %@)", reached ? "reached" : "not reached")
     }
 }
