@@ -28,10 +28,10 @@ struct EeveeSettingsView: View {
         PopUpHelper.showPopUp(message: "debug_log_cleared".localized, buttonText: "debug_log_cleared_ok".localized)
     }
 
-    // Ko-fi is where the tweak is funded from. It is the only place we ask for
-    // money, so the button lives with the other "about" style rows near the
+    // Donations are where the tweak is funded from. It is the only place we ask
+    // for money, so the button lives with the other "about" style rows near the
     // bottom of the page rather than up in the feature groups.
-    private static let supportURL = URL(string: "https://ko-fi.com/jaydenjcpy")!
+    private static let supportURL = URL(string: "https://sideloadlabs.github.io/donate/")!
 
     private func openSupportPage() {
         UIApplication.shared.open(Self.supportURL)
