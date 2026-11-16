@@ -122,6 +122,8 @@ Turn on debug logging, enable Speed & pitch, restart, play a song, then export t
 - `… its own connection kept: …`: speed is off for that output, and the line says why
 - `-[SPTEsperantoPlayer …] is missing` / `SPTPlayerState is missing`: a hook was skipped on this version
 - `menu table …, header …, footer …`: the first player ⋯ menu, and where the row went
+- `menu font …, from Spotify's rows`: the typeface the row took from Spotify's own rows. Without this line
+  none were found, and the row used `SpotifyMix-Regular` (or the system font if that's gone)
 
 Then check, at 1.5× and 0.75×, with *Pitch follows speed* both on and off:
 

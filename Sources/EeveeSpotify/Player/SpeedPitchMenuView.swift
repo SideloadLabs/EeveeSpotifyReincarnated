@@ -1,3 +1,4 @@
+import CoreText
 import UIKit
 
 // the Speed & pitch row in the player's ⋯ menu: a row like Spotify's own that opens in place onto the speed
@@ -60,9 +61,9 @@ final class SpeedPitchMenuView: UIView {
 
         icon.image = Self.symbol("speedometer", size: 20, color: Self.secondary)
         icon.contentMode = .center
-        Self.style(title, font: Self.font(.body), color: Self.primary)
+        Self.style(title, color: Self.primary)
         title.text = "speed_pitch".localized
-        Self.style(summary, font: Self.digits(Self.font(.subheadline)), color: Self.secondary)
+        Self.style(summary, color: Self.secondary)
         summary.textAlignment = .right
         chevron.image = Self.symbol("chevron.down", size: 13, weight: .semibold, color: Self.secondary)
         chevron.contentMode = .center
@@ -72,12 +73,11 @@ final class SpeedPitchMenuView: UIView {
         }
 
         addSubview(panel)
-        let nameFont = Self.font(.subheadline)
-        Self.style(speedName, font: nameFont, color: Self.secondary)
+        Self.style(speedName, color: Self.secondary)
         speedName.text = "speed_pitch_speed".localized
-        Self.style(pitchName, font: nameFont, color: Self.secondary)
+        Self.style(pitchName, color: Self.secondary)
         pitchName.text = "speed_pitch_pitch".localized
-        Self.style(followsName, font: nameFont, color: Self.primary)
+        Self.style(followsName, color: Self.primary)
         followsName.text = "speed_pitch_follows".localized
         speedSlider.accessibilityLabel = "speed_pitch_speed".localized
         pitchSlider.accessibilityLabel = "speed_pitch_pitch".localized
@@ -87,6 +87,7 @@ final class SpeedPitchMenuView: UIView {
             panel.addSubview(view)
         }
 
+        applyFonts()
         refresh()
     }
 
@@ -96,6 +97,7 @@ final class SpeedPitchMenuView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        adoptRowFont()
         let width = bounds.width, margin = Self.margin, rowHeight = Self.rowHeight
         row.frame = CGRect(x: 0, y: 0, width: width, height: rowHeight)
         icon.frame = CGRect(x: margin, y: (rowHeight - 24) / 2, width: 24, height: 24)
@@ -126,6 +128,7 @@ final class SpeedPitchMenuView: UIView {
 
     // what the engine has now, onto the controls (not while a finger is on one).
     func refresh() {
+        adoptRowFont()
         let speedAvailable = SpeedPitch.speedAvailable
         if !speedSlider.isTracking { shownSpeed = SpeedPitch.snapped(SpeedPitch.speed) }
         if !pitchSlider.isTracking { shownPitch = SpeedPitch.semitones }
@@ -281,7 +284,6 @@ final class SpeedPitchMenuView: UIView {
 
     private func valueButton(_ reset: Selector) -> UIButton {
         let button = UIButton(type: .system)
-        button.titleLabel?.font = Self.digits(Self.font(.subheadline, weight: .semibold))
         button.tintColor = Self.primary
         button.setTitleColor(Self.primary, for: .normal)
         button.setTitleColor(Self.primary.withAlphaComponent(0.4), for: .highlighted)
@@ -342,21 +344,74 @@ final class SpeedPitchMenuView: UIView {
         UIColor(white: 1, alpha: UIAccessibility.isDarkerSystemColorsEnabled ? 0.8 : 0.65)
     }
 
-    // the system font at a text style's size, stopping at extra large so the row still fits.
-    private static func font(_ style: UIFont.TextStyle, weight: UIFont.Weight = .regular) -> UIFont {
+    // the face of Spotify's own menu rows, read off them, so the row follows whatever font Spotify ships.
+    private static var rowFont: UIFont?
+    // until those rows are found; nil (the system font) if Spotify renames it.
+    private static let standIn = UIFont(name: "SpotifyMix-Regular", size: 16)
+
+    private func applyFonts() {
+        let name = Self.font(.subheadline)
+        title.font = Self.titleFont()
+        summary.font = Self.digits(name)
+        for label in [speedName, pitchName, followsName] { label.font = name }
+        for button in [speedValue, pitchValue] { button.titleLabel?.font = Self.digits(Self.font(.subheadline, bold: true)) }
+    }
+
+    // the table makes its rows before laying out its header, so this usually lands before the menu is drawn;
+    // refresh() tries again as it appears.
+    private func adoptRowFont() {
+        guard Self.rowFont == nil, let table, let found = Self.spotifyRowFont(in: table) else { return }
+        Self.rowFont = found
+        eeveeLog("[EeveeSpotify][SpeedPitch] menu font %@ %.1f, from Spotify's rows", found.fontName, found.pointSize)
+        applyFonts()
+        setNeedsLayout()
+    }
+
+    // the face most of the rows' labels use, so the track's own title at the top isn't the one taken.
+    private static func spotifyRowFont(in table: UITableView) -> UIFont? {
+        var faces: [String: (font: UIFont, count: Int)] = [:]
+        var queue: [UIView] = table.visibleCells
+        while let view = queue.popLast() {
+            queue += view.subviews
+            guard let label = view as? UILabel, !label.isHidden, label.text?.isEmpty == false else { continue }
+            // styled text carries its own font, which the label's font property may not reflect.
+            guard let font = label.attributedText?.attribute(.font, at: 0, effectiveRange: nil) as? UIFont ?? label.font else { continue }
+            faces["\(font.fontName) \(font.pointSize)", default: (font, 0)].count += 1
+        }
+        return faces.values.max { $0.count < $1.count }?.font
+    }
+
+    // a text style's size, stopping at extra large so the row still fits.
+    private static func size(_ style: UIFont.TextStyle) -> CGFloat {
         var category = UIApplication.shared.preferredContentSizeCategory
         if category > .extraLarge { category = .extraLarge }
-        let size = UIFont.preferredFont(forTextStyle: style, compatibleWith: UITraitCollection(preferredContentSizeCategory: category)).pointSize
-        return .systemFont(ofSize: size, weight: weight)
+        return UIFont.preferredFont(forTextStyle: style, compatibleWith: UITraitCollection(preferredContentSizeCategory: category)).pointSize
     }
 
-    // digits of one width, so a value doesn't shuffle as it counts.
+    private static func font(_ style: UIFont.TextStyle, bold: Bool = false) -> UIFont {
+        let points = size(style)
+        guard let face = rowFont ?? standIn else { return .systemFont(ofSize: points, weight: bold ? .semibold : .regular) }
+        let descriptor = face.fontDescriptor
+        guard bold, let boldFace = descriptor.withSymbolicTraits(descriptor.symbolicTraits.union(.traitBold)) else { return face.withSize(points) }
+        return UIFont(descriptor: boldFace, size: points)
+    }
+
+    // as Spotify sets its own row titles.
+    private static func titleFont() -> UIFont {
+        guard let rowFont else { return font(.body) }
+        return rowFont.withSize(min(rowFont.pointSize, size(.body)))
+    }
+
+    // digits of one width where the face has them, so a value doesn't shuffle as it counts.
     private static func digits(_ font: UIFont) -> UIFont {
-        .monospacedDigitSystemFont(ofSize: font.pointSize, weight: font.fontDescriptor.weight)
+        let tabular: [UIFontDescriptor.FeatureKey: Any] = [
+            UIFontDescriptor.FeatureKey(kCTFontOpenTypeFeatureTag as String): "tnum",
+            UIFontDescriptor.FeatureKey(kCTFontOpenTypeFeatureValue as String): 1,
+        ]
+        return UIFont(descriptor: font.fontDescriptor.addingAttributes([.featureSettings: [tabular]]), size: font.pointSize)
     }
 
-    private static func style(_ label: UILabel, font: UIFont, color: UIColor) {
-        label.font = font
+    private static func style(_ label: UILabel, color: UIColor) {
         label.textColor = color
         label.adjustsFontForContentSizeCategory = false
     }
@@ -374,12 +429,5 @@ final class SpeedPitchMenuView: UIView {
         return UIGraphicsImageRenderer(size: box).image { _ in
             glyph.draw(at: CGPoint(x: (box.width - glyph.size.width) / 2, y: (box.height - glyph.size.height) / 2))
         }
-    }
-}
-
-private extension UIFontDescriptor {
-    var weight: UIFont.Weight {
-        let traits = object(forKey: .traits) as? [UIFontDescriptor.TraitKey: Any]
-        return (traits?[.weight] as? CGFloat).map { UIFont.Weight($0) } ?? .regular
     }
 }
