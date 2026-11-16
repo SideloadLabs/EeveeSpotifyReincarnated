@@ -43,6 +43,9 @@ enum GlassTabBar {
     private static weak var row: UIStackView?
     private static weak var platterView: UIView?
     private static var retries = 0
+    private static var waitRetries = 0
+    private static var waitScheduled = false
+    private static var revealedWhileInactive = false
     private static var launchTabApplied = false
     private static var filmKey: UInt8 = 0
     private static var platterLogged = false
@@ -61,17 +64,42 @@ enum GlassTabBar {
         activateGlassCustomTabs()
         if let stock { sync(stock) }
     }
+    // A cold launch can lay the stock bar out before its tabs exist, and sometimes nothing lays it out
+    // again until the app is backgrounded and reopened. Becoming active is what used to rescue the bar,
+    // so sync here as well and rebuild once if the first reveal happened before the scene was active.
+    private static let activationObserver = NotificationCenter.default.addObserver(
+        forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main
+    ) { _ in
+        guard let stock else { return }
+        waitRetries = 0
+        waitScheduled = false
+        if revealedWhileInactive,
+           let bar = objc_getAssociatedObject(stock, &barKey) as? GlassSystemTabBar, !bar.isHidden {
+            revealedWhileInactive = false
+            rebuild(bar)
+            eeveeLog("[EeveeSpotify][Glass] Tab bar rebuilt after activation")
+        }
+        sync(stock)
+    }
 
     static func sync(_ stock: UIView) {
         _ = observer
         _ = tintObserver
+        _ = activationObserver
         self.stock = stock
         let bar = systemBar(on: stock)
-        guard let row = tabRow(in: stock) else { return }
+        guard let row = tabRow(in: stock) else {
+            waitForTabs(stock)
+            return
+        }
         row.superview?.layoutIfNeeded()
 
         let tabs = row.arrangedSubviews.filter { !$0.isHidden && $0.bounds.width >= 20 }
-        guard !tabs.isEmpty else { return }
+        guard !tabs.isEmpty else {
+            waitForTabs(stock)
+            return
+        }
+        waitRetries = 0
         let labels = Dictionary(tabs.map { (ObjectIdentifier($0), label(in: $0)) }) { first, _ in first }
         func labelOf(_ tab: UIView) -> UILabel? { labels[ObjectIdentifier(tab)] ?? nil }
         func title(_ tab: UIView) -> String? { labelOf(tab)?.text }
@@ -143,21 +171,48 @@ enum GlassTabBar {
     // Spotify's own bar stays up until ours has every icon, so launch never shows an empty glass bar.
     private static func reveal(_ bar: GlassSystemTabBar, over stock: UIView, ready: Bool) {
         guard ready else { return }
-        for sub in stock.subviews where sub !== bar && sub.alpha != 0 {
-            sub.alpha = 0
-            sub.isUserInteractionEnabled = false
+        if bar.isHidden {
+            for sub in stock.subviews where sub !== bar && sub.alpha != 0 {
+                sub.alpha = 0
+                sub.isUserInteractionEnabled = false
+            }
+            bar.alpha = 0
+            bar.isHidden = false
+            rebuild(bar)
+            UIView.animate(withDuration: 0.2) { bar.alpha = 1 }
+            eeveeLog("[EeveeSpotify][Glass] Tab bar revealed after %d retries", retries)
         }
-        guard bar.isHidden else { return }
-        bar.alpha = 0
-        bar.isHidden = false
-        // Items laid out while hidden keep squashed labels, so they're rebuilt once visible.
+        // Revealing before the scene is active can leave the glass platter blank until another layout
+        // pass, which is why switching apps used to bring the bar back.
+        if stock.window?.windowScene?.activationState != .foregroundActive {
+            revealedWhileInactive = true
+        }
+    }
+
+    // Items laid out while hidden (or before the scene is active) keep squashed or blank labels, so
+    // they are rebuilt once the bar is on screen.
+    private static func rebuild(_ bar: GlassSystemTabBar) {
         let selected = bar.selectedItem.flatMap { bar.items?.firstIndex(of: $0) }
         let fresh = (bar.items ?? []).map { UITabBarItem(title: $0.title, image: $0.image, selectedImage: $0.selectedImage) }
         bar.setItems(fresh, animated: false)
         if let selected, selected < fresh.count { bar.selectedItem = fresh[selected] }
+        bar.setNeedsLayout()
         bar.layoutIfNeeded()
-        UIView.animate(withDuration: 0.2) { bar.alpha = 1 }
-        eeveeLog("[EeveeSpotify][Glass] Tab bar revealed after %d retries", retries)
+    }
+
+    // A cold launch can run layout before Spotify adds or unhides its tab items, and no later layout
+    // pass is guaranteed. Poll briefly while the glass bar is still hidden; once it is revealed the
+    // normal layout/tap/foreground paths keep it in sync.
+    private static func waitForTabs(_ stock: UIView) {
+        guard !waitScheduled, waitRetries < 60,
+              let bar = objc_getAssociatedObject(stock, &barKey) as? GlassSystemTabBar, bar.isHidden else { return }
+        waitScheduled = true
+        waitRetries += 1
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak stock] in
+            waitScheduled = false
+            guard let stock else { return }
+            sync(stock)
+        }
     }
 
     private static func applyTint(_ bar: GlassSystemTabBar) {
@@ -238,6 +293,9 @@ enum GlassTabBar {
         // The bar is a touch taller than Spotify's strip on iPad, so it must not be clipped away.
         stock.clipsToBounds = false
         retries = 0
+        waitRetries = 0
+        waitScheduled = false
+        revealedWhileInactive = false
         objc_setAssociatedObject(stock, &barKey, bar, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
         stock.addSubview(bar)
         return bar
