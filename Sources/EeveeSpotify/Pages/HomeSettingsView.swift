@@ -15,11 +15,13 @@ struct HomeSettingsView: View {
         List {
             Section(header: Text("home_hide".localized), footer: Text("restart_is_required_description".localized)) {
                 ForEach(Self.rows, id: \.0) { part, icon, color in
-                    SettingsToggle(title: "home_\(part.rawValue)".localized, icon: icon, color: color, isOn: Binding(
-                        get: { hidden.contains(part) },
-                        set: { if $0 { hidden.insert(part) } else { hidden.remove(part) } }
-                    ))
+                    toggle(part, icon: icon, color: color)
                 }
+            }
+
+            Section(footer: Text("home_shortcuts_only_footer".localized)) {
+                toggle(.episodeCarousels, icon: "mic.fill", color: .teal)
+                toggle(.shortcutsOnly, icon: "rectangle.grid.1x2.fill", color: .blue)
             }
 
             SettingsResetSection(visible: !hidden.isEmpty) {
@@ -32,5 +34,12 @@ struct HomeSettingsView: View {
         }
         .eeveeSettingsStyle()
         .onChange(of: hidden) { UserDefaults.homeHidden = HomePart.allCases.filter($0.contains) }
+    }
+
+    private func toggle(_ part: HomePart, icon: String, color: Color) -> some View {
+        SettingsToggle(title: "home_\(part.rawValue)".localized, icon: icon, color: color, isOn: Binding(
+            get: { hidden.contains(part) },
+            set: { if $0 { hidden.insert(part) } else { hidden.remove(part) } }
+        ))
     }
 }
