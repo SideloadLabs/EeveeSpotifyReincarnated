@@ -1,3 +1,4 @@
+import Darwin
 import EeveeSpotifyC
 import Orion
 import UIKit
@@ -387,7 +388,8 @@ enum CustomTabs {
     private(set) static var selectedKey: String?
     private static weak var page: UIViewController?
     private static var watch: Timer?
-    private static let navigate = NSSelectorFromString("navigateToURI:options:interactionID:")
+    private static let navigateShort = NSSelectorFromString("navigateToURI:options:interactionID:")
+    private static let navigateFull = NSSelectorFromString("navigateToURI:options:reason:completionHandler:resultHandler:")
 
     // Spotify's own link dispatcher keeps the URI in-app; the system route would ask to open the other Spotify install.
     static func open(_ tab: CustomTab) {
@@ -395,12 +397,41 @@ enum CustomTabs {
             eeveeLog("[EeveeSpotify][CustomTabs] '%@' has an invalid URI %@", tab.title, tab.uri)
             return
         }
-        guard let dispatcher, dispatcher.responds(to: navigate) else {
+        guard let dispatcher else {
             eeveeLog("[EeveeSpotify][CustomTabs] '%@' not opened: link dispatcher not captured yet", tab.title)
             return
         }
-        typealias Navigate = @convention(c) (NSObject, Selector, NSURL, Int64, AnyObject?) -> Void
-        unsafeBitCast(dispatcher.method(for: navigate), to: Navigate.self)(dispatcher, navigate, url as NSURL, 0, nil)
+        if dispatcher.responds(to: navigateShort) {
+            typealias Navigate = @convention(c) (NSObject, Selector, NSURL, Int64, AnyObject?) -> Void
+            unsafeBitCast(dispatcher.method(for: navigateShort), to: Navigate.self)(dispatcher, navigateShort, url as NSURL, 0, nil)
+        } else if dispatcher.responds(to: navigateFull) {
+            let reason: AnyObject? = {
+                guard let reasonClass = NSClassFromString("SPTUBINavigationReason") else { return nil }
+                let allocSel = NSSelectorFromString("alloc")
+                let initSel = NSSelectorFromString("initWithSourceApplication:interactionID:")
+                guard reasonClass.responds(to: allocSel), reasonClass.instancesRespond(to: initSel) else { return nil }
+                guard let msgSend = dlsym(dlopen(nil, RTLD_LAZY), "objc_msgSend") else { return nil }
+                typealias AllocFn = @convention(c) (AnyClass, Selector) -> Unmanaged<AnyObject>
+                let allocFn = unsafeBitCast(msgSend, to: AllocFn.self)
+                let raw = allocFn(reasonClass, allocSel)
+                typealias InitFn = @convention(c) (Unmanaged<AnyObject>, Selector, AnyObject?, AnyObject?) -> Unmanaged<AnyObject>?
+                let initFn = unsafeBitCast(msgSend, to: InitFn.self)
+                guard let result = initFn(raw, initSel, nil, nil) else {
+                    raw.release()
+                    return nil
+                }
+                return result.takeRetainedValue()
+            }()
+            guard let reason else {
+                eeveeLog("[EeveeSpotify][CustomTabs] '%@' not opened: navigation reason could not be created", tab.title)
+                return
+            }
+            typealias Navigate = @convention(c) (NSObject, Selector, NSURL, Int64, AnyObject?, AnyObject?, AnyObject?) -> Void
+            unsafeBitCast(dispatcher.method(for: navigateFull), to: Navigate.self)(dispatcher, navigateFull, url as NSURL, 0, reason, nil, nil)
+        } else {
+            eeveeLog("[EeveeSpotify][CustomTabs] '%@' not opened: link dispatcher has no known navigation method", tab.title)
+            return
+        }
         select(tab)
     }
 
@@ -467,6 +498,11 @@ class LinkDispatcherHook: ClassHook<NSObject> {
     func navigateToURI(_ uri: NSURL, options: Int64, interactionID: AnyObject?) {
         CustomTabs.capture(target, "navigation")
         orig.navigateToURI(uri, options: options, interactionID: interactionID)
+    }
+
+    func navigateToURI(_ uri: NSURL, options: Int64, reason: AnyObject?, completionHandler: AnyObject?, resultHandler: AnyObject?) {
+        CustomTabs.capture(target, "navigation")
+        orig.navigateToURI(uri, options: options, reason: reason, completionHandler: completionHandler, resultHandler: resultHandler)
     }
 }
 
