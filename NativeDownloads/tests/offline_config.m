@@ -98,8 +98,8 @@ int main(void) { @autoreleasepool {
         assert(![result isEqual:original]);
         assert(SAPProtoNumber(SAPProtoFields(attribute(result, @"offline", boot)), 2, 0) == 1);
         assert([SAPProtoString(SAPProtoFields(attribute(result, @"can-use-offline", boot)), 4) isEqual:@"1"]);
-        assert(SAPProtoNumber(SAPProtoFields(attribute(result, @"max-offline-tracks", boot)), 3, 0) == 1000000);
-        assert(SAPProtoNumber(SAPProtoFields(attribute(result, @"max-offline-downloads-per-device", boot)), 3, 0) == 1000000);
+        assert(SAPProtoNumber(SAPProtoFields(attribute(result, @"max-offline-tracks", boot)), 3, 0) == 10000);
+        assert(SAPProtoNumber(SAPProtoFields(attribute(result, @"max-offline-downloads-per-device", boot)), 3, 0) == 10000);
         assert([attribute(result, @"type", boot) isEqual:attribute(original, @"type", boot)]);
         assert(SAPProtoNumber(SAPProtoFields(attribute(result, @"offline", boot)), 98, 0) == 123456);
         assert([SAPRewriteOfflineConfig(result, boot) isEqual:result]);

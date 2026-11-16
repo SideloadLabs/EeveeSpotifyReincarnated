@@ -19,13 +19,16 @@ int main(void) {@autoreleasepool {
     NSDictionary *journal=@{@"snapshots":@{@"license_status":@{@"free_licenses":@0,@"max_licenses":@5}},@"core_errors":@[@{@"code":@7028}]};
     NSURL *out=[folder URLByAppendingPathComponent:@"PixieSupportLog.json"];NSError *error=nil;
     NSDictionary *trace=@{@"events":@[@{@"event_id":@1}],@"coverage":@{@"scope":@"fixture"}};
-    assert(SAPSupportLogWrite(out,@{@"configured_mode":@0,@"diagnostic_trace":trace},journal,@"DEVICE_LIMIT_REACHED",files,&error));
+    assert(SAPSupportLogWrite(out,@{@"configured_mode":@0,@"diagnostic_trace":trace,@"track_journal":@{@"duplicate":@YES}},journal,@"DEVICE_LIMIT_REACHED",files,&error));
     NSDictionary *result=[NSJSONSerialization JSONObjectWithData:[NSData dataWithContentsOfURL:out] options:0 error:&error];
     assert([result[@"sections"][@"download_journal"]isEqual:journal]);
     assert([result[@"sections"][@"log_files"]isEqual:files]);
     assert([result[@"sections"][@"download_summary"]isEqual:@"DEVICE_LIMIT_REACHED"]);
     assert([result[@"log_schema"]isEqual:@"Pixie support log 3"]&&[result[@"sections"][@"trace"]isEqual:trace]);
     assert(!result[@"sections"][@"diagnostics"][@"diagnostic_trace"]);
+    assert(!result[@"sections"][@"diagnostics"][@"track_journal"]);
+    // One output file contains every section and every original log payload.
+    assert([result[@"sections"] count]==5);
     assert(!SAPSupportLogWrite([folder URLByAppendingPathComponent:@"missing/out.json"],@{},@{},@"",@[],&error));
     [NSFileManager.defaultManager removeItemAtURL:folder error:NULL];
     puts("PASS one JSON contains complete report, journal, summary and lossless logs; missing/read/write failures are explicit");

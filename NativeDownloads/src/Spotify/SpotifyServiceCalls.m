@@ -8,7 +8,10 @@
 #include <stdatomic.h>
 
 #ifdef SAP_TESTING
-static const double serviceTimeoutSeconds=.04,streamFirstResponseTimeoutSeconds=.12;
+#ifndef SAP_TEST_SERVICE_TIMEOUT_SECONDS
+#define SAP_TEST_SERVICE_TIMEOUT_SECONDS .04
+#endif
+static const double serviceTimeoutSeconds=SAP_TEST_SERVICE_TIMEOUT_SECONDS,streamFirstResponseTimeoutSeconds=.12;
 #else
 static const double serviceTimeoutSeconds=8,streamFirstResponseTimeoutSeconds=8;
 #endif

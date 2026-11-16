@@ -653,8 +653,8 @@ if needsLocalSyncOffline || pixieCompanionPresent {
         // Pixie companion (native offline downloads): on Spotify 9.2 the offline core reads these four
         // entitlements from this response, not from the product-state objects Pixie also rewrites.
         attributes["can-use-offline"] = AccountAttribute.with { $0.boolValue = true }
-        attributes["max-offline-tracks"] = AccountAttribute.with { $0.longValue = 1_000_000 }
-        attributes["max-offline-downloads-per-device"] = AccountAttribute.with { $0.longValue = 1_000_000 }
+        attributes["max-offline-tracks"] = AccountAttribute.with { $0.longValue = 10_000 }
+        attributes["max-offline-downloads-per-device"] = AccountAttribute.with { $0.longValue = 10_000 }
     }
 }
 }

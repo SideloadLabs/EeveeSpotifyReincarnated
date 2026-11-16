@@ -179,6 +179,15 @@ func eeveeEnvFlag(_ name: String) -> Bool {
     return s == "1" || s == "true" || s == "yes" || s == "y"
 }
 
+// Swift global initialization runs once, even if Orion reinitializes the tweak.
+// The main queue runs after dylib constructors, avoiding a false startup failure
+// when Pixie is initialized after Eevee in the same process.
+private let pixieStartupLog: Void = {
+    DispatchQueue.main.async {
+        writeDebugLog("[INIT] \(EeveePixieStartupSummary())")
+    }
+}()
+
 struct EeveeSpotify: Tweak {
     static let version = "7.5.0"
     static let buildNumber = "1"
@@ -204,6 +213,7 @@ struct EeveeSpotify: Tweak {
 
     init() {
         eeveeBreadcrumb("Tweak init() entered")
+        _ = pixieStartupLog
         // A stale flag cancels the next bootstrap and hangs the splash screen.
         UserDefaults.hasPatchedBootstrap = false
 

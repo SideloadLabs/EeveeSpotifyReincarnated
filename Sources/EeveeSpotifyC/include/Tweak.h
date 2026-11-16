@@ -20,6 +20,7 @@ NSString *_Nullable EeveePixieArtistURIForHeader(UIView *header);
 void EeveePixieInstallArtistFollow(void);
 // The Pixie download manager page in Eevee's settings list. Both do nothing when the companion is not loaded.
 BOOL EeveePixieDownloadsAvailable(void);
+NSString *EeveePixieStartupSummary(void);
 UIViewController *_Nullable EeveePixieMakeDownloadsController(void);
 NSInteger EeveePixieArtistFollowing(UIView *header, void (^changed)(void));
 // 1 saved, 0 not saved, -1 not known yet. `changed` runs when Spotify reports a new state.

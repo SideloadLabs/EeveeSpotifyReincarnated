@@ -1,5 +1,6 @@
 #import <UIKit/UIKit.h>
 #import <dlfcn.h>
+#import <mach-o/dyld.h>
 #import "include/Tweak.h"
 
 // The artist download button is implemented by the Pixie native-downloads companion. The glass
@@ -27,6 +28,28 @@ static UIViewController *(*PixieDownloadsFactory(void))(void) {
     static dispatch_once_t once;
     dispatch_once(&once, ^{ make = dlsym(RTLD_DEFAULT, "SAPCreateDownloadsSettings"); });
     return make;
+}
+
+// Observe the already-loaded companion. Never dlopen/retry a module for logging.
+NSString *EeveePixieStartupSummary(void) {
+    void *factory=dlsym(RTLD_DEFAULT,"SAPCreateDownloadsSettings");
+    NSDictionary *(*report)(void)=dlsym(RTLD_DEFAULT,"SAPStartupReport");
+    if(report) {
+        NSDictionary *status=report();
+        NSString *state=status[@"state"]?:@"unknown",*version=status[@"version"]?:@"unknown";
+        if(!factory)return [NSString stringWithFormat:@"[ERROR] Pixie %@: settings entry point missing",version];
+        return [NSString stringWithFormat:@"%@Pixie %@: bootstrap=%@",[state isEqual:@"complete"]?@"":@"[ERROR] ",version,state];
+    }
+    if(factory)return @"Pixie loaded: bootstrap status unavailable (older companion)";
+    for(uint32_t i=0;i<_dyld_image_count();i++) {
+        const char *name=_dyld_get_image_name(i);
+        if(name && [[NSString stringWithUTF8String:name].lastPathComponent isEqual:@"SpotifyAudioProbe.dylib"])
+            return @"[ERROR] Pixie library loaded but settings entry point missing";
+    }
+    NSString *frameworks=NSBundle.mainBundle.privateFrameworksPath;
+    if(frameworks && [NSFileManager.defaultManager fileExistsAtPath:[frameworks stringByAppendingPathComponent:@"SpotifyAudioProbe.dylib"]])
+        return @"[ERROR] Pixie library bundled but not loaded";
+    return @"Pixie not bundled (optional module)";
 }
 
 BOOL EeveePixieDownloadsAvailable(void) { return PixieDownloadsFactory() != NULL; }

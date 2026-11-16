@@ -403,22 +403,23 @@ static void bindLifetime(SAPTraceRPC *call,id lifetime) {
     for(unsigned i=0;i<lifetimeClassCount;i++)if(lifetimeClasses[i]==cls){os_unfair_lock_unlock(&lifetimeLock);return;}
     if(lifetimeClassCount==32){os_unfair_lock_unlock(&lifetimeLock);atomic_fetch_add(&lifetimeCapacityDrops,1);SAP_TRACE("rpc","lifetime_hook_capacity_reached",call.identifier,@{});return;}
     lifetimeClasses[lifetimeClassCount++]=cls;
-    for(NSString *name in @[@"acquire",@"cancel"]){SEL selector=NSSelectorFromString(name);Method method=class_getInstanceMethod(cls,selector);char type[16]={0};
-        if(!method||method_getNumberOfArguments(method)!=2)continue;method_getReturnType(method,type,sizeof(type));if(type[0]!='v')continue;
-        IMP original=method_getImplementation(method);BOOL cancels=[name isEqual:@"cancel"];
-        IMP replacement=imp_implementationWithBlock(^(id receiver){
-            void *previousReceiver=lifetimeReceiver;SEL previousSelector=lifetimeSelector;
-            BOOL nested=previousReceiver==(__bridge void *)receiver&&previousSelector==selector;
-            lifetimeReceiver=(__bridge void *)receiver;lifetimeSelector=selector;
-            @try {
-                SAPTraceRPC *bound=!nested&&SAPTraceIsActive()?objc_getAssociatedObject(receiver,&lifetimeTraceKey):nil;
-                if(bound){SAPTraceHookCalled(object_getClass(receiver),selector);rpcEvent(bound,cancels?"lifetime_cancel_invoked":"lifetime_acquire_invoked",@{});if(cancels)SAPTraceRPCStreamEnd(bound,@"native_lifetime_cancel_invoked");}
-                ((void(*)(id,SEL))original)(receiver,selector);
-            }@finally {lifetimeReceiver=previousReceiver;lifetimeSelector=previousSelector;}
-        });
-        if(!class_addMethod(cls,selector,replacement,method_getTypeEncoding(method)))class_replaceMethod(cls,selector,replacement,method_getTypeEncoding(method));
-        SAPTraceRegisterHook(cls,selector,replacement,original);
-    }
+    SEL selector=NSSelectorFromString(@"cancel");Method method=class_getInstanceMethod(cls,selector);char type[16]={0};
+    if(!method||method_getNumberOfArguments(method)!=2){os_unfair_lock_unlock(&lifetimeLock);return;}
+    method_getReturnType(method,type,sizeof(type));
+    if(type[0]!='v'){os_unfair_lock_unlock(&lifetimeLock);return;}
+    IMP original=method_getImplementation(method);
+    IMP replacement=imp_implementationWithBlock(^(id receiver){
+        void *previousReceiver=lifetimeReceiver;SEL previousSelector=lifetimeSelector;
+        BOOL nested=previousReceiver==(__bridge void *)receiver&&previousSelector==selector;
+        lifetimeReceiver=(__bridge void *)receiver;lifetimeSelector=selector;
+        @try {
+            SAPTraceRPC *bound=!nested&&SAPTraceIsActive()?objc_getAssociatedObject(receiver,&lifetimeTraceKey):nil;
+            if(bound){SAPTraceHookCalled(object_getClass(receiver),selector);SAPTraceRPCStreamEnd(bound,@"native_lifetime_cancel_invoked");}
+            ((void(*)(id,SEL))original)(receiver,selector);
+        }@finally {lifetimeReceiver=previousReceiver;lifetimeSelector=previousSelector;}
+    });
+    if(!class_addMethod(cls,selector,replacement,method_getTypeEncoding(method)))class_replaceMethod(cls,selector,replacement,method_getTypeEncoding(method));
+    SAPTraceRegisterHook(cls,selector,replacement,original);
     os_unfair_lock_unlock(&lifetimeLock);
 }
 static BOOL noisyService(NSString *service) {
@@ -459,7 +460,13 @@ SAPTraceRPC *SAPTraceRPCBegin(NSString *service,NSString *method,NSData *payload
         @synchronized(call){if(atomic_load(&call->_finished)){dispatch_source_cancel(timer);dispatch_resume(timer);return;}call.deadline=timer;dispatch_resume(timer);}
     });return call;
 }
-void SAPTraceRPCReturned(SAPTraceRPC *call,id lifetime) {if(!call||!SAPTraceIsActive()||call.generation!=SAPTraceGeneration())return;rpcEvent(call,"invocation_returned",@{@"lifetime_returned":@(lifetime!=nil),@"lifetime_class":lifetime?NSStringFromClass(object_getClass(lifetime)):@"none"});bindLifetime(call,lifetime);}
+void SAPTraceRPCReturned(SAPTraceRPC *call,id lifetime) {
+    if(!call||!SAPTraceIsActive()||call.generation!=SAPTraceGeneration())return;
+    // Ordinary returns add no outcome. A missing lifetime before any reply is
+    // still useful when diagnosing a request whose completion cannot be tracked.
+    if(!lifetime&&!atomic_load(&call->_finished))rpcEvent(call,"lifetime_unavailable",@{});
+    bindLifetime(call,lifetime);
+}
 void SAPTraceRPCReply(SAPTraceRPC *call,id response) {
     if(!call||!SAPTraceIsActive()||call.generation!=SAPTraceGeneration())return;
     @synchronized(call){
