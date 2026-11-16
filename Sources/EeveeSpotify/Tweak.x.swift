@@ -224,6 +224,7 @@ struct EeveeSpotify: Tweak {
         activateLiquidGlass()
         activatePlayerGestures()
         activatePlayerHaptics()
+        activateSpeedPitch()
         activateHomeDeclutter()
         activateGlassCustomTabs()
         activateHomeGradient()
