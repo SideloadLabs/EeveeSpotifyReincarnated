@@ -18,6 +18,7 @@ not brought over.
 | `EeveeSpeedPitch.m` | That API: install, availability, clamping, the log |
 | `SpeedPitchEngine.m` | Spotify's audio output: rebinding, the render callbacks, which output carries the music |
 | `SpeedPitchClock.x` | Hooks on Spotify's player that keep the progress bar in step. **All the player names the engine needs are here** |
+| `MixerLimit.m` | Lifts Spotify's core mixer limit with the speed, so there are no pauses above 1.2× |
 | `TimePitch.h/.m` | Apple's time-pitch unit and Varispeed, wrapped for the render thread |
 | `Rebind.h/.m` | Rebinding Spotify's imports of C functions, with a jailbreak fallback |
 | `SpeedPitchPrivate.h` | What the files above share |
@@ -80,18 +81,30 @@ Spotify's, and the next report starts ours again.
 on its audio thread; `Output` records change under `sg_outputsLock` there and on `sg_outputsQueue`, and a
 change waits for any render in progress to end. The API is main thread only.
 
-### Known limit: pauses above about 1.2×
+### Spotify's mixer limit
 
-Spotify's core gives the driver about 30 s of a song up front, then delivers it at only about 1.2× real time
-(measured in Vitrine, [vitrine#103](https://github.com/My-Name-Is-Jeff/vitrine/issues/103); no buffer setting
-changed it). Faster than that, the head start runs out and the core pauses to catch up: at 1.5× after
-about 100 s of listening, at 2× after about 40 s, then about 0.8 s of silence every 2.2 s. The clock handles
-these pauses (each one hands it back to Spotify's), but the sound has gaps.
+The list player's mixer (the `List Player Media Mixer Renderer Thread`) hands audio to the driver through a
+token bucket: 10 s of frames up front, refilled at sample rate × 1.2 / 1000 frames per millisecond of
+`std::chrono::steady_clock` (52 at 44.1 kHz). Both numbers are fixed in the binary, not remote settings. At
+1.5× the engine drains the bucket in about 30 s; after that the core delivers 1.2× and the sound pauses
+every few seconds to catch up. This is the stall Vitrine reports in
+[vitrine#103](https://github.com/My-Name-Is-Jeff/vitrine/issues/103). No driver, buffer or look-ahead setting
+changes it.
 
-Spotify has its own song speed, codenamed zephyr (`MusicPlaybackSpeed_*` modules, the `ios-zephyr.*` and
-`ios-playbackcontrol-playbackspeed-impl.enable_playback_speed_for_music` flags, off for most accounts). The
-core paces itself for that, so driving it instead of the engine's stretch would remove the pauses. Not done
-yet.
+The bucket reads time through a `std::function` holding the address of Spotify's import of
+`steady_clock::now()`, which the core copies when it starts. `MixerLimit.m` rebinds that import at launch,
+before the core starts, so the copy holds ours. Our `now()` gives the real time to every caller except the
+bucket's two reads, told by the code they return to: a load from `[bucket + 0x30]` followed by a divide by
+1,000,000, and a store to `[bucket + 0x38]` right after `add x0, bucket, #0x10`. Those two get a timeline that
+runs max(1, speed) times as fast, so the bucket refills at 1.2× the chosen speed. The timeline never jumps
+or runs behind the real clock, and the bucket keeps it after a return to 1×, so its stored time stays
+consistent. A new bucket after a seek starts full.
+
+Measured on Spotify 9.2.0 (XR), 60 s of continuous play: 1.5× played at 1.499× and 2× at 1.988×, against
+1.31–1.34× before. 1× and 0.75× right after 2× played at 0.996× and 0.747×.
+
+Spotify also has its own song speed, codenamed zephyr. The core allows it only for tracks whose server-sent
+content type is talk, so it isn't used here.
 
 ## When Spotify updates
 
@@ -108,6 +121,11 @@ Everything Spotify-specific is checked at launch; a missing piece is logged and 
 - Spotify's binary importing `AudioUnitSetProperty` (without it only pitch works, in place), and
   `AudioOutputUnitStart`, `AudioOutputUnitStop` and `AudioComponentInstanceDispose`, which track outputs
   starting, stopping and going away.
+- Spotify's binary importing `std::__1::chrono::steady_clock::now()`, and its mixer's token bucket keeping the
+  shape `fromBucket()` in `MixerLimit.m` looks for. If the log says `Spotify's mixer not seen yet` after
+  playing above 1×, the bucket's code changed: find the function that divides by 1,000,000 between two
+  clock reads (it is also used for download limits) and update the patterns. Speed still works; it only
+  pauses above 1.2× again.
 
 The Objective-C names were confirmed on Spotify 9.1.78, 9.1.88 and 9.1.90 (in Vitrine). When the log says
 `-[SPTEsperantoPlayer …] is missing` after an update, find the new name (a class dump of the new build) and
@@ -120,6 +138,8 @@ Turn on debug logging, enable Speed & pitch, restart, play a song, then export t
 
 - `audio: Spotify connects mixer … fed through the engine's callback`: speed is possible
 - `… its own connection kept: …`: speed is off for that output, and the line says why
+- `mixer limit: follows 1.50x (Spotify's mixer seen)`: the core's limit follows the speed. Set the speed
+  after a few seconds of playing, or the first change can say `not seen yet` before the mixer has run
 - `-[SPTEsperantoPlayer …] is missing` / `SPTPlayerState is missing`: a hook was skipped on this version
 - `menu table …, header …, footer …`: the first player ⋯ menu, and where the row went
 - `menu font …, from Spotify's rows`: the typeface the row took from Spotify's own rows. Without this line

@@ -27,6 +27,13 @@ void SpeedPitchEngineSetSemitones(float semitones);
 BOOL SpeedPitchEngineFollows(void);
 void SpeedPitchEngineSetFollows(BOOL follows);
 
+#pragma mark - MixerLimit.m: Spotify's core mixer limit
+
+// rebinds Spotify's steady_clock::now, once at launch. returns whether the limit can follow the speed.
+BOOL SpeedPitchMixerLimitInstall(void);
+// main thread.
+void SpeedPitchMixerLimitSetSpeed(float speed);
+
 #pragma mark - SpeedPitchClock.x: Spotify's progress bar
 
 // hooks Spotify's player. returns whether its clock can follow the speed; speed stays off without it.

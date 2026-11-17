@@ -824,6 +824,8 @@ BOOL SpeedPitchEngineInstall(BOOL follows, BOOL *canSpeed) {
     atomic_store(&sg_follows, follows);
     rebind();
     *canSpeed = sg_setProperty != NULL;
+    // before Spotify's core starts: it copies the clock once.
+    if (*canSpeed) SpeedPitchMixerLimitInstall();
     return sg_reachable;
 }
 
@@ -850,6 +852,7 @@ void SpeedPitchEngineResetUnit(void) {
 void SpeedPitchEngineSetSpeed(float speed) {
     sg_speed = speed;
     storeFloat(&sg_speedBits, speed);
+    SpeedPitchMixerLimitSetSpeed(speed);
     apply();
 }
 
