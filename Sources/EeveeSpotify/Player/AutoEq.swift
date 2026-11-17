@@ -100,7 +100,7 @@ enum AutoEq {
                     try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
                     try? text.write(to: file, atomically: true, encoding: .utf8)
                 }
-                let why = fetched.isEmpty ? (error?.localizedDescription ?? "autoeq_unreadable".localized) : nil
+                let why = fetched.isEmpty ? (error?.localizedDescription ?? "autoeq_list_failed".localized) : nil
                 DispatchQueue.main.async {
                     if let why {
                         eeveeLog("[EeveeSpotify][Equalizer] AutoEq list: GitHub failed (%@, HTTP %d), %d headphones from the cache",

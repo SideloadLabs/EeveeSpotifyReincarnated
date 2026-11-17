@@ -42,8 +42,10 @@ static void report(void) {
     NSMutableArray<NSString *> *bands = [NSMutableArray arrayWithCapacity:kEqualizerBands];
     for (int i = 0; i < kEqualizerBands; i++) [bands addObject:[NSString stringWithFormat:@"%+g", sg_gains[i]]];
     NSString *rate = sg_rate > 0 ? [NSString stringWithFormat:@"at %.0f Hz", sg_rate] : @"waiting for Spotify's output";
-    NSString *level = sg_preventClipping ? [NSString stringWithFormat:@"turned down %.2f dB", sg_peak]
-                                         : [NSString stringWithFormat:@"clip prevention off, peaks at +%.2f dB", sg_peak];
+    // the peak is known once a design is made, for the output's rate.
+    NSString *level = sg_rate <= 0          ? (sg_preventClipping ? @"clip prevention on" : @"clip prevention off")
+                      : sg_preventClipping ? [NSString stringWithFormat:@"turned down %.2f dB", sg_peak]
+                                           : [NSString stringWithFormat:@"clip prevention off, peaks at +%.2f dB", sg_peak];
     EQLog(@"%@ %@, bands %@, correction %d filters, %@; since the last report %llu buffers run, %llu for "
           @"another rate, %llu refused, %llu passed over, %llu cleared after a fault",
           sg_on ? @"on" : @"off", rate, [bands componentsJoinedByString:@" "], sg_correctionCount, level,
