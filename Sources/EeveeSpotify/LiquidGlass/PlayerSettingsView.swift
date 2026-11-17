@@ -63,12 +63,6 @@ struct PlayerSettingsView: View {
                 SettingsToggle(title: "player_haptics".localized, subtitle: "player_haptics_subtitle".localized, icon: "iphone.radiowaves.left.and.right", color: .green, isOn: $extras.haptics)
             }
 
-            Section {
-                SettingsLink(title: "speed_pitch".localized, subtitle: "speed_pitch_subtitle".localized, icon: "speedometer", color: .orange) {
-                    SpeedPitchSettingsView()
-                }
-            }
-
             Section(footer: Text("new_player_design_footer".localized)) {
                 SettingsToggle(title: "new_player_design".localized, icon: "play.circle.fill", color: .orange, isOn: $glass.newPlayerDesign)
             }

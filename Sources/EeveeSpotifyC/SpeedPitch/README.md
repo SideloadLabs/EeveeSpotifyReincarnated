@@ -1,8 +1,12 @@
 # Speed & pitch
 
 Changes how fast and how high Spotify's music plays, on Spotify's own audio, so it works on every song,
-local files included. Player settings → Speed & pitch turns it on (restart needed); the sliders are then in
-the full-screen player's ⋯ menu and apply at once. Neither value is stored: every launch plays at normal speed.
+local files included. The sliders are in the full-screen player's ⋯ menu and apply at once. Tapping a value
+resets it; holding it opens a box to type one, finer than the sliders' steps or past their ends (0.25× to 4×,
+±24 semitones). Neither value is stored: every launch plays at normal speed.
+
+There is no switch: it is installed at every launch, because it has to be in place before Spotify sets up its
+audio, and at normal speed and pitch the sound passes through untouched.
 
 Based on the speed & pitch feature of [Vitrine](https://github.com/My-Name-Is-Jeff/vitrine) (GPL-3.0, as is
 this project) as of commit `f6f519b` (2026-11-15), which took it from spoti.pw by Vojtěch Škopek. Thanks to
@@ -29,8 +33,7 @@ Swift side, in `Sources/EeveeSpotify/Player/`:
 |---|---|
 | `SpeedPitch.swift` | The options, installing at launch, and the Swift face of the C API |
 | `SpeedPitchMenu.x.swift` | Hooks that put the row into the player's ⋯ menu (Spotify's context menu sheet and the player header) |
-| `SpeedPitchMenuView.swift` | That row, which opens in place onto the sliders and the *Pitch follows speed* switch |
-| `SpeedPitchSettingsView.swift` | The on/off switch in Player settings |
+| `SpeedPitchMenuView.swift` | That row, which opens in place onto the sliders and the *Pitch follows speed* switch, and the box for typing a value |
 
 The strings are the `speed_pitch*` keys in
 `layout/Library/Application Support/EeveeSpotify.bundle/en.lproj/Localizable.strings`; other languages fall
@@ -133,7 +136,7 @@ change it in `SpeedPitchClock.x`: both the hooked method and its `hasMethods` li
 
 ## Testing
 
-Turn on debug logging, enable Speed & pitch, restart, play a song, then export the debug log and look for
+Turn on debug logging, restart, play a song, then export the debug log and look for
 `[SpeedPitch]` lines:
 
 - `audio: Spotify connects mixer … fed through the engine's callback`: speed is possible
@@ -148,5 +151,6 @@ Turn on debug logging, enable Speed & pitch, restart, play a song, then export t
 Then check, at 1.5× and 0.75×, with *Pitch follows speed* both on and off:
 
 - the progress bar and lyrics stay in step through a whole song, a seek, a skip and a pause
+- typed values past the sliders (4× and 0.25×) and between their steps (1.13×, -0.32 st)
 - pitch alone at 1× (±12) sounds right and comes back clean at 0
 - a local file at another sample rate, AirPods/Bluetooth, and a call or Siri interruption

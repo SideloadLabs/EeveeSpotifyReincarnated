@@ -2,8 +2,9 @@ import CoreText
 import UIKit
 
 // the Speed & pitch row in the player's ⋯ menu: a row like Spotify's own that opens in place onto the speed
-// and pitch sliders. it sits in the menu table's header (or footer, when Spotify uses the header), so opening
-// it resizes that view inside a table update and the rows under it move with it.
+// and pitch sliders; holding a value opens a box to type one. it sits in the menu table's header (or footer,
+// when Spotify uses the header), so opening it resizes that view inside a table update and the rows under it
+// move with it.
 final class SpeedPitchMenuView: UIView {
     private static let rowHeight: CGFloat = 56
     private static let sliderHeight: CGFloat = 72
@@ -130,7 +131,7 @@ final class SpeedPitchMenuView: UIView {
     func refresh() {
         adoptRowFont()
         let speedAvailable = SpeedPitch.speedAvailable
-        if !speedSlider.isTracking { shownSpeed = SpeedPitch.snapped(SpeedPitch.speed) }
+        if !speedSlider.isTracking { shownSpeed = SpeedPitch.speed }
         if !pitchSlider.isTracking { shownPitch = SpeedPitch.semitones }
         speedSlider.value = Float(shownSpeed)
         pitchSlider.value = Float(shownPitch)
@@ -159,8 +160,11 @@ final class SpeedPitchMenuView: UIView {
         let pitchFree = pitchAvailable && !following
         pitchSlider.isEnabled = pitchFree
         pitchSlider.alpha = pitchFree ? 1 : 0.4
-        speedValue.isEnabled = speedAvailable && shownSpeed != 1
-        pitchValue.isEnabled = pitchFree && pitch != 0
+        // on at normal too, for holding.
+        speedValue.isEnabled = speedAvailable
+        pitchValue.isEnabled = pitchFree
+        speedValue.accessibilityHint = shownSpeed != 1 ? "speed_pitch_reset_hint".localized : nil
+        pitchValue.accessibilityHint = pitch != 0 ? "speed_pitch_reset_hint".localized : nil
         speedSlider.accessibilityValue = speedAvailable ? Self.speedText(shownSpeed) : unavailable
         pitchSlider.accessibilityValue = following ? "speed_pitch_follows_value".localized : Self.pitchText(pitch)
 
@@ -247,7 +251,7 @@ final class SpeedPitchMenuView: UIView {
     @objc private func sliderReleased(_ slider: UISlider) {
         if slider === speedSlider {
             slider.value = Float(shownSpeed)
-            if speedPending || SpeedPitch.snapped(SpeedPitch.speed) != shownSpeed { sendSpeed() }
+            if speedPending || SpeedPitch.speed != shownSpeed { sendSpeed() }
         } else {
             slider.value = Float(shownPitch)
         }
@@ -259,18 +263,76 @@ final class SpeedPitchMenuView: UIView {
         SpeedPitch.speed = shownSpeed
     }
 
-    @objc private func resetSpeed() {
-        shownSpeed = 1
+    private func setSpeed(_ speed: Double) {
+        shownSpeed = speed
         sendSpeed()
-        speedSlider.setValue(1, animated: true)
+        speedSlider.setValue(Float(speed), animated: true)
         showValues()
     }
 
-    @objc private func resetPitch() {
-        shownPitch = 0
-        SpeedPitch.semitones = 0
-        pitchSlider.setValue(0, animated: true)
+    private func setPitch(_ pitch: Double) {
+        shownPitch = pitch
+        SpeedPitch.semitones = pitch
+        pitchSlider.setValue(Float(pitch), animated: true)
         showValues()
+    }
+
+    @objc private func resetSpeed() {
+        if shownSpeed != 1 { setSpeed(1) }
+    }
+
+    @objc private func resetPitch() {
+        if shownPitch != 0 { setPitch(0) }
+    }
+
+    @objc private func held(_ press: UILongPressGestureRecognizer) {
+        guard press.state == .began, let value = press.view else { return }
+        feedback.selectionChanged()
+        askValue(for: value)
+    }
+
+    private func askValue(for value: UIView) {
+        if value === speedValue {
+            ask("speed_pitch_speed".localized, value: shownSpeed, range: SpeedPitch.typedSpeedRange, text: Self.speedText,
+                keyboard: .decimalPad) { [weak self] in self?.setSpeed($0) }
+        } else {
+            ask("speed_pitch_pitch".localized, value: shownPitch, range: SpeedPitch.typedPitchRange, text: Self.pitchText,
+                keyboard: .numbersAndPunctuation) { [weak self] in self?.setPitch($0) }
+        }
+    }
+
+    // a box to type a value finer than the slider's steps, or past its ends.
+    private func ask(_ title: String, value: Double, range: ClosedRange<Double>, text: (Double) -> String,
+                     keyboard: UIKeyboardType, set: @escaping (Double) -> Void) {
+        guard let host = presenter() else { return }
+        let alert = UIAlertController(title: title, message: "speed_pitch_range".localizeWithFormat(text(range.lowerBound), text(range.upperBound)),
+                                      preferredStyle: .alert)
+        alert.overrideUserInterfaceStyle = .dark
+        let typed = { [weak alert] in Self.number(alert?.textFields?.first?.text).flatMap { range.contains($0) ? $0 : nil } }
+        let ok = UIAlertAction(title: "OK".uiKitLocalized, style: .default) { _ in
+            if let value = typed() { set(value) }
+        }
+        ok.isEnabled = false
+        alert.addTextField { field in
+            field.placeholder = Self.editable(value)
+            field.keyboardType = keyboard
+            field.keyboardAppearance = .dark
+            field.textAlignment = .center
+            field.addAction(UIAction { _ in ok.isEnabled = typed() != nil }, for: .editingChanged)
+        }
+        alert.addAction(UIAlertAction(title: "Cancel".uiKitLocalized, style: .cancel))
+        alert.addAction(ok)
+        alert.preferredAction = ok
+        host.present(alert, animated: true)
+    }
+
+    // the controller on top of the sheet this row is in.
+    private func presenter() -> UIViewController? {
+        var responder: UIResponder? = next
+        while let current = responder, !(current is UIViewController) { responder = current.next }
+        var host = responder as? UIViewController
+        while let presented = host?.presentedViewController, !presented.isBeingDismissed { host = presented }
+        return host
     }
 
     @objc private func followsChanged() {
@@ -282,6 +344,7 @@ final class SpeedPitchMenuView: UIView {
 
     // MARK: - parts
 
+    // a tap resets the value; holding it, or VoiceOver's action, opens the box to type one.
     private func valueButton(_ reset: Selector) -> UIButton {
         let button = UIButton(type: .system)
         button.tintColor = Self.primary
@@ -289,8 +352,13 @@ final class SpeedPitchMenuView: UIView {
         button.setTitleColor(Self.primary.withAlphaComponent(0.4), for: .highlighted)
         button.setTitleColor(Self.primary, for: .disabled)
         button.contentHorizontalAlignment = .right
-        button.accessibilityHint = "speed_pitch_reset_hint".localized
         button.addTarget(self, action: reset, for: .touchUpInside)
+        button.addGestureRecognizer(UILongPressGestureRecognizer(target: self, action: #selector(held(_:))))
+        button.accessibilityCustomActions = [UIAccessibilityCustomAction(name: "speed_pitch_type".localized) { [weak self, weak button] _ in
+            guard let self, let button, button.isEnabled else { return false }
+            self.askValue(for: button)
+            return true
+        }]
         return button
     }
 
@@ -332,8 +400,29 @@ final class SpeedPitchMenuView: UIView {
         String(format: "%.2f×", speed)
     }
 
+    // whole semitones without decimals, a typed fraction with them.
     private static func pitchText(_ pitch: Double) -> String {
-        pitch == 0 ? "0" : "speed_pitch_semitones".localizeWithFormat(String(format: "%+.0f", pitch))
+        pitch == 0 ? "0" : "speed_pitch_semitones".localizeWithFormat((pitch < 0 ? "" : "+") + plain(pitch))
+    }
+
+    // up to two decimals, without trailing zeros.
+    private static func plain(_ value: Double) -> String {
+        var number = String(format: "%.2f", value)
+        while number.contains("."), number.hasSuffix("0") || number.hasSuffix(".") { number.removeLast() }
+        return number
+    }
+
+    // a value as it's typed: no unit, the locale's decimal mark.
+    private static func editable(_ value: Double) -> String {
+        plain(value).replacingOccurrences(of: ".", with: Locale.current.decimalSeparator ?? ".")
+    }
+
+    // the typed number, with either decimal mark and any sign or unit around it.
+    private static func number(_ text: String?) -> Double? {
+        guard let text else { return nil }
+        let digits = text.replacingOccurrences(of: ",", with: ".").replacingOccurrences(of: "\u{2212}", with: "-")
+            .filter { "0123456789.+-".contains($0) }
+        return Double(digits).map(SpeedPitch.hundredths)
     }
 
     // MARK: - look, drawn from its own measures so it fits Spotify's sheet in any eevee appearance

@@ -2,10 +2,9 @@ import Foundation
 import EeveeSpotifyC
 
 // speed and pitch on Spotify's sound. the engine is C (EeveeSpotifyC/SpeedPitch, see its README.md); this
-// keeps the switch that installs it and hands the sliders to it. speed and pitch themselves are never stored,
+// installs it at every launch and hands the menu's values to it. speed and pitch themselves are never stored,
 // so a launch always plays at normal speed.
 struct SpeedPitchOptions: Codable, Equatable {
-    var enabled = false
     var pitchFollowsSpeed = true
 }
 
@@ -18,21 +17,23 @@ enum SpeedPitch {
     static let speedRange: ClosedRange<Double> = 0.5...2
     static let speedStep = 0.05
     static let pitchRange: ClosedRange<Double> = -12...12
+    // a typed value can go past the sliders, as far as the engine goes (EeveeSpeedPitch.h).
+    static let typedSpeedRange: ClosedRange<Double> = 0.25...4
+    static let typedPitchRange: ClosedRange<Double> = -24...24
 
-    static let launchOptions = UserDefaults.speedPitchOptions
     private(set) static var installed = false
 
     static var speedAvailable: Bool { installed && EeveeSpeedPitchSpeedAvailable() }
     static var pitchAvailable: Bool { installed && EeveeSpeedPitchPitchAvailable() }
 
     static var speed: Double {
-        get { installed ? EeveeSpeedPitchSpeed() : 1 }
-        set { if installed { EeveeSpeedPitchSetSpeed(snapped(newValue)) } }
+        get { installed ? hundredths(EeveeSpeedPitchSpeed()) : 1 }
+        set { if installed { EeveeSpeedPitchSetSpeed(hundredths(newValue)) } }
     }
 
     static var semitones: Double {
-        get { installed ? Double(EeveeSpeedPitchSemitones()) : 0 }
-        set { if installed { EeveeSpeedPitchSetSemitones(Float(newValue.rounded())) } }
+        get { installed ? hundredths(Double(EeveeSpeedPitchSemitones())) : 0 }
+        set { if installed { EeveeSpeedPitchSetSemitones(Float(hundredths(newValue))) } }
     }
 
     // stored with the options; this only hands it to the engine.
@@ -41,15 +42,18 @@ enum SpeedPitch {
         EeveeSpeedPitchSetPitchFollowsSpeed(follows)
     }
 
-    // to the slider's step, and exactly 1 near it so the engine can take itself out.
+    // to the slider's step, exactly 1 at normal so the engine can take itself out.
     static func snapped(_ value: Double) -> Double {
-        let speed = (value / speedStep).rounded() * speedStep
-        return abs(speed - 1) < speedStep * 0.6 ? 1 : speed
+        hundredths((value / speedStep).rounded() * speedStep)
+    }
+
+    // both values are kept to hundredths, so what the engine holds compares equal to what was shown.
+    static func hundredths(_ value: Double) -> Double {
+        (value * 100).rounded() / 100
     }
 
     static func activate() {
-        guard launchOptions.enabled else { return }
-        let reached = EeveeSpeedPitchInstall(launchOptions.pitchFollowsSpeed) { message in
+        let reached = EeveeSpeedPitchInstall(UserDefaults.speedPitchOptions.pitchFollowsSpeed) { message in
             eeveeLog("[EeveeSpotify][SpeedPitch] %@", message)
         }
         installed = true
