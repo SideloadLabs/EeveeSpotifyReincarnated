@@ -10,6 +10,11 @@ extension URL {
         self.path.contains("nebula/v1/configuration/attributes")
     }
     
+    // The 9.2 remote configuration, signed in - see rewriteRemoteConfigurationData.
+    var isRemoteConfiguration: Bool {
+        self.path.contains("remote-config-resolver/v3/configuration")
+    }
+
     var isPlanOverview: Bool {
         self.path.contains("GetPlanOverview")
     }

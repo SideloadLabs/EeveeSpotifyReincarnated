@@ -25,6 +25,9 @@ import Foundation
 // Only requests whose path is nebula/v1/configuration/attributes are touched;
 // every other request is passed through to the original implementation
 // unchanged. The cost is one extra non-cached response per launch.
+//
+// The remote configuration (remote-config-resolver/v3/configuration) gets the
+// same treatment, so rewriteRemoteConfigurationData always has a body to edit.
 
 enum NebulaAttributes {
     /// Only 9.2 and later are known to deliver product state this way, so both
@@ -50,7 +53,7 @@ enum NebulaAttributes {
     private static func rewriteIfNebula(_ request: AnyObject?) -> AnyObject? {
         guard let nsRequest = request as? NSURLRequest,
               let url = nsRequest.url,
-              url.isNebulaAttributes else { return request }
+              url.isNebulaAttributes || url.isRemoteConfiguration else { return request }
         return unconditional(nsRequest as URLRequest) as NSURLRequest
     }
 
