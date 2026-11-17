@@ -166,6 +166,9 @@ enum Equalizer {
     // MARK: - launch
 
     static func activate() {
+        EeveeEqualizerSetLog { message in
+            eeveeLog("[EeveeSpotify][Equalizer] %@", message)
+        }
         apply()
         applyCorrection()
         // posted on the audio session's own thread; handed to main without waiting for it.

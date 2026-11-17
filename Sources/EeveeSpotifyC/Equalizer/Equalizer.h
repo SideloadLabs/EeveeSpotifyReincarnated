@@ -52,8 +52,27 @@ bool EqualizerWanted(void);
 // the filters empty. `silent` is a buffer of silence, whose lanes are not read. returns whether they changed.
 // never allocates, locks or waits; a second render thread calling at the same time is passed over.
 bool EqualizerRun(const void *owner, double rate, float *const *lanes, uint32_t channels, uint32_t frames, bool silent);
+// a buffer it wanted but the in-place path couldn't read: its format, its size, or its channels (over
+// kEqualizerMaxChannels). counted for the log.
+void EqualizerCountRefused(void);
+
+#pragma mark - for the log, any thread
+
+// buffers since launch: run through it, passed as they were because the design was made for another rate, refused
+// for their format, passed over while another render thread had it, and those whose filters went non-finite and
+// were cleared.
+typedef struct {
+    uint64_t run, otherRate, refused, passedOver, cleared;
+} EqualizerStats;
+
+EqualizerStats EqualizerReadStats(void);
 
 #pragma mark - EeveeEqualizer.m
 
 // the music's output now plays at `rate` (SpeedPitchEngine.m). main thread.
 void EeveeEqualizerFollowOutput(double rate);
+#ifdef __OBJC__
+#import <Foundation/Foundation.h>
+// the equalizer's log lines, through the sink Swift sets (EeveeEqualizerSetLog). never on the render thread.
+void EeveeEqualizerLog(NSString *format, ...) NS_FORMAT_FUNCTION(1, 2);
+#endif

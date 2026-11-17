@@ -242,6 +242,11 @@ static const double kFadeSeconds = 0.03;
 enum { kStep = 32 };
 
 static atomic_flag sg_busy = ATOMIC_FLAG_INIT;
+static atomic_uint_fast64_t sg_ran, sg_otherRate, sg_refused, sg_passedOver, sg_cleared;
+
+static void tally(atomic_uint_fast64_t *counter) {
+    atomic_fetch_add_explicit(counter, 1, memory_order_relaxed);
+}
 
 static struct {
     unsigned front;                 // the slot taken last
@@ -348,6 +353,7 @@ static void process(float *const *lanes, uint32_t channels, uint32_t frames) {
         for (int i = 0; i < sg_run.sections; i++) {
             if (!isfinite(sg_run.state[c][i][0]) || !isfinite(sg_run.state[c][i][1])) {
                 empty();
+                tally(&sg_cleared);
                 return;
             }
         }
@@ -367,12 +373,17 @@ static bool run(const void *owner, double rate, float *const *lanes, uint32_t ch
     sg_run.owner = owner;
     sg_run.channels = channels;
     // a design for another rate passes the sound as it is until the one for this rate comes.
-    if (!sg_run.ready || sg_run.idle || sg_run.rate != rate) return false;
+    if (!sg_run.ready || sg_run.idle) return false;
+    if (sg_run.rate != rate) {
+        tally(&sg_otherRate);
+        return false;
+    }
     if (silent) {
         startClean();
         return false;
     }
     process(lanes, channels, frames);
+    tally(&sg_ran);
     if (sg_run.flat && sg_run.at == sg_run.length) {
         sg_run.idle = true;
         empty();
@@ -385,8 +396,23 @@ bool EqualizerWanted(void) {
 }
 
 bool EqualizerRun(const void *owner, double rate, float *const *lanes, uint32_t channels, uint32_t frames, bool silent) {
-    if (atomic_flag_test_and_set_explicit(&sg_busy, memory_order_acquire)) return false;
+    if (atomic_flag_test_and_set_explicit(&sg_busy, memory_order_acquire)) {
+        tally(&sg_passedOver);
+        return false;
+    }
     bool changed = run(owner, rate, lanes, channels, frames, silent);
     atomic_flag_clear_explicit(&sg_busy, memory_order_release);
     return changed;
+}
+
+void EqualizerCountRefused(void) {
+    tally(&sg_refused);
+}
+
+EqualizerStats EqualizerReadStats(void) {
+    return (EqualizerStats){
+        atomic_load_explicit(&sg_ran, memory_order_relaxed), atomic_load_explicit(&sg_otherRate, memory_order_relaxed),
+        atomic_load_explicit(&sg_refused, memory_order_relaxed), atomic_load_explicit(&sg_passedOver, memory_order_relaxed),
+        atomic_load_explicit(&sg_cleared, memory_order_relaxed),
+    };
 }

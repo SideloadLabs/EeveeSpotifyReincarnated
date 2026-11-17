@@ -71,12 +71,16 @@ enum AutoEq {
             let age = cacheFile.flatMap { try? FileManager.default.attributesOfItem(atPath: $0.path)[.modificationDate] as? Date }
                 .map { -$0.timeIntervalSinceNow } ?? .infinity
             if !refresh, !cached.isEmpty, age < indexLife {
-                DispatchQueue.main.async { done(cached, nil) }
+                DispatchQueue.main.async {
+                    eeveeLog("[EeveeSpotify][Equalizer] AutoEq list: %d headphones from the cache, %.1f days old", cached.count, age / 86400)
+                    done(cached, nil)
+                }
                 return
             }
             guard let url = URL(string: results + "INDEX.md") else { return }
             session.dataTask(with: url) { data, response, error in
-                let ok = (response as? HTTPURLResponse)?.statusCode == 200
+                let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+                let ok = status == 200
                 let text = ok ? data.flatMap { String(data: $0, encoding: .utf8) } : nil
                 let fetched = text.map(parseIndex) ?? []
                 if let text, !fetched.isEmpty, let file = cacheFile {
@@ -84,7 +88,15 @@ enum AutoEq {
                     try? text.write(to: file, atomically: true, encoding: .utf8)
                 }
                 let why = fetched.isEmpty ? (error?.localizedDescription ?? "autoeq_unreadable".localized) : nil
-                DispatchQueue.main.async { done(fetched.isEmpty ? cached : fetched, why) }
+                DispatchQueue.main.async {
+                    if let why {
+                        eeveeLog("[EeveeSpotify][Equalizer] AutoEq list: GitHub failed (%@, HTTP %d), %d headphones from the cache",
+                                 why, status, cached.count)
+                    } else {
+                        eeveeLog("[EeveeSpotify][Equalizer] AutoEq list: %d headphones from GitHub", fetched.count)
+                    }
+                    done(fetched.isEmpty ? cached : fetched, why)
+                }
             }.resume()
         }
     }
@@ -138,8 +150,12 @@ enum AutoEq {
             let filters = status == 200 ? data.flatMap { String(data: $0, encoding: .utf8) }.flatMap(parseParametric) : nil
             DispatchQueue.main.async {
                 if let filters {
+                    eeveeLog("[EeveeSpotify][Equalizer] AutoEq %@ (%@): %d filters", headphone.name, headphone.source, filters.count)
                     done(.success(filters))
                 } else {
+                    // a 200 without filters is a file this can't read: a new filter kind, or another layout.
+                    eeveeLog("[EeveeSpotify][Equalizer] AutoEq %@ (%@) failed: HTTP %d, %@", headphone.name, headphone.source, status,
+                             error?.localizedDescription ?? (status == 200 ? "no filters it can read" : "no file"))
                     done(.failure(DownloadError(message: error?.localizedDescription
                         ?? (status == 404 ? "autoeq_no_parametric".localized : "autoeq_unreadable".localized))))
                 }

@@ -13,6 +13,9 @@ typedef NS_ENUM(NSInteger, EeveeEqualizerFilter) {
     EeveeEqualizerFilterHighShelf,
 };
 
+// where the equalizer's log lines go, set once at launch; any thread but the render thread calls it.
+void EeveeEqualizerSetLog(void (^log)(NSString *message));
+
 // a band's centre in Hz, lowest first.
 double EeveeEqualizerFrequency(NSInteger band);
 

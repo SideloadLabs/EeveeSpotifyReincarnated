@@ -93,10 +93,34 @@ everywhere: the correction belongs to the headphones, the bands to taste.
 - Once it's off and faded, nothing runs.
 - It costs about 3 ms per second of 48 kHz stereo on a desktop CPU.
 
+## The log
+
+With debug logging on, everything it does is under `[Equalizer]`:
+
+- `on` / `off`, and `the music's output plays at 48000 Hz` when the output starts or its rate changes.
+- `output AirPods Pro, correction Apple AirPods Pro 2`: the output and its correction, at launch and on every
+  route change. The output's UID is left out, since for Bluetooth it's the device's address.
+- A report three seconds after anything changes, once per burst of slider moves:
+
+  ```
+  on at 48000 Hz, bands +6 +6 +5 +4 +2 +1 +0 +0 +0 +0 +0 +0 +0 +0 +0, correction 10 filters, turned down 6.15 dB;
+  since the last report 1873 buffers run, 0 for another rate, 0 refused, 0 passed over, 0 cleared after a fault
+  ```
+
+  The render thread can't log, so it counts instead. **Buffers run** should climb while music plays and it's
+  on. **For another rate** climbing means the design didn't follow the output to its new rate (see
+  `applyToFormat()` in `SpeedPitchEngine.m`). **Refused** means the hardware's format isn't one the in-place path
+  reads: more than two channels, or not 16 or 32-bit; the `[SpeedPitch]` lines have the format. **Passed over**
+  is a buffer that came while another output's render thread had it, which happens for a moment when the music
+  moves between outputs. **Cleared after a fault** is filters that went non-finite and were emptied; it should
+  stay at 0.
+- `AutoEq list: 8850 headphones from the cache, 3.2 days old` (or `from GitHub`, or `GitHub failed (…, HTTP 403)`),
+  and `AutoEq Sennheiser HD 650 (oratory1990): 10 filters` or `… failed: HTTP 404, no file`. A failed download
+  with HTTP 200 is a file it couldn't read: a new filter kind, or another layout.
+
 ## Testing
 
-Turn on debug logging, restart, play a song, and look for `[SpeedPitch]` lines: `equalizer on` and
-`equalizer: the music's output plays at 48000 Hz` (or the route's rate). Then:
+Turn on debug logging, restart, play a song, and check the `[Equalizer]` lines above. Then:
 
 - turning it on with a preset, and dragging a band, change the sound at once, without clicks;
 - turning it off goes back to the plain sound;

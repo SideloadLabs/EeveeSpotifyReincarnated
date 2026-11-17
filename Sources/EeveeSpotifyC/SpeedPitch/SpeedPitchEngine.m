@@ -256,10 +256,15 @@ static void processInPlace(Output *output, EeveeTimePitch *unit, AudioUnitRender
     BOOL isFloat = (formatFlags & kAudioFormatFlagIsFloat) != 0;
     BOOL split = (formatFlags & kAudioFormatFlagIsNonInterleaved) != 0;
     UInt32 fraction = (formatFlags & kLinearPCMFormatFlagsSampleFractionMask) >> kLinearPCMFormatFlagsSampleFractionShift;
-    if (frames > kEeveeTimePitchMaxFrames || (bytes != 2 && bytes != 4) || channels < 1 || channels > kEeveeTimePitchMaxChannels) return;
-    if (split ? data->mNumberBuffers != channels : data->mNumberBuffers != 1 || data->mBuffers[0].mNumberChannels != channels) return;
-    for (UInt32 b = 0; b < data->mNumberBuffers; b++) {
-        if (!data->mBuffers[b].mData || data->mBuffers[b].mDataByteSize < frames * bytes * (split ? 1 : channels)) return;
+    BOOL fits = frames <= kEeveeTimePitchMaxFrames && (bytes == 2 || bytes == 4) && channels >= 1 && channels <= kEeveeTimePitchMaxChannels
+                && (split ? data->mNumberBuffers == channels : data->mNumberBuffers == 1 && data->mBuffers[0].mNumberChannels == channels);
+    for (UInt32 b = 0; fits && b < data->mNumberBuffers; b++) {
+        fits = data->mBuffers[b].mData && data->mBuffers[b].mDataByteSize >= frames * bytes * (split ? 1 : channels);
+    }
+    if (!fits) {
+        // counted for the equalizer's log; the speed & pitch log has the hardware's format to tell why.
+        EqualizerCountRefused();
+        return;
     }
     if (unit && EeveeTimePitchChannels(unit) != channels) unit = NULL;
     double rate = rateOf(hardware);
