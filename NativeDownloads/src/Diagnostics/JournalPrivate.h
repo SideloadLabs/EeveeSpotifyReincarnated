@@ -16,7 +16,7 @@
 
 // Границы: журнал живёт внутри Spotify и не должен расти без предела.
 static const NSUInteger maximumTracks = 20000, maximumTransitions = 400, maximumEvents = 120;
-static const NSUInteger maximumEntities = 24, maximumTrackTransitions = 12;
+static const NSUInteger maximumEntities = 3000, maximumTrackTransitions = 12;
 static const NSUInteger chunkSize = 300, maximumChunks = 12, maximumReportedTracks = 3000;
 static const double refreshThrottle = 2, pollInterval = 5, sessionIdleTimeout = 45;
 static const double maximumSessionSeconds = 1800, stalledAfter = 45;
@@ -105,6 +105,8 @@ static inline void trimEvents(NSMutableArray *list, NSUInteger limit) { while (l
 void SAPJournalSetup(void);
 void SAPJournalOnQueue(void (^work)(void));
 SAPTrack *SAPJournalRecordFor(NSString *uri);
+// Caller holds the state lock. Evict one oldest context, never the whole cache.
+NSMutableDictionary *SAPJournalEntityFor(NSString *uri);
 void SAPJournalApplyState(NSString *uri,NSUInteger state,NSUInteger videoState,NSUInteger progress,BOOL hasProgress,NSString *source);
 void SAPJournalBeginSession(NSString *reason,NSString *entity);
 void SAPJournalEndSessionIfIdle(void);

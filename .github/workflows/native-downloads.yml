@@ -2,9 +2,9 @@ name: Pixie 1.4 — Spotify 9.2.0
 
 on:
   push:
-    paths: ['NativeDownloads/**', 'Sources/**', 'Makefile', '.github/workflows/native-downloads.yml']
+    paths: ['NativeDownloads/**', 'Sources/**', 'Tests/PixieStartupLogging/**', 'Makefile', '.github/workflows/native-downloads.yml']
   pull_request:
-    paths: ['NativeDownloads/**', 'Sources/**', 'Makefile', '.github/workflows/native-downloads.yml']
+    paths: ['NativeDownloads/**', 'Sources/**', 'Tests/PixieStartupLogging/**', 'Makefile', '.github/workflows/native-downloads.yml']
   workflow_dispatch:
     inputs:
       ipa_url:
@@ -35,6 +35,8 @@ jobs:
           HOMEBREW_NO_AUTO_UPDATE: '1'
           HOMEBREW_NO_INSTALL_CLEANUP: '1'
       - run: python3 NativeDownloads/tools/validate_eevee_9192.py
+      - name: Check Pixie startup logging
+        run: swift Tests/PixieStartupLogging/main.swift
       - run: python3 NativeDownloads/tools/test.py --build-dir outputs/ci-host-tests
       - uses: actions/upload-artifact@v4
         if: always()

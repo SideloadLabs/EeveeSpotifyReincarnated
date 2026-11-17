@@ -43,7 +43,7 @@ int main(void) { @autoreleasepool {
     assert([[state stringForKey:@"offline"] isEqual:@"1"]);
     assert([[state objectForKey:@"can-use-offline"] isEqual:@"1"]);
     assert([state[@"offline"] isEqual:@"1"] && [state boolForKey:@"can-use-offline"]);
-    assert([state integerForKey:@"max-offline-tracks"] == 1000000);
+    assert([state integerForKey:@"max-offline-tracks"] == 10000);
     assert([[state stringForKey:@"unrelated"] isEqual:@"unchanged"]);
     assert([[state objectForKey:@"type"] isEqual:@"free"] && ![state boolForKey:@"has-offline-state"]);
     assert([state objectForKey:@"missing"] == nil);

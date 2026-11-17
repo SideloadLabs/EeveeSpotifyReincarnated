@@ -111,7 +111,7 @@ class ChromeHost:UIViewController {
      self.capture("downloads-top")
      guard let page=nav.topViewController as? UITableViewController else{return}
      precondition(page.tableView.numberOfSections==4)
-     precondition(page.tableView.numberOfRows(inSection:1)==3,"quota/license/device rows missing")
+     precondition(page.tableView.numberOfRows(inSection:1)==2,"configured mode/device rows missing")
      let modeCell=page.tableView.dataSource!.tableView(page.tableView,cellForRowAt:IndexPath(row:0,section:1))
      precondition((modeCell.contentConfiguration as? UIListContentConfiguration)?.text=="Configured request mode","selected mode must not be presented as verified execution")
      precondition(!modeCell.isUserInteractionEnabled,"mode 0 must be read-only")
@@ -128,7 +128,7 @@ class ChromeHost:UIViewController {
      let disabled=page.tableView.dataSource!.tableView(reuseTable,cellForRowAt:IndexPath(row:0,section:1))
      precondition(!disabled.isUserInteractionEnabled)
      reuseTable.recycled=disabled
-     for _ in 0..<3 {for (section,row) in [(0,0),(0,1),(1,2),(1,1),(2,0),(2,1),(2,2),(3,0),(3,1)] {
+     for _ in 0..<3 {for (section,row) in [(0,0),(0,1),(1,1),(2,1),(3,0),(3,1),(3,2)] {
       let action=page.tableView.dataSource!.tableView(reuseTable,cellForRowAt:IndexPath(row:row,section:section))
       precondition(action === disabled && action.isUserInteractionEnabled && action.selectionStyle == .default,"recycled read-only mode cell disabled an action")
      }}
@@ -136,54 +136,65 @@ class ChromeHost:UIViewController {
      let modeFooter=page.tableView.dataSource!.tableView?(page.tableView,titleForFooterInSection:1) ?? ""
      precondition(!modeFooter.contains("5 licenses = up to 5 devices with offline music."))
      precondition(!modeFooter.lowercased().contains("recovery"))
-     let refreshCell=page.tableView.dataSource!.tableView(page.tableView,cellForRowAt:IndexPath(row:1,section:1))
-     precondition((refreshCell.contentConfiguration as? UIListContentConfiguration)?.text=="Refresh quotas and licenses")
-     for (row,title) in [(2,"Offline devices")] {
-      let cell=page.tableView.dataSource!.tableView(page.tableView,cellForRowAt:IndexPath(row:row,section:1))
-      precondition((cell.contentConfiguration as? UIListContentConfiguration)?.text==title)
-     }
+     let devicesCell=page.tableView.dataSource!.tableView(page.tableView,cellForRowAt:IndexPath(row:1,section:1))
+     precondition((devicesCell.contentConfiguration as? UIListContentConfiguration)?.text=="Offline devices")
      precondition(page.title=="Pixie Download Manager","Pixie must remain in English")
      for section in 0..<page.tableView.numberOfSections {for row in 0..<page.tableView.numberOfRows(inSection:section) {
       let cell=page.tableView.dataSource!.tableView(page.tableView,cellForRowAt:IndexPath(row:row,section:section))
       if let content=cell.contentConfiguration as? UIListContentConfiguration {
        precondition(!(content.text ?? "").contains("WAV"),"WAV row still present")
        precondition(!(content.text ?? "").contains("Заглушить") && !(content.text ?? "").contains("Mute audio"),"mute row still present")
-       precondition(!(content.text ?? "").contains("Export") && !(content.text ?? "").contains("Send log"),"duplicate log export row")
+       if section != 3 {precondition(!(content.text ?? "").contains("Send log"),"duplicate log export row")}
       }
      }}
-     page.tableView.scrollToRow(at:IndexPath(row:0,section:2),at:.middle,animated:false)
+     page.tableView.scrollToRow(at:IndexPath(row:0,section:3),at:.middle,animated:false)
      DispatchQueue.main.asyncAfter(deadline:.now()+0.5){
-      let togglePath=IndexPath(row:0,section:2)
-      if let toggle=page.tableView.cellForRow(at:togglePath)?.accessoryView as? UISwitch {
-       precondition(!toggle.isOn,"diagnostics must default off")
-       toggle.isOn=true;toggle.sendActions(for:.valueChanged)
-       precondition((page.tableView.cellForRow(at:togglePath)?.accessoryView as? UISwitch)?.isOn == true)
-       if let current=page.tableView.cellForRow(at:togglePath)?.accessoryView as? UISwitch {current.isOn=false;current.sendActions(for:.valueChanged)}
-       precondition((page.tableView.cellForRow(at:togglePath)?.accessoryView as? UISwitch)?.isOn == false)
-       self.write("PASS: legacy and module-qualified native page protocols; diagnostics switch defaults OFF and toggles ON/OFF")
-      } else {preconditionFailure("diagnostics switch not visible")}
+      let togglePath=IndexPath(row:0,section:3)
+      guard let toggle=page.tableView.cellForRow(at:togglePath)?.accessoryView as? UISwitch else {preconditionFailure("diagnostics switch not visible")}
+      precondition(!toggle.isOn && page.tableView.numberOfRows(inSection:3)==3)
+      let offHeight=page.tableView.contentSize.height
+      for _ in 0..<3 {
+       SAPFixtureSetDiagnostics(page,true);page.tableView.layoutIfNeeded()
+       precondition(page.tableView.numberOfRows(inSection:3)==4)
+       precondition(page.tableView.contentSize.height>offHeight+50,"details row failed to add height")
+       let details=page.tableView.dataSource!.tableView(page.tableView,cellForRowAt:IndexPath(row:1,section:3))
+       precondition((details.contentConfiguration as? UIListContentConfiguration)?.text=="Download status")
+       SAPFixtureSetDiagnostics(page,false);page.tableView.layoutIfNeeded()
+       precondition(page.tableView.numberOfRows(inSection:3)==3)
+       precondition(abs(page.tableView.contentSize.height-offHeight)<2,"diagnostics toggle accumulated table height")
+       let send=page.tableView.dataSource!.tableView(page.tableView,cellForRowAt:IndexPath(row:1,section:3))
+       precondition((send.contentConfiguration as? UIListContentConfiguration)?.text=="Send log","Send log index shifted incorrectly")
+      }
+      SAPFixtureSetDiagnostics(page,true);page.tableView.layoutIfNeeded()
+      self.write("PASS: diagnostic details appear only while enabled; row indexes and height restore across repeated toggles")
 
       page.tableView.setContentOffset(CGPoint(x:0,y:max(0,page.tableView.contentSize.height-page.tableView.bounds.height+page.tableView.adjustedContentInset.bottom)),animated:false)
       page.tableView.layoutIfNeeded()
       self.capture("downloads-bottom")
-      let last=page.tableView.convert(page.tableView.rectForRow(at:IndexPath(row:1,section:3)),to:window)
+      let last=page.tableView.convert(page.tableView.rectForRow(at:IndexPath(row:page.tableView.numberOfRows(inSection:3)-1,section:3)),to:window)
       self.write("downloads last row bottom=\(last.maxY); mini top=\(miniTop); inset=\(page.tableView.contentInset)")
       precondition(last.maxY<=miniTop-10,"downloads row under mini-player")
-      page.tableView.delegate?.tableView?(page.tableView,didSelectRowAt:IndexPath(row:1,section:2))
+      page.tableView.delegate?.tableView?(page.tableView,didSelectRowAt:IndexPath(row:1,section:3))
       DispatchQueue.main.asyncAfter(deadline:.now()+0.7){
        self.capture("diagnostics")
        guard let details=nav.topViewController as? UITableViewController else {preconditionFailure("missing diagnostics page")}
-       precondition(details.title=="Audio diagnostics" && details.tableView.numberOfRows(inSection:1)==8)
+       precondition(details.title=="Download status" && details.tableView.numberOfSections==2 && details.tableView.numberOfRows(inSection:0)==8 && details.tableView.numberOfRows(inSection:1)==7)
+       precondition(details.tableView.dataSource?.tableView?(details.tableView,titleForHeaderInSection:0)=="Status")
+       precondition(details.tableView.dataSource?.tableView?(details.tableView,titleForHeaderInSection:1)=="Offline checks")
+       let verify=details.tableView.dataSource!.tableView(details.tableView,cellForRowAt:IndexPath(row:5,section:1))
+       precondition(verify.textLabel?.text=="Check current track")
+       let refreshCell=details.tableView.dataSource!.tableView(details.tableView,cellForRowAt:IndexPath(row:6,section:1))
+       precondition((refreshCell.contentConfiguration as? UIListContentConfiguration)?.text=="Refresh quotas and licenses")
        let labels=["Downloaded","Downloading","Waiting","Paused","Errors","Limit reached","Not downloaded","Expired"]
        for row in 0..<8 {
-        let cell=details.tableView.dataSource!.tableView(details.tableView,cellForRowAt:IndexPath(row:row,section:1))
+        let cell=details.tableView.dataSource!.tableView(details.tableView,cellForRowAt:IndexPath(row:row,section:0))
         precondition(cell.textLabel?.text==labels[row] && cell.detailTextLabel?.text != "Unavailable")
        }
-       details.tableView.scrollToRow(at:IndexPath(row:0,section:1),at:.top,animated:false)
+       details.tableView.scrollToRow(at:IndexPath(row:0,section:0),at:.top,animated:false)
        details.tableView.layoutIfNeeded();self.capture("diagnostics-status")
        func inspectManager(_ remaining:Int) {
         nav.popToViewController(page,animated:false)
-        page.tableView.delegate?.tableView?(page.tableView,didSelectRowAt:IndexPath(row:2,section:1))
+        page.tableView.delegate?.tableView?(page.tableView,didSelectRowAt:IndexPath(row:1,section:1))
         DispatchQueue.main.asyncAfter(deadline:.now()+0.5) {
          guard let devices=nav.topViewController as? UITableViewController else {preconditionFailure("missing device page")}
          devices.loadViewIfNeeded()
@@ -267,7 +278,7 @@ class ChromeHost:UIViewController {
            precondition(enabled.isUserInteractionEnabled,"failed completion left device manager busy")
            if times>1 {DispatchQueue.main.asyncAfter(deadline:.now()+0.2){exerciseEnable(times-1)};return}
            self.write("PASS: repeated enable error completion clears busy state; source mismatch blocks mutations until refresh")
-           self.write("PASS: status counts inside Audio diagnostics; repeated offline manager navigation; active-only device rows preserve order and tokens; full plan and inactive current identity retained; empty active placeholder has no Remove; exact current name marker for enabled/disabled identity; no marker or enable for unknown identity; guarded Remove without full swipe; no enable swipes")
+           self.write("PASS: status counts inside Download status; repeated offline manager navigation; active-only device rows preserve order and tokens; full plan and inactive current identity retained; empty active placeholder has no Remove; exact current name marker for enabled/disabled identity; no marker or enable for unknown identity; guarded Remove without full swipe; no enable swipes")
            self.write("PASS: entry spacing, mini-player clearance, navigation and native pages rendered")
           }
          }
