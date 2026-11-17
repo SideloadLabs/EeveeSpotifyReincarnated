@@ -1,25 +1,22 @@
 // the calls Swift makes (include/EeveeSpeedPitch.h). SpeedPitchEngine.m changes the sound and
 // SpeedPitchClock.x keeps Spotify's progress bar in step with it.
 #import "EeveeSpeedPitch.h"
+#import "../Shared/LogSink.h"
 #import "SpeedPitchPrivate.h"
 
-static void (^sg_logSink)(NSString *);
 static BOOL sg_reachable, sg_clockHooked;
 
 void EeveeSpeedPitchLog(NSString *format, ...) {
     va_list args;
     va_start(args, format);
-    NSString *message = [[NSString alloc] initWithFormat:format arguments:args];
+    EeveeLogSinkWrite(EeveeLogSpeedPitch, format, args);
     va_end(args);
-    void (^sink)(NSString *) = sg_logSink;
-    if (sink) sink(message);
-    else NSLog(@"[EeveeSpotify][SpeedPitch] %@", message);
 }
 
 BOOL EeveeSpeedPitchInstall(BOOL pitchFollowsSpeed, void (^log)(NSString *message)) {
     static dispatch_once_t once;
     dispatch_once(&once, ^{
-        sg_logSink = [log copy];
+        EeveeLogSinkSet(EeveeLogSpeedPitch, log);
         BOOL canSpeed = NO;
         sg_reachable = SpeedPitchEngineInstall(pitchFollowsSpeed, &canSpeed);
         sg_clockHooked = SpeedPitchClockInstall();
@@ -42,8 +39,9 @@ double EeveeSpeedPitchSpeed(void) {
 }
 
 void EeveeSpeedPitchSetSpeed(double speed) {
-    if (!EeveeSpeedPitchSpeedAvailable()) return;
     float next = (float)fmax(0.25, fmin(speed, 4));
+    // a speed set before the engine lost Spotify's output waits for it to come back; 1x can always be put back.
+    if (!EeveeSpeedPitchSpeedAvailable() && next != 1) return;
     SpeedPitchClockSpeedWillChange(SpeedPitchEngineSpeed(), next);
     SpeedPitchEngineSetSpeed(next);
 }

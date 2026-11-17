@@ -25,7 +25,10 @@ static SteadyNow sg_realNow;
 static atomic_uint sg_seq;
 static _Atomic int64_t sg_base, sg_warpedBase;
 static _Atomic float sg_rate = 1;
-static atomic_bool sg_bucketSeen;
+
+// the bucket's two reads, as bits of which have been seen.
+enum { kElapsedRead = 1, kLastRead = 2, kBothReads = kElapsedRead | kLastRead };
+static atomic_uint sg_readsSeen;
 
 static int64_t warped(int64_t now) {
     for (;;) {
@@ -39,10 +42,11 @@ static int64_t warped(int64_t now) {
     }
 }
 
-// the bucket's two reads, told by the code they return to (both reach the clock through tail calls):
+// which of the bucket's two reads this is, told by the code it returns to (both reach the clock through tail
+// calls), 0 for neither:
 // - elapsed time: ldp of the tokens and the last read from [bucket + 0x30], then a divide by 1,000,000
 // - the last read: str x0 to [bucket + 0x38], after add x0, bucket, #0x10 (its clock) and the bl
-static BOOL fromBucket(void *returnAddress) {
+static unsigned bucketRead(void *returnAddress) {
 #if __has_feature(ptrauth_calls)
     returnAddress = ptrauth_strip(returnAddress, ptrauth_key_return_address);
 #endif
@@ -51,23 +55,29 @@ static BOOL fromBucket(void *returnAddress) {
     if ((next & 0xFFC00000) == 0xA9400000 && ((next >> 15) & 0x7F) == 0x30 / 8) {
         // mov wN, #0x4240 then movk wN, #0xf, lsl #16
         for (int i = 1; i < 5; i++) {
-            if ((ret[i] & 0x7FFFFFE0) == 0x52884800 && (ret[i + 1] & 0x7FFFFFE0) == 0x72A001E0) return YES;
+            if ((ret[i] & 0x7FFFFFE0) == 0x52884800 && (ret[i + 1] & 0x7FFFFFE0) == 0x72A001E0) return kElapsedRead;
         }
-        return NO;
+        return 0;
     }
     if ((next & 0xFFFFFC1F) == 0xF9000000 + ((0x38 / 8) << 10)) {
         uint32_t add = ret[-2];
-        return (add & 0xFFFFFC1F) == 0x91000000 + (0x10 << 10) && ((add >> 5) & 31) == ((next >> 5) & 31);
+        BOOL fromClock = (add & 0xFFFFFC1F) == 0x91000000 + (0x10 << 10) && ((add >> 5) & 31) == ((next >> 5) & 31);
+        return fromClock ? kLastRead : 0;
     }
-    return NO;
+    return 0;
 }
 
-// any thread, the render threads included: no locks, no allocation, no log.
+// any thread, the render threads included: no locks, no allocation, no log. the bucket's reads are warped only
+// once both have been seen: with one warped and the other not, a Spotify build that changed one of them would
+// have the bucket subtract times from two timelines. the warped one is never behind the real one, so the first
+// read that goes over only refills the bucket early.
 static int64_t now(void *returnAddress) {
     int64_t real = sg_realNow();
-    if (!fromBucket(returnAddress)) return real;
-    if (!atomic_load_explicit(&sg_bucketSeen, memory_order_relaxed)) atomic_store_explicit(&sg_bucketSeen, true, memory_order_relaxed);
-    return warped(real);
+    unsigned read = bucketRead(returnAddress);
+    if (!read) return real;
+    unsigned seen = atomic_load_explicit(&sg_readsSeen, memory_order_relaxed);
+    if (!(seen & read)) seen = atomic_fetch_or_explicit(&sg_readsSeen, read, memory_order_relaxed) | read;
+    return seen == kBothReads ? warped(real) : real;
 }
 
 static int64_t reboundNow(void) {
@@ -110,5 +120,8 @@ void SpeedPitchMixerLimitSetSpeed(float speed) {
     atomic_store_explicit(&sg_warpedBase, at, memory_order_relaxed);
     atomic_store_explicit(&sg_rate, rate, memory_order_relaxed);
     atomic_fetch_add_explicit(&sg_seq, 1, memory_order_release);
-    SPLog(@"mixer limit: follows %.2fx (Spotify's mixer %@)", rate, atomic_load(&sg_bucketSeen) ? @"seen" : @"not seen yet");
+    unsigned seen = atomic_load(&sg_readsSeen);
+    SPLog(@"mixer limit: follows %.2fx (Spotify's mixer %@)", rate,
+          seen == kBothReads ? @"seen" : seen == kElapsedRead ? @"only its elapsed-time read seen, so it stays at 1.2x"
+          : seen == kLastRead ? @"only its last-read store seen, so it stays at 1.2x" : @"not seen yet");
 }

@@ -1,6 +1,7 @@
 // what Swift calls (include/EeveeEqualizer.h). the sliders and the correction are kept here and designed again
 // for the music's output rate whenever any of them changes, then handed to the render thread (Equalizer.m).
 #import "EeveeEqualizer.h"
+#import "../Shared/LogSink.h"
 #import "Equalizer.h"
 
 _Static_assert(EeveeEqualizerBandCount == kEqualizerBands && EeveeEqualizerMaxCorrection == kEqualizerMaxCorrection, "one size");
@@ -15,20 +16,15 @@ static int sg_correctionCount;
 static double sg_rate;          // 0 until the music's output starts
 static double sg_peak;          // dB, the highest point of the design handed over last
 
-static void (^sg_logSink)(NSString *);
-
 void EeveeEqualizerSetLog(void (^log)(NSString *message)) {
-    sg_logSink = [log copy];
+    EeveeLogSinkSet(EeveeLogEqualizer, log);
 }
 
 void EeveeEqualizerLog(NSString *format, ...) {
     va_list args;
     va_start(args, format);
-    NSString *message = [[NSString alloc] initWithFormat:format arguments:args];
+    EeveeLogSinkWrite(EeveeLogEqualizer, format, args);
     va_end(args);
-    void (^sink)(NSString *) = sg_logSink;
-    if (sink) sink(message);
-    else NSLog(@"[EeveeSpotify][Equalizer] %@", message);
 }
 
 #define EQLog EeveeEqualizerLog

@@ -26,6 +26,7 @@ not brought over. The equalizer was redone in `../Equalizer` and runs in this en
 | `TimePitch.h/.m` | Apple's time-pitch unit and Varispeed, wrapped for the render thread |
 | `Rebind.h/.m` | Rebinding Spotify's imports of C functions, with a jailbreak fallback |
 | `SpeedPitchPrivate.h` | What the files above share |
+| `../Shared/LogSink.h/.m` | Where the log lines go, shared with the equalizer |
 
 Swift side, in `Sources/EeveeSpotify/Player/`:
 
@@ -74,8 +75,15 @@ On a jailbreak where Spotify's import page can't be written, the functions are h
 Between its player's reports, Spotify extrapolates the position: `-[SPTPlayerState position]` is the last
 reported position plus the time since, times `-playbackSpeed`. So `playbackSpeed` is scaled by our speed,
 and once the speed leaves 1x, `position` answers from our own clock: Spotify's position at that moment plus
-the song the engine has handed over since. A seek, skip, stop, new track or stall hands the clock back to
-Spotify's, and the next report starts ours again.
+the song the engine has handed over since, times Spotify's own speed (1 for music; a podcast's, see below).
+A seek, skip, stop, new track or stall hands the clock back to Spotify's, and the next report starts ours
+again. After a return to 1x ours keeps counting, since Spotify's is still behind, until one of those.
+
+Neither applies while the music isn't going through the engine: over Spotify Connect on another device, or
+through Spotify's own connection when the engine lost it (a rebuilt chain, a refused format). That's told by
+Spotify's player saying it plays while nothing has come through the engine for 3 s. Spotify's clock is the
+right one then, and ours starts again from it when the music is back. A speed set before stays set, and the
+menu shows it, so a tap can put it back to 1x while speed is unavailable.
 
 ### Threading
 
@@ -98,8 +106,10 @@ The bucket reads time through a `std::function` holding the address of Spotify's
 `steady_clock::now()`, which the core copies when it starts. `MixerLimit.m` rebinds that import at launch,
 before the core starts, so the copy holds ours. Our `now()` gives the real time to every caller except the
 bucket's two reads, told by the code they return to: a load from `[bucket + 0x30]` followed by a divide by
-1,000,000, and a store to `[bucket + 0x38]` right after `add x0, bucket, #0x10`. Those two get a timeline that
-runs max(1, speed) times as fast, so the bucket refills at 1.2× the chosen speed. The timeline never jumps
+1,000,000, and a store to `[bucket + 0x38]` right after `add x0, bucket, #0x10`. Once both have been seen,
+those two get a timeline that runs max(1, speed) times as fast, so the bucket refills at 1.2× the chosen speed.
+With only one recognised (a Spotify build that changed the other), neither is warped, so the bucket never
+subtracts times from two timelines. The timeline never jumps
 or runs behind the real clock, and the bucket keeps it after a return to 1×, so its stored time stays
 consistent. A new bucket after a seek starts full.
 
@@ -107,7 +117,8 @@ Measured on Spotify 9.2.0 (XR), 60 s of continuous play: 1.5× played at 1.499×
 1.31–1.34× before. 1× and 0.75× right after 2× played at 0.996× and 0.747×.
 
 Spotify also has its own song speed, codenamed zephyr. The core allows it only for tracks whose server-sent
-content type is talk, so it isn't used here.
+content type is talk, so it isn't used here. It still matters for podcasts: the core applies it before the
+mixer, so each second through the engine holds that many seconds of the episode, and the clock counts with it.
 
 ## When Spotify updates
 
@@ -123,12 +134,13 @@ Everything Spotify-specific is checked at launch; a missing piece is logged and 
   row is left out (`menu skipped` in the log).
 - Spotify's binary importing `AudioUnitSetProperty` (without it only pitch works, in place), and
   `AudioOutputUnitStart`, `AudioOutputUnitStop` and `AudioComponentInstanceDispose`, which track outputs
-  starting, stopping and going away.
+  starting, stopping and going away. Start is only rebound along with Stop; short of either, the
+  jailbreak's hooks take all three where there are any.
 - Spotify's binary importing `std::__1::chrono::steady_clock::now()`, and its mixer's token bucket keeping the
-  shape `fromBucket()` in `MixerLimit.m` looks for. If the log says `Spotify's mixer not seen yet` after
-  playing above 1×, the bucket's code changed: find the function that divides by 1,000,000 between two
-  clock reads (it is also used for download limits) and update the patterns. Speed still works; it only
-  pauses above 1.2× again.
+  shape `bucketRead()` in `MixerLimit.m` looks for. If the log says `Spotify's mixer not seen yet`, or `only
+  its … seen`, after playing above 1×, the bucket's code changed: find the function that divides by 1,000,000
+  between two clock reads (it is also used for download limits) and update the patterns. Speed still works;
+  it only pauses above 1.2× again.
 
 The Objective-C names were confirmed on Spotify 9.1.78, 9.1.88 and 9.1.90 (in Vitrine). When the log says
 `-[SPTEsperantoPlayer …] is missing` after an update, find the new name (a class dump of the new build) and
@@ -154,3 +166,7 @@ Then check, at 1.5× and 0.75×, with *Pitch follows speed* both on and off:
 - typed values past the sliders (4× and 0.25×) and between their steps (1.13×, -0.32 st)
 - pitch alone at 1× (±12) sounds right and comes back clean at 0
 - a local file at another sample rate, AirPods/Bluetooth, and a call or Siri interruption
+- a podcast at Spotify's own 1.5× with ours at 1.2×: the bar and SponsorBlock follow the episode (1.8×)
+- moving playback to another device over Connect and back: the bar follows that device at its speed, and
+  `Spotify plays, but nothing has come through the engine` is logged once
+- back at 1× after another speed, a stall or a seek hands the clock back without the bar jumping ahead

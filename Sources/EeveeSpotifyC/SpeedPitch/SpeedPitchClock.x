@@ -4,13 +4,15 @@
 // between its player's reports Spotify counts the position itself: -[SPTPlayerState position] is the
 // reported position plus the time since, times -playbackSpeed, so playbackSpeed is scaled by our speed.
 // once the speed leaves 1x, -position answers from our own clock instead: Spotify's position at that
-// moment plus the song the engine has handed over since. a seek, skip, stop, new track or stall hands the
-// clock back to Spotify's, and the next report away from 1x starts ours again.
+// moment plus the song the engine has handed over since, times Spotify's own speed (a podcast's). a seek,
+// skip, stop, new track or stall hands the clock back to Spotify's, and the next report away from 1x starts
+// ours again. while the music plays elsewhere (Connect) or not through the engine, neither applies.
 %config(generator=internal);
 
 #import <objc/message.h>
 #import <objc/runtime.h>
 #import <os/lock.h>
+#import <stdatomic.h>
 #import "SpeedPitchPrivate.h"
 
 // only what this file reads; the names are Spotify's.
@@ -34,12 +36,23 @@ static SPTPlayerState *sg_playerState;
 static _Thread_local double sg_spotifyPosition;
 
 // our clock: `on` while it counts, from `position` seconds into the song when SpeedPitchEnginePlayedSeconds()
-// was `played`. `armed` starts it at the first report stamped at or after `notBefore`.
+// was `played`, each second since holding `rate` of the song (Spotify's own speed: 1, or a podcast's).
+// `armed` starts it at the first report stamped at or after `notBefore`; `away` when it was handed back
+// because the music played elsewhere, which starts it again as soon as the music is back.
 static struct {
-    BOOL on, armed;
+    BOOL on, armed, away;
     CFAbsoluteTime notBefore;
-    double position, played;
+    double position, played, rate;
 } sg_clock;
+
+// Spotify's player saying it plays this long with no song through the engine means the music is elsewhere:
+// on another device over Connect, or through Spotify's own connection (the pitch-only fallback, at 1x).
+static const double kAwayAfter = 3;
+// since when Spotify's player has said it plays (not paused, stopped or buffering), 0 while it doesn't.
+static _Atomic double sg_playingSince;
+
+// -playbackSpeed asked for Spotify's own speed, without ours.
+static _Thread_local BOOL sg_native;
 
 // -position may be asked again from inside itself; only the outer one corrects.
 static _Thread_local BOOL sg_correcting;
@@ -59,6 +72,21 @@ static NSString *trackOf(SPTPlayerState *state) {
     return [state.track.URI description];
 }
 
+// 1 for music, a podcast's chosen speed (Spotify's zephyr), 0 while stalled.
+static double nativeSpeed(SPTPlayerState *state) {
+    sg_native = YES;
+    double speed = state.playbackSpeed;
+    sg_native = NO;
+    return speed;
+}
+
+// whether the music plays here, through the engine, so at our speed. paused or buffering there's nothing to
+// tell by, and right after it starts the output gets kAwayAfter to begin.
+static BOOL playsHere(void) {
+    double since = atomic_load_explicit(&sg_playingSince, memory_order_relaxed);
+    return since <= 0 || CFAbsoluteTimeGetCurrent() - since < kAwayAfter || SpeedPitchEngineSecondsSincePlayed() < kAwayAfter;
+}
+
 // away from 1x, Spotify's next report from now restarts our clock.
 static void rearmClock(void) {
     os_unfair_lock_lock(&sg_clockLock);
@@ -74,16 +102,26 @@ static void handBack(void) {
 
 // each report Spotify's player makes. away from 1x its core sometimes can't keep up and stalls: the mixer
 // hands over zeros and the core reports speed 0 where it stopped, then resumes from there. our clock counted
-// the zeros and is ahead by then, so a stall hands the clock back to Spotify's.
+// the zeros and is ahead by then, so a stall hands the clock back to Spotify's. after a return to 1x our clock
+// keeps counting (Spotify's is still behind) until a seek, skip or stall, so a stall still hands it back then.
 static void noteState(id state) {
     if (![state isKindOfClass:objc_getClass("SPTPlayerState")]) return;
     dispatch_block_t note = ^{
         SPTPlayerState *playerState = state;
         sg_playerState = playerState;
-        if (SpeedPitchEngineSpeed() == 1 || !playerState.isPlaying || playerState.isPaused) return;
         SEL isBuffering = NSSelectorFromString(@"isBuffering");
         BOOL buffering = [playerState respondsToSelector:isBuffering] && [[playerState valueForKey:@"isBuffering"] boolValue];
-        if (buffering || playerState.playbackSpeed == 0) rearmClock();
+        BOOL stalled = buffering || nativeSpeed(playerState) == 0;
+        BOOL playing = playerState.isPlaying && !playerState.isPaused;
+        if (!playing || stalled) {
+            atomic_store_explicit(&sg_playingSince, 0, memory_order_relaxed);
+        } else if (atomic_load_explicit(&sg_playingSince, memory_order_relaxed) <= 0) {
+            atomic_store_explicit(&sg_playingSince, CFAbsoluteTimeGetCurrent(), memory_order_relaxed);
+        }
+        os_unfair_lock_lock(&sg_clockLock);
+        BOOL counting = sg_clock.on;
+        os_unfair_lock_unlock(&sg_clockLock);
+        if (playing && stalled && (counting || SpeedPitchEngineSpeed() != 1)) rearmClock();
     };
     if (NSThread.isMainThread) note();
     else dispatch_async(dispatch_get_main_queue(), note);
@@ -109,8 +147,9 @@ static EeveeSpeedPitchObserver *sg_observer;
 %hook SPTPlayerState
 - (double)playbackSpeed {
     double speed = %orig;
+    if (sg_native) return speed;
     float ours = SpeedPitchEngineSpeed();
-    return ours > 0 && ours != 1 ? speed * ours : speed;
+    return ours > 0 && ours != 1 && playsHere() ? speed * ours : speed;
 }
 
 - (double)position {
@@ -123,8 +162,10 @@ static EeveeSpeedPitchObserver *sg_observer;
     BOOL counting = sg_clock.on || sg_clock.armed;
     NSString *track = counting ? trackOf(self) : nil;
     double played = SpeedPitchEnginePlayedSeconds();
-    CFAbsoluteTime stamp = self.timestamp.timeIntervalSinceReferenceDate;
-    double speed = self.isPaused ? 0 : self.playbackSpeed, asOf = position - (CFAbsoluteTimeGetCurrent() - stamp) * speed;
+    double native = counting ? nativeSpeed(self) : 1;
+    BOOL here = playsHere();
+    CFAbsoluteTime now = CFAbsoluteTimeGetCurrent(), stamp = self.timestamp.timeIntervalSinceReferenceDate;
+    double speed = self.isPaused ? 0 : self.playbackSpeed, asOf = position - (now - stamp) * speed;
     os_unfair_lock_lock(&sg_clockLock);
     BOOL seeked = NO;
     if (stamp > sg_lastReport.stamp) {
@@ -135,14 +176,32 @@ static EeveeSpeedPitchObserver *sg_observer;
     if (seekedAway || (sg_clock.on && track && ![track isEqualToString:sg_clockTrack])) {
         sg_clock = (typeof(sg_clock)){.armed = SpeedPitchEngineSpeed() != 1};
     }
-    if (!sg_clock.on && sg_clock.armed && track && stamp >= sg_clock.notBefore) {
-        sg_clock = (typeof(sg_clock)){.on = YES, .position = position, .played = played};
+    // elsewhere Spotify's clock is the right one: it counts at the remote device's speed, or the 1x of Spotify's
+    // own connection.
+    BOOL wentAway = sg_clock.on && !here;
+    if (wentAway) sg_clock = (typeof(sg_clock)){.armed = SpeedPitchEngineSpeed() != 1, .away = YES};
+    // back only once song comes through again: paused on the other device there's nothing to tell by.
+    BOOL back = !sg_clock.away || SpeedPitchEngineSecondsSincePlayed() < 1;
+    if (!sg_clock.on && sg_clock.armed && here && back && track && stamp >= sg_clock.notBefore) {
+        // back from elsewhere, from where Spotify's clock had it then, at its own speed (as it showed).
+        double from = !sg_clock.away ? position : asOf + (self.isPaused ? 0 : (now - stamp) * native);
+        sg_clock = (typeof(sg_clock)){.on = YES, .position = from, .played = played, .rate = native > 0 ? native : 1};
         sg_clockTrack = track;
     }
-    // while paused too: Spotify's paused report is just as far behind.
-    if (sg_clock.on) position = sg_clock.position + (played - sg_clock.played);
+    if (sg_clock.on) {
+        // Spotify's own speed changed (a podcast's) on its newest report: what came through before counts at the old one.
+        if (native > 0 && native != sg_clock.rate && stamp >= sg_lastReport.stamp) {
+            sg_clock.position += (played - sg_clock.played) * sg_clock.rate;
+            sg_clock.played = played;
+            sg_clock.rate = native;
+        }
+        // while paused too: Spotify's paused report is just as far behind.
+        position = sg_clock.position + (played - sg_clock.played) * sg_clock.rate;
+    }
     os_unfair_lock_unlock(&sg_clockLock);
     if (seekedAway) SPLog(@"Spotify moved to %.1f s without a seek here; the clock starts over", asOf);
+    if (wentAway) SPLog(@"Spotify plays, but nothing has come through the engine for %.0f s (Connect, or Spotify's own connection): Spotify's clock until it does",
+                        kAwayAfter);
     return position;
 }
 %end
@@ -250,12 +309,12 @@ void SpeedPitchClockSpeedWillChange(float from, float to) {
     SPTPlayerState *state = sg_playerState;
     sg_spotifyPosition = -1;
     [state position];
-    double position = sg_spotifyPosition;
+    double position = sg_spotifyPosition, native = state ? nativeSpeed(state) : 1;
     NSString *track = state ? trackOf(state) : nil;
     os_unfair_lock_lock(&sg_clockLock);
     if (!sg_clock.on && !sg_clock.armed && to != 1) {
         if (track && position >= 0) {
-            sg_clock = (typeof(sg_clock)){.on = YES, .position = position, .played = SpeedPitchEnginePlayedSeconds()};
+            sg_clock = (typeof(sg_clock)){.on = YES, .position = position, .played = SpeedPitchEnginePlayedSeconds(), .rate = native > 0 ? native : 1};
             sg_clockTrack = track;
         } else {
             // no report yet: the next one starts it.

@@ -31,6 +31,7 @@ side and the parametric corrections are new; why is below.
 | `EeveeEqualizer.m` | That API: keeps the sliders and the correction, designs them for the output's rate, logs |
 | `Equalizer.h/.m` | The core, plain C: the design, the hand-over and the render side |
 | `../SpeedPitch/SpeedPitchEngine.m` | Runs it, in `processInPlace()`, from the render notify on the music's output |
+| `../Shared/LogSink.h/.m` | Where the log lines go, shared with speed & pitch |
 
 Swift side, in `Sources/EeveeSpotify/Player/`:
 
@@ -40,7 +41,7 @@ Swift side, in `Sources/EeveeSpotify/Player/`:
 | `AutoEq.swift` | AutoEq's index (parsed, searched, cached) and its parametric files |
 | `EqualizerSettingsView.swift` | The page and its curve |
 | `EqualizerHeadphonesView.swift` | The headphone search |
-| `ValuePrompt.swift` | The boxes to type a value or a name, shared with speed & pitch |
+| `ValuePrompt.swift` | The boxes to type a value or a name, and the rounding to hundredths, shared with speed & pitch |
 
 ## The design
 

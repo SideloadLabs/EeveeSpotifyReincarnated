@@ -27,13 +27,13 @@ enum SpeedPitch {
     static var pitchAvailable: Bool { installed && EeveeSpeedPitchPitchAvailable() }
 
     static var speed: Double {
-        get { installed ? hundredths(EeveeSpeedPitchSpeed()) : 1 }
-        set { if installed { EeveeSpeedPitchSetSpeed(hundredths(newValue)) } }
+        get { installed ? ValuePrompt.hundredths(EeveeSpeedPitchSpeed()) : 1 }
+        set { if installed { EeveeSpeedPitchSetSpeed(ValuePrompt.hundredths(newValue)) } }
     }
 
     static var semitones: Double {
-        get { installed ? hundredths(Double(EeveeSpeedPitchSemitones())) : 0 }
-        set { if installed { EeveeSpeedPitchSetSemitones(Float(hundredths(newValue))) } }
+        get { installed ? ValuePrompt.hundredths(Double(EeveeSpeedPitchSemitones())) : 0 }
+        set { if installed { EeveeSpeedPitchSetSemitones(Float(ValuePrompt.hundredths(newValue))) } }
     }
 
     // stored with the options; this only hands it to the engine.
@@ -44,12 +44,7 @@ enum SpeedPitch {
 
     // to the slider's step, exactly 1 at normal so the engine can take itself out.
     static func snapped(_ value: Double) -> Double {
-        hundredths((value / speedStep).rounded() * speedStep)
-    }
-
-    // both values are kept to hundredths, so what the engine holds compares equal to what was shown.
-    static func hundredths(_ value: Double) -> Double {
-        (value * 100).rounded() / 100
+        ValuePrompt.hundredths((value / speedStep).rounded() * speedStep)
     }
 
     static func activate() {

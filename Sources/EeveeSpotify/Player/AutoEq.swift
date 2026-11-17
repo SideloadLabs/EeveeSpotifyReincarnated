@@ -114,14 +114,16 @@ enum AutoEq {
         }
     }
 
+    // ASCII letters, digits and these: CharacterSet.alphanumerics holds every script's, and before iOS 17
+    // URL(string:) refuses those raw (23 of the index's folders have one, an accent or a zero-width space).
+    private static let unescaped = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~/")
+
     // the folder decoded and encoded again: the index leaves some characters raw ("&", parentheses) that are
     // safer escaped.
     static func parametricURL(_ path: String) -> URL? {
         let folder = path.removingPercentEncoding ?? path
         let file = "\(folder)/\((folder as NSString).lastPathComponent) ParametricEQ.txt"
-        var allowed = CharacterSet.alphanumerics
-        allowed.insert(charactersIn: "-._~/")
-        return file.addingPercentEncoding(withAllowedCharacters: allowed).flatMap { URL(string: results + $0) }
+        return file.addingPercentEncoding(withAllowedCharacters: unescaped).flatMap { URL(string: results + $0) }
     }
 
     // a parametric file's filters, nil when a filter that's on is of a kind this doesn't know, or there are none.

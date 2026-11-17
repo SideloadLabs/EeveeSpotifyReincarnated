@@ -34,7 +34,7 @@ struct EqualizerSettingsView: View {
 
     private func set(_ band: Int, _ value: Double) {
         var next = gains
-        next[band] = (value * 100).rounded() / 100
+        next[band] = ValuePrompt.hundredths(value)
         options.gains = next
     }
 

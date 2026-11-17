@@ -69,6 +69,11 @@ enum ValuePrompt {
         guard let text else { return nil }
         let digits = text.replacingOccurrences(of: ",", with: ".").replacingOccurrences(of: "\u{2212}", with: "-")
             .filter { "0123456789.+-".contains($0) }
-        return Double(digits).map { ($0 * 100).rounded() / 100 }
+        return Double(digits).map(hundredths)
+    }
+
+    // values typed, slid and held are all kept to hundredths, so they compare equal to what was shown.
+    static func hundredths(_ value: Double) -> Double {
+        (value * 100).rounded() / 100
     }
 }

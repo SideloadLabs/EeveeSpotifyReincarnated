@@ -13,7 +13,7 @@ BOOL EeveeSpeedPitchInstall(BOOL pitchFollowsSpeed, void (^log)(NSString *messag
 BOOL EeveeSpeedPitchSpeedAvailable(void);
 BOOL EeveeSpeedPitchPitchAvailable(void);
 
-// 1 is normal (0.25...4). ignored while speed is unavailable.
+// 1 is normal (0.25...4). while speed is unavailable only 1 is taken, and a speed set before waits for it.
 double EeveeSpeedPitchSpeed(void);
 void EeveeSpeedPitchSetSpeed(double speed);
 

@@ -14,8 +14,11 @@ BOOL SpeedPitchEngineInstall(BOOL follows, BOOL *canSpeed);
 BOOL SpeedPitchEngineTapped(void);
 // any thread.
 float SpeedPitchEngineSpeed(void);
-// song seconds the music's mixer has handed over, any thread.
+// seconds the music's mixer has handed over with sound, any thread. for a podcast at Spotify's own speed each
+// holds that many seconds of the episode.
 double SpeedPitchEnginePlayedSeconds(void);
+// seconds since the music's mixer last handed any over through the engine, INFINITY before; any thread.
+double SpeedPitchEngineSecondsSincePlayed(void);
 // drops the sound the unit holds, so playback after a seek or skip starts clean. on whatever thread
 // Spotify's player calls its hooks.
 void SpeedPitchEngineResetUnit(void);

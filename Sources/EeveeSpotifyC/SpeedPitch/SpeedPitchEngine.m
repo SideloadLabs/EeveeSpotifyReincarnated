@@ -80,8 +80,9 @@ static Output *music(void) {
     return atomic_load(&sg_music);
 }
 
-// microseconds of song the music's mixer has handed over with sound; SpeedPitchClock.x counts with it.
-static _Atomic uint64_t sg_playedMicros;
+// microseconds of song the music's mixer has handed over with sound, and the host time it last did;
+// SpeedPitchClock.x counts with the one and tells from the other whether the music plays here.
+static _Atomic uint64_t sg_playedMicros, sg_playedAt;
 
 // whether the music's output is fed through feed().
 static BOOL tapped(void) {
@@ -155,6 +156,7 @@ static OSStatus pullSource(Output *output, AudioUnit source, const AudioTimeStam
         } else if (output == music()) {
             double rate = rateOf(&output->client);
             if (rate > 0) atomic_fetch_add_explicit(&sg_playedMicros, (uint64_t)(count * 1e6 / rate), memory_order_relaxed);
+            atomic_store_explicit(&sg_playedAt, mach_absolute_time(), memory_order_relaxed);
         }
         done += count;
     }
@@ -821,23 +823,40 @@ static BOOL hookInline(void) {
     return YES;
 }
 
+// start only with its stop, as hookInline() has it: stop goes first, and start is only rebound once stop is. a
+// missing dispose only leaves a disposed output unseen, and is logged. NO, with the slots as they were, when
+// start or stop can't be rebound.
+static BOOL rebindOutputCalls(void) {
+    if (!EeveeRebindImport("AudioOutputUnitStop", stopOutput, (void **)&sg_stopOutput) || !sg_stopOutput) {
+        sg_stopOutput = NULL;
+        return NO;
+    }
+    BOOL dispose = EeveeRebindImport("AudioComponentInstanceDispose", disposeUnit, (void **)&sg_dispose) && sg_dispose;
+    if (EeveeRebindImport("AudioOutputUnitStart", startOutput, (void **)&sg_startOutput) && sg_startOutput) {
+        if (!dispose) {
+            sg_dispose = AudioComponentInstanceDispose;
+            SPLog(@"audio: Spotify does not import AudioComponentInstanceDispose, a disposed output is not seen");
+        }
+        return YES;
+    }
+    EeveeRebindImport("AudioOutputUnitStop", (void *)sg_stopOutput, NULL);
+    if (dispose) EeveeRebindImport("AudioComponentInstanceDispose", (void *)sg_dispose, NULL);
+    sg_startOutput = NULL;
+    sg_stopOutput = NULL;
+    sg_dispose = NULL;
+    return NO;
+}
+
 static void rebind(void) {
     mach_timebase_info_data_t timebase;
     mach_timebase_info(&timebase);
     sg_secondsPerTick = (double)timebase.numer / timebase.denom / 1e9;
     sg_outputsQueue = dispatch_queue_create("EeveeSpotify.speedpitch.outputs", dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL, QOS_CLASS_USER_INITIATED, 0));
     if (!EeveeRebindImport("AudioUnitSetProperty", setProperty, (void **)&sg_setProperty) || !sg_setProperty) sg_setProperty = NULL;
-    sg_reachable = EeveeRebindImport("AudioOutputUnitStart", startOutput, (void **)&sg_startOutput) && sg_startOutput;
+    sg_reachable = rebindOutputCalls();
     if (!sg_reachable) {
-        sg_startOutput = NULL;
         sg_reachable = hookInline();
-        if (!sg_reachable) SPLog(@"audio: Spotify's AudioOutputUnitStart could be neither rebound nor hooked, its output cannot be reached");
-    } else {
-        if (!EeveeRebindImport("AudioOutputUnitStop", stopOutput, (void **)&sg_stopOutput) || !sg_stopOutput) sg_stopOutput = AudioOutputUnitStop;
-        if (!EeveeRebindImport("AudioComponentInstanceDispose", disposeUnit, (void **)&sg_dispose) || !sg_dispose) {
-            sg_dispose = AudioComponentInstanceDispose;
-            SPLog(@"audio: Spotify does not import AudioComponentInstanceDispose, a disposed output is not seen");
-        }
+        if (!sg_reachable) SPLog(@"audio: Spotify's AudioOutputUnitStart and Stop could be neither rebound nor hooked, its output cannot be reached");
     }
     if (!sg_setProperty) SPLog(@"Spotify's AudioUnitSetProperty could be neither rebound nor hooked, pitch only");
 }
@@ -863,6 +882,11 @@ float SpeedPitchEngineSpeed(void) {
 
 double SpeedPitchEnginePlayedSeconds(void) {
     return atomic_load_explicit(&sg_playedMicros, memory_order_relaxed) / 1e6;
+}
+
+double SpeedPitchEngineSecondsSincePlayed(void) {
+    uint64_t at = atomic_load_explicit(&sg_playedAt, memory_order_relaxed);
+    return at ? seconds(mach_absolute_time() - at) : INFINITY;
 }
 
 void SpeedPitchEngineResetUnit(void) {

@@ -151,8 +151,10 @@ final class SpeedPitchMenuView: UIView {
         let following = speedAvailable && follows.isOn && shownSpeed != 1
         let pitch = following ? 0 : shownPitch
         let unavailable = "speed_pitch_unavailable".localized
+        // a speed set before the engine lost Spotify's output still shows, so a tap can put it back to 1x.
+        let kept = !speedAvailable && shownSpeed != 1
         UIView.performWithoutAnimation {
-            speedValue.setTitle(speedAvailable ? Self.speedText(shownSpeed) : unavailable, for: .normal)
+            speedValue.setTitle(speedAvailable || kept ? Self.speedText(shownSpeed) : unavailable, for: .normal)
             pitchValue.setTitle(!pitchAvailable ? unavailable : following ? "speed_pitch_follows_value".localized : Self.pitchText(pitch), for: .normal)
             speedValue.layoutIfNeeded()
             pitchValue.layoutIfNeeded()
@@ -161,7 +163,7 @@ final class SpeedPitchMenuView: UIView {
         pitchSlider.isEnabled = pitchFree
         pitchSlider.alpha = pitchFree ? 1 : 0.4
         // on at normal too, for holding.
-        speedValue.isEnabled = speedAvailable
+        speedValue.isEnabled = speedAvailable || kept
         pitchValue.isEnabled = pitchFree
         speedValue.accessibilityHint = shownSpeed != 1 ? "speed_pitch_reset_hint".localized : nil
         pitchValue.accessibilityHint = pitch != 0 ? "speed_pitch_reset_hint".localized : nil
@@ -286,7 +288,8 @@ final class SpeedPitchMenuView: UIView {
     }
 
     @objc private func held(_ press: UILongPressGestureRecognizer) {
-        guard press.state == .began, let value = press.view else { return }
+        // while speed is unavailable only a tap's reset is taken, so there's nothing to type.
+        guard press.state == .began, let value = press.view, value !== speedValue || SpeedPitch.speedAvailable else { return }
         feedback.selectionChanged()
         askValue(for: value)
     }
