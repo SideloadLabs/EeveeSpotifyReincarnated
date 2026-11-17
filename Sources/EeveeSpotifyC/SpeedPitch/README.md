@@ -12,7 +12,7 @@ Based on the speed & pitch feature of [Vitrine](https://github.com/My-Name-Is-Je
 this project) as of commit `f6f519b` (2026-11-15), which took it from spoti.pw by Vojtěch Škopek. Thanks to
 both. It is maintained here on its own from that point. Vitrine's extras that plug into the same engine
 (its karaoke look-ahead, lossless source selection, sleep timer fade, audio effects and Music Haptics) were
-not brought over.
+not brought over. The equalizer was redone in `../Equalizer` and runs in this engine's render notify.
 
 ## Files
 

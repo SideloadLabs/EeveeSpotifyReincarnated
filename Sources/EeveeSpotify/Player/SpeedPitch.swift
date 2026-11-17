@@ -62,7 +62,8 @@ enum SpeedPitch {
     }
 }
 
-// before Spotify sets up its audio, which it does right after launch.
+// before Spotify sets up its audio, which it does right after launch. the equalizer runs on the same engine.
 func activateSpeedPitch() {
     SpeedPitch.activate()
+    Equalizer.activate()
 }

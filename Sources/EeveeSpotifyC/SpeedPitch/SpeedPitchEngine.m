@@ -2,14 +2,17 @@
 // import of AudioUnitSetProperty is rebound, and when Spotify connects a mixer to a RemoteIO unit, feed()
 // pulls the mixer instead: straight through at normal speed and pitch, else through the time-pitch unit.
 //
+// the equalizer (../Equalizer) runs in the same render notify, after the pitch.
+//
 // threading: feed() and rendered() run on each RemoteIO unit's render thread and only touch atomics, their
-// own Output and the units; they never wait. Spotify connects, starts, stops and disposes on its audio
-// thread, and Output records change under sg_outputsLock there and on sg_outputsQueue. a change waits for a
-// render in progress to end.
+// own Output, the units and the equalizer's render side; they never wait. Spotify connects, starts, stops
+// and disposes on its audio thread, and Output records change under sg_outputsLock there and on
+// sg_outputsQueue. a change waits for a render in progress to end.
 #import <AudioToolbox/AudioToolbox.h>
 #import <mach/mach_time.h>
 #import <pthread.h>
 #import <stdatomic.h>
+#import "../Equalizer/Equalizer.h"
 #import "Rebind.h"
 #import "SpeedPitchPrivate.h"
 #import "TimePitch.h"
@@ -215,7 +218,7 @@ static OSStatus feed(void *refCon, AudioUnitRenderActionFlags *flags, const Audi
     return status;
 }
 
-#pragma mark - the render thread: in place, the fallback
+#pragma mark - the render thread: in place
 
 static float sg_scratch[kEeveeTimePitchMaxChannels][kEeveeTimePitchMaxFrames];
 
@@ -228,34 +231,44 @@ static inline float readSample(const void *data, UInt32 index, UInt32 bytes, BOO
     return ((const int16_t *)data)[index] / 32768.0f;
 }
 
+// readSample's scale back, rounded, so a sample nothing changed comes back exact.
 static inline void writeSample(void *data, UInt32 index, float value, UInt32 bytes, BOOL isFloat, UInt32 fraction) {
     if (bytes == 4 && isFloat) {
         ((float *)data)[index] = value;
         return;
     }
-    value = fmaxf(-1, fminf(value, 1));
     if (bytes == 4) {
-        double scale = fraction ? (double)(1u << fraction) : 2147483647.0;
-        ((int32_t *)data)[index] = (int32_t)(value * scale);
+        double scale = fraction ? (double)(1u << fraction) : 2147483648.0;
+        ((int32_t *)data)[index] = (int32_t)llrint(fmax(-2147483648.0, fmin(value * scale, 2147483647.0)));
     } else {
-        ((int16_t *)data)[index] = (int16_t)(value * 32767);
+        ((int16_t *)data)[index] = (int16_t)lrintf(fmaxf(-32768, fminf(value * 32768, 32767)));
     }
 }
 
-static void shiftInPlace(EeveeTimePitch *unit, Format *hardware, AudioUnitRenderActionFlags *flags, UInt32 frames, AudioBufferList *data) {
+// the music's finished buffer, in the hardware's format, through the time-pitch unit when it shifts the pitch
+// here (`unit`, NULL when not) and then the equalizer: the buffers themselves when they are float split, else
+// read into float lanes and written back.
+static void processInPlace(Output *output, EeveeTimePitch *unit, AudioUnitRenderActionFlags *flags, UInt32 frames, AudioBufferList *data) {
+    Format *hardware = &output->hardware;
     UInt32 formatFlags = atomic_load_explicit(&hardware->flags, memory_order_relaxed);
     UInt32 bytes = atomic_load_explicit(&hardware->bytes, memory_order_relaxed);
-    UInt32 channels = EeveeTimePitchChannels(unit);
+    UInt32 channels = atomic_load_explicit(&hardware->channels, memory_order_relaxed);
     BOOL isFloat = (formatFlags & kAudioFormatFlagIsFloat) != 0;
     BOOL split = (formatFlags & kAudioFormatFlagIsNonInterleaved) != 0;
     UInt32 fraction = (formatFlags & kLinearPCMFormatFlagsSampleFractionMask) >> kLinearPCMFormatFlagsSampleFractionShift;
-    if (frames > kEeveeTimePitchMaxFrames || (bytes != 2 && bytes != 4)) return;
+    if (frames > kEeveeTimePitchMaxFrames || (bytes != 2 && bytes != 4) || channels < 1 || channels > kEeveeTimePitchMaxChannels) return;
     if (split ? data->mNumberBuffers != channels : data->mNumberBuffers != 1 || data->mBuffers[0].mNumberChannels != channels) return;
     for (UInt32 b = 0; b < data->mNumberBuffers; b++) {
         if (!data->mBuffers[b].mData || data->mBuffers[b].mDataByteSize < frames * bytes * (split ? 1 : channels)) return;
     }
-    // silence still goes through, so the sound the unit holds plays out rather than coming back later.
+    if (unit && EeveeTimePitchChannels(unit) != channels) unit = NULL;
+    double rate = rateOf(hardware);
+    // silence still goes through the unit, so the sound it holds plays out rather than coming back later.
     BOOL silent = (*flags & kAudioUnitRenderAction_OutputIsSilence) != 0;
+    if (silent && !unit) {
+        EqualizerRun(output, rate, NULL, channels, frames, true);
+        return;
+    }
 
     float *lanes[kEeveeTimePitchMaxChannels];
     BOOL direct = split && isFloat && bytes == 4 && !silent;
@@ -270,7 +283,9 @@ static void shiftInPlace(EeveeTimePitch *unit, Format *hardware, AudioUnitRender
             lanes[c][i] = silent ? 0 : readSample(source, split ? i : i * channels + c, bytes, isFloat, fraction);
         }
     }
-    if (!EeveeTimePitchProcess(unit, lanes, frames) || direct) return;
+    BOOL shifted = unit && EeveeTimePitchProcess(unit, lanes, frames);
+    BOOL equalized = EqualizerRun(output, rate, lanes, channels, frames, silent && !shifted);
+    if ((!shifted && !equalized) || direct) return;
     for (UInt32 c = 0; c < channels; c++) {
         void *target = data->mBuffers[split ? c : 0].mData;
         for (UInt32 i = 0; i < frames; i++) writeSample(target, split ? i : i * channels + c, lanes[c][i], bytes, isFloat, fraction);
@@ -294,19 +309,21 @@ static BOOL hasSound(Format *format, AudioUnitRenderActionFlags flags, const Aud
     return NO;
 }
 
-// on every started output, `refCon` its Output: notes when it has sound, and shifts the pitch on the music's
-// when it is not fed by feed().
+// on every started output, `refCon` its Output: notes when it has sound, and on the music's shifts the pitch
+// when feed() doesn't feed it, and runs the equalizer.
 static OSStatus rendered(void *refCon, AudioUnitRenderActionFlags *flags, const AudioTimeStamp *timestamp, UInt32 bus,
                          UInt32 frames, AudioBufferList *data) {
     if (!(*flags & kAudioUnitRenderAction_PostRender) || bus != 0 || !data || !data->mNumberBuffers || !frames) return noErr;
     Output *output = refCon;
     if (hasSound(&output->hardware, *flags, data)) atomic_store_explicit(&output->loudAt, mach_absolute_time(), memory_order_relaxed);
-    if (output != music() || atomic_load(&output->taken) || !atomic_load(&sg_engaged)) return noErr;
+    if (output != music()) return noErr;
     atomic_store(&output->busy, true);
-    EeveeTimePitch *unit = atomic_load(&sg_inPlace);
-    if (atomic_load(&sg_engaged) && output == music() && unit && EeveeTimePitchSampleRate(unit) == rateOf(&output->hardware)) {
-        shiftInPlace(unit, &output->hardware, flags, frames, data);
+    EeveeTimePitch *unit = NULL;
+    if (!atomic_load(&output->taken) && atomic_load(&sg_engaged)) {
+        unit = atomic_load(&sg_inPlace);
+        if (unit && EeveeTimePitchSampleRate(unit) != rateOf(&output->hardware)) unit = NULL;
     }
+    if (output == music() && (unit || EqualizerWanted())) processInPlace(output, unit, flags, frames, data);
     atomic_store(&output->busy, false);
     return noErr;
 }
@@ -755,9 +772,11 @@ static void apply(void) {
 
 // a speed or pitch chosen before the output started, or kept across a new format or another output, applies
 // now: apply() makes the unit again when the rate or the channels changed, and puts it back in, reset, after
-// a change of output took it out.
+// a change of output took it out. the equalizer is designed again for the output's rate.
 static void applyToFormat(void) {
     dispatch_async(dispatch_get_main_queue(), ^{
+        Output *output = music();
+        if (output) EeveeEqualizerFollowOutput(rateOf(&output->hardware));
         if (sg_speed != 1 || sg_semitones != 0) apply();
     });
 }
