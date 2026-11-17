@@ -22,6 +22,18 @@ class PreferencesCrossfadeHook: ClassHook<NSObject> {
     }
 }
 
+enum EeveeCrossfade {
+    // forced in 9.2's remote configuration (rewriteRemoteConfigurationData), where a Spotify experiment now
+    // turns crossfade off: the settings row, the core's own gate, and both sides reading crossfade from the
+    // local prefs the hook above keeps in step, rather than the server's playback settings.
+    static let replacements = [
+        EeveePropertyReplacement(name: "crossfade_enabled", scope: "ios-feature-settings", modification: .forceBool(true)),
+        EeveePropertyReplacement(name: "crossfade_enabled", scope: "core-playback-setup", modification: .forceBool(true)),
+        EeveePropertyReplacement(name: "use_playback_settings_crossfade", scope: "ios-feature-settings", modification: .forceBool(false)),
+        EeveePropertyReplacement(name: "use_playback_settings_crossfade", scope: "playback-settings", modification: .forceBool(false)),
+    ]
+}
+
 func activateEeveeCrossfadeForce() {
     guard NSClassFromString(PreferencesCrossfadeHook.targetName) != nil else {
         eeveeLog("[EeveeSpotify][Crossfade] Skipped: \(PreferencesCrossfadeHook.targetName) not found")

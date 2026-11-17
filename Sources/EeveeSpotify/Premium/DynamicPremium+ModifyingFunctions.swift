@@ -391,7 +391,53 @@ private let propertyReplacements = [
 ]
 
 private func modifyAssignedValues(_ values: inout [AssignedValue]) {
-    for replacement in propertyReplacements {
+    applyPropertyReplacements(propertyReplacements, to: &values)
+
+    for index in values.indices {
+        let scope = values[index].propertyID.scope.lowercased()
+        let name = values[index].propertyID.name.lowercased()
+        guard case .boolValue(let b) = values[index].structuredValue, b.value else { continue }
+        if isCohortAdOrUpsellFlag(scope: scope, name: name) {
+            values[index].boolValue = BoolValue.with { $0.value = false }
+            writeDebugLog("[ORACLE][COHORT_FLAG_KILLED] \(scope).\(name)")
+        }
+    }
+}
+
+/// Rewrites 9.2's remote configuration (remote-config-resolver/v3/configuration),
+/// a serialized `ResolveResponse`. On 9.2 it replaces the bootstrap and customize
+/// responses modifyRemoteConfiguration rewrites, so none of propertyReplacements
+/// reach it; only the crossfade replacements are applied here so far. Returns nil
+/// when the bytes are not that proto or nothing changed, so the caller leaves the
+/// response untouched.
+func rewriteRemoteConfigurationData(_ data: Data) -> Data? {
+    guard var response = try? ResolveResponse(serializedBytes: data),
+          !response.configuration.assignedValues.isEmpty else { return nil }
+
+    let replacements = EeveeCrossfade.replacements
+    func summary() -> String {
+        replacements.compactMap { replacement in
+            guard let scope = replacement.scope, let name = replacement.name else { return nil }
+            let value = response.configuration.assignedValues.first {
+                $0.propertyID.scope == scope && $0.propertyID.name == name
+            }
+            return "\(scope).\(name)=\(value.map { "\($0.boolValue.value)" } ?? "absent")"
+        }.joined(separator: " ")
+    }
+
+    let before = response.configuration.assignedValues
+    let beforeSummary = summary()
+    applyPropertyReplacements(replacements, to: &response.configuration.assignedValues)
+    guard response.configuration.assignedValues != before else {
+        writeDebugLog("[RemoteConfig] Nothing to change: \(beforeSummary)")
+        return nil
+    }
+    writeDebugLog("[RemoteConfig] Rewrote \(before.count) values; before[\(beforeSummary)] after[\(summary())]")
+    return try? response.serializedData()
+}
+
+private func applyPropertyReplacements(_ replacements: [EeveePropertyReplacement], to values: inout [AssignedValue]) {
+    for replacement in replacements {
         let matchingIndices = values.indices.filter({ index in
             let value = values[index]
             let nameMatches = replacement.name.map { value.propertyID.name == $0 } ?? true
@@ -422,16 +468,6 @@ private func modifyAssignedValues(_ values: inout [AssignedValue]) {
             case .forceBool(let newValue):
                 values[index].boolValue = BoolValue.with { $0.value = newValue }
             }
-        }
-    }
-
-    for index in values.indices {
-        let scope = values[index].propertyID.scope.lowercased()
-        let name = values[index].propertyID.name.lowercased()
-        guard case .boolValue(let b) = values[index].structuredValue, b.value else { continue }
-        if isCohortAdOrUpsellFlag(scope: scope, name: name) {
-            values[index].boolValue = BoolValue.with { $0.value = false }
-            writeDebugLog("[ORACLE][COHORT_FLAG_KILLED] \(scope).\(name)")
         }
     }
 }
