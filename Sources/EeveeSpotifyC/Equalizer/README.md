@@ -9,10 +9,14 @@ through untouched.
   back to 0. The correction, when there is one, is the dashed line.
 - **Bands** have a slider each. Tapping a band's value resets it; holding it opens a box to type one.
 - **Presets**: twelve built in, and your own, saved under a name from the current curve and deleted with a swipe.
-- **Headphones**: search AutoEq's list for yours and its correction is kept for the output playing now, so
-  AirPods and wired headphones each get their own. It plays under the bands while the equalizer is on.
-  AutoEq's list (about 850 KB) is fetched from GitHub when the page is opened and kept for a month; a
-  correction (under 1 KB) when it's picked. Nothing else goes over the network.
+- **Prevent clipping**, on by default, turns the sound down by the curve's highest point; the page says by how
+  much, or with it off, how far the boosts go over.
+- **Headphones**: pick yours from AutoEq's list and its correction is kept for the output playing now, so
+  AirPods and wired headphones each get their own. It plays under the bands while the equalizer is on. The
+  whole list shows, or what matches a search, 100 rows at a time as it scrolls; the page stays open after a
+  pick, to try another. AutoEq's list (about 850 KB) is fetched from GitHub when the page is opened and kept
+  for a month; a correction (under 1 KB) when it's first picked after launch. Nothing else goes over the
+  network.
 
 The bands and presets are those of spoti.pw's equalizer by Vojtěch Škopek, as found in
 [Vitrine](https://github.com/My-Name-Is-Jeff/vitrine) (GPL-3.0, as is this project), and the draggable curve is
@@ -63,7 +67,9 @@ spoti.pw's bands meet the sliders exactly at their centres but sag between them:
 gets +2.9. Here a centre can be off by about 0.3 dB, in return for the whole curve following the sliders.
 
 The sound is turned down by the curve's highest point, so the boosts can't clip and no limiter is needed. The
-page says by how much.
+page says by how much. With **Prevent clipping** off it isn't: the boosts play at full height and a loud song
+can clip, as in most equalizers, for those who'd rather keep the volume. Nothing limits it then; a float output
+clips in the hardware, a 16 or 32-bit integer one where the samples are written back.
 
 ## Headphone corrections
 
@@ -97,7 +103,8 @@ everywhere: the correction belongs to the headphones, the bands to taste.
 
 With debug logging on, everything it does is under `[Equalizer]`:
 
-- `on` / `off`, and `the music's output plays at 48000 Hz` when the output starts or its rate changes.
+- `on` / `off`, `clip prevention on` / `off` (at launch only when off), and `the music's output plays at
+  48000 Hz` when the output starts or its rate changes.
 - `output AirPods Pro, correction Apple AirPods Pro 2`: the output and its correction, at launch and on every
   route change. The output's UID is left out, since for Bluetooth it's the device's address.
 - A report three seconds after anything changes, once per burst of slider moves:
@@ -107,7 +114,8 @@ With debug logging on, everything it does is under `[Equalizer]`:
   since the last report 1873 buffers run, 0 for another rate, 0 refused, 0 passed over, 0 cleared after a fault
   ```
 
-  The render thread can't log, so it counts instead. **Buffers run** should climb while music plays and it's
+  With clip prevention off, `turned down 6.15 dB` reads `clip prevention off, peaks at +6.15 dB`. The render
+  thread can't log, so it counts instead. **Buffers run** should climb while music plays and it's
   on. **For another rate** climbing means the design didn't follow the output to its new rate (see
   `applyToFormat()` in `SpeedPitchEngine.m`). **Refused** means the hardware's format isn't one the in-place path
   reads: more than two channels, or not 16 or 32-bit; the `[SpeedPitch]` lines have the format. **Passed over**
@@ -115,8 +123,9 @@ With debug logging on, everything it does is under `[Equalizer]`:
   moves between outputs. **Cleared after a fault** is filters that went non-finite and were emptied; it should
   stay at 0.
 - `AutoEq list: 8850 headphones from the cache, 3.2 days old` (or `from GitHub`, or `GitHub failed (…, HTTP 403)`),
-  and `AutoEq Sennheiser HD 650 (oratory1990): 10 filters` or `… failed: HTTP 404, no file`. A failed download
-  with HTTP 200 is a file it couldn't read: a new filter kind, or another layout.
+  and `AutoEq Sennheiser HD 650 (oratory1990): 10 filters` (`…, downloaded before` when it's picked again) or
+  `… failed: HTTP 404, no file`. A failed download with HTTP 200 is a file it couldn't read: a new filter kind,
+  or another layout.
 
 ## Testing
 
@@ -129,4 +138,7 @@ Turn on debug logging, restart, play a song, and check the `[Equalizer]` lines a
 - it works along with speed and pitch;
 - a dot on the curve drags, and a double tap resets it, without scrolling the page;
 - a preset saved under a name shows in the preset menu and the list, and a swipe deletes it;
+- with Prevent clipping off, a boosted curve plays louder, and the page says by how much it can go over;
+- the headphones page lists everything without a search, scrolls to the end without stalling, and stays open
+  after a pick;
 - a headphone picked for one output plays only on that output, and comes back when it reconnects.

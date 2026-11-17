@@ -1,18 +1,27 @@
 import SwiftUI
 
-// AutoEq's headphones, searched, for the output playing now. picking one downloads its correction, keeps it for
-// that output and turns the equalizer on; "No correction" takes it off.
+// AutoEq's headphones for the output playing now: all of them, or those matching the search, a chunk at a time
+// as the list scrolls. picking one downloads its correction, keeps it for that output and turns the equalizer
+// on; the page stays open to try another. "No correction" takes it off.
 struct EqualizerHeadphonesView: View {
     let output: Equalizer.Output
 
+    private struct Found {
+        let query: String
+        let headphones: [AutoEq.Headphone]
+    }
+
     @State private var all = [AutoEq.Headphone]()
     @State private var query = ""
+    @State private var found: Found?            // nil while the search is empty: the list is all of them
+    @State private var shown = Self.chunk
     @State private var loading = true
     @State private var failure: String?
     @State private var downloading: String?
     @State private var current: HeadphoneCorrection?
 
-    private static let shown = 200
+    // rows added each time the list is scrolled to its end.
+    private static let chunk = 100
 
     init(output: Equalizer.Output) {
         self.output = output
@@ -23,8 +32,10 @@ struct EqualizerHeadphonesView: View {
         NumberFormatter.localizedString(from: NSNumber(value: number), number: .decimal)
     }
 
+    private var listed: [AutoEq.Headphone] { found?.headphones ?? all }
+
     var body: some View {
-        let matches = AutoEq.search(all, query)
+        let listed = listed
         List {
             Section(header: Text(output.name), footer: Text("autoeq_credit".localized)) {
                 HStack(spacing: 10) {
@@ -52,18 +63,20 @@ struct EqualizerHeadphonesView: View {
                 Section(footer: Text(failure ?? "")) {
                     Button("autoeq_retry".localized) { load(refresh: true) }
                 }
-            } else if query.trimmingCharacters(in: .whitespaces).isEmpty {
-                Section {
-                    Text("autoeq_hint".localizeWithFormat(Self.count(all.count))).foregroundColor(.secondary)
-                }
             } else {
-                Section(footer: more(matches.count)) {
-                    if matches.isEmpty {
+                Section(header: Text((found == nil ? "autoeq_all" : "autoeq_found").localizeWithFormat(Self.count(listed.count)))) {
+                    if listed.isEmpty {
                         Text("autoeq_no_match".localized).foregroundColor(.secondary)
                     }
-                    ForEach(matches.prefix(Self.shown)) { headphone in
+                    ForEach(listed.prefix(shown)) { headphone in
                         Button { pick(headphone) } label: { row(headphone) }
                             .disabled(downloading != nil)
+                    }
+                    if shown < listed.count {
+                        ProgressView()
+                            .frame(maxWidth: .infinity)
+                            .id(shown)
+                            .onAppear { shown = min(listed.count, shown + Self.chunk) }
                     }
                 }
             }
@@ -72,12 +85,7 @@ struct EqualizerHeadphonesView: View {
         }
         .eeveeSettingsStyle()
         .onAppear { if all.isEmpty { load(refresh: false) } }
-    }
-
-    @ViewBuilder private func more(_ count: Int) -> some View {
-        if count > Self.shown {
-            Text("autoeq_more".localizeWithFormat(Self.count(Self.shown), Self.count(count)))
-        }
+        .onChange(of: query, perform: search)
     }
 
     private func row(_ headphone: AutoEq.Headphone) -> some View {
@@ -102,6 +110,27 @@ struct EqualizerHeadphonesView: View {
             all = headphones
             failure = why
             loading = false
+            search(query)
+        }
+    }
+
+    // off the main thread, so typing doesn't wait on 8,000 names; a search a later keystroke replaced is dropped.
+    private func search(_ query: String) {
+        guard !query.trimmingCharacters(in: .whitespaces).isEmpty else {
+            if found != nil {
+                found = nil
+                shown = Self.chunk
+            }
+            return
+        }
+        let all = all
+        DispatchQueue.global(qos: .userInitiated).async {
+            let headphones = AutoEq.search(all, query)
+            DispatchQueue.main.async {
+                guard query == self.query else { return }
+                found = Found(query: query, headphones: headphones)
+                shown = Self.chunk
+            }
         }
     }
 
@@ -120,7 +149,6 @@ struct EqualizerHeadphonesView: View {
                     Equalizer.apply()
                 }
                 current = correction
-                SettingsNavigator.navigationController?.popViewController(animated: true)
             case .failure(let error):
                 let alert = UIAlertController(title: "autoeq_failed".localized, message: error.message, preferredStyle: .alert)
                 alert.addAction(UIAlertAction(title: "OK".uiKitLocalized, style: .default))

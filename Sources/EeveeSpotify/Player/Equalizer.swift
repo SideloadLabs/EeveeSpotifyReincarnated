@@ -8,6 +8,21 @@ import EeveeSpotifyC
 struct EqualizerOptions: Codable, Equatable {
     var enabled = false
     var gains = Equalizer.flat
+    var preventClipping = true
+
+    init() {}
+
+    private enum CodingKeys: String, CodingKey {
+        case enabled, gains, preventClipping
+    }
+
+    // options saved before a field existed keep decoding.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? false
+        gains = try container.decodeIfPresent([Double].self, forKey: .gains) ?? Equalizer.flat
+        preventClipping = try container.decodeIfPresent(Bool.self, forKey: .preventClipping) ?? true
+    }
 }
 
 struct EqualizerUserPreset: Codable, Equatable {
@@ -84,7 +99,7 @@ enum Equalizer {
     }
 
     static func apply(_ options: EqualizerOptions = UserDefaults.equalizerOptions) {
-        EeveeEqualizerSet(options.enabled, normalized(options.gains))
+        EeveeEqualizerSet(options.enabled, normalized(options.gains), options.preventClipping)
     }
 
     // MARK: - your presets
@@ -144,13 +159,13 @@ enum Equalizer {
     struct Curve {
         var bands: [Double]         // from 20 Hz to 20 kHz, log spaced
         var correction: [Double]    // the same points, the current output's correction alone
-        var turnDown: Double        // dB the sound is lowered by so the two together can't clip
+        var peak: Double            // dB, the two together at their highest: what clip prevention turns down
     }
 
     static func curve(_ gains: [Double], points: Int = 128) -> Curve {
         var frequencies = [Double](repeating: 0, count: points), bands = frequencies, correction = frequencies
         let down = EeveeEqualizerCurve(normalized(gains), points, &frequencies, &bands, &correction)
-        return Curve(bands: bands, correction: correction, turnDown: -down)
+        return Curve(bands: bands, correction: correction, peak: max(0, -down))
     }
 
     static func frequencyText(_ frequency: Double) -> String {

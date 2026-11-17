@@ -8,12 +8,12 @@ _Static_assert(EeveeEqualizerBandCount == kEqualizerBands && EeveeEqualizerMaxCo
 // a change settles this long before the report line, so a dragged slider makes one line, not one per step.
 static const double kReportAfter = 3;
 
-static BOOL sg_on, sg_set;
+static BOOL sg_on, sg_set, sg_preventClipping = YES;
 static double sg_gains[kEqualizerBands];
 static EqualizerFilter sg_correction[kEqualizerMaxCorrection];
 static int sg_correctionCount;
 static double sg_rate;          // 0 until the music's output starts
-static double sg_turnDown;      // dB, of the design handed over last
+static double sg_peak;          // dB, the highest point of the design handed over last
 
 static void (^sg_logSink)(NSString *);
 
@@ -42,9 +42,11 @@ static void report(void) {
     NSMutableArray<NSString *> *bands = [NSMutableArray arrayWithCapacity:kEqualizerBands];
     for (int i = 0; i < kEqualizerBands; i++) [bands addObject:[NSString stringWithFormat:@"%+g", sg_gains[i]]];
     NSString *rate = sg_rate > 0 ? [NSString stringWithFormat:@"at %.0f Hz", sg_rate] : @"waiting for Spotify's output";
-    EQLog(@"%@ %@, bands %@, correction %d filters, turned down %.2f dB; since the last report %llu buffers run, %llu for "
+    NSString *level = sg_preventClipping ? [NSString stringWithFormat:@"turned down %.2f dB", sg_peak]
+                                         : [NSString stringWithFormat:@"clip prevention off, peaks at +%.2f dB", sg_peak];
+    EQLog(@"%@ %@, bands %@, correction %d filters, %@; since the last report %llu buffers run, %llu for "
           @"another rate, %llu refused, %llu passed over, %llu cleared after a fault",
-          sg_on ? @"on" : @"off", rate, [bands componentsJoinedByString:@" "], sg_correctionCount, sg_turnDown,
+          sg_on ? @"on" : @"off", rate, [bands componentsJoinedByString:@" "], sg_correctionCount, level,
           now.run - last.run, now.otherRate - last.otherRate, now.refused - last.refused, now.passedOver - last.passedOver,
           now.cleared - last.cleared);
     last = now;
@@ -64,23 +66,28 @@ static void publish(void) {
     static const double flat[kEqualizerBands];
     EqualizerDesign design;
     EqualizerDesignFor(sg_rate, sg_on ? sg_gains : flat, sg_correction, sg_on ? sg_correctionCount : 0, &design);
+    sg_peak = design.gain < 1 ? -20 * log10(design.gain) : 0;
+    if (!sg_preventClipping) design.gain = 1;
     EqualizerPublish(&design);
-    sg_turnDown = -20 * log10(design.gain);
 }
 
 double EeveeEqualizerFrequency(NSInteger band) {
     return band >= 0 && band < kEqualizerBands ? kEqualizerFrequencies[band] : 0;
 }
 
-void EeveeEqualizerSet(BOOL on, const double *gains) {
+void EeveeEqualizerSet(BOOL on, const double *gains, BOOL preventClipping) {
     double next[kEqualizerBands];
     for (int i = 0; i < kEqualizerBands; i++) {
         next[i] = isfinite(gains[i]) ? fmax(-kEqualizerGainLimit, fmin(kEqualizerGainLimit, gains[i])) : 0;
     }
-    if (sg_set && on == sg_on && memcmp(next, sg_gains, sizeof next) == 0) return;
+    preventClipping = !!preventClipping;
+    if (sg_set && on == sg_on && preventClipping == sg_preventClipping && memcmp(next, sg_gains, sizeof next) == 0) return;
     if (!sg_set || on != sg_on) EQLog(@"%@", on ? @"on" : @"off");
+    // at launch only when off, it being on by default.
+    if (sg_set ? preventClipping != sg_preventClipping : !preventClipping) EQLog(@"clip prevention %@", preventClipping ? @"on" : @"off");
     sg_set = YES;
     sg_on = on;
+    sg_preventClipping = preventClipping;
     memcpy(sg_gains, next, sizeof next);
     publish();
 }

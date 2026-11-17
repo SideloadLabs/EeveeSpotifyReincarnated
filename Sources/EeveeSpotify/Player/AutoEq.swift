@@ -12,8 +12,9 @@ enum AutoEq {
         let name: String
         let source: String
         let path: String
-        fileprivate let foldedName: String
-        fileprivate let folded: String
+        // name, then name and source, folded, as UTF-8: searched as bytes, 8,850 of them each keystroke.
+        fileprivate let foldedName: [UInt8]
+        fileprivate let folded: [UInt8]
 
         var id: String { path }
     }
@@ -32,8 +33,14 @@ enum AutoEq {
             .appendingPathComponent("EeveeSpotify/AutoEq/INDEX.md")
     }
 
-    private static func fold(_ text: String) -> String {
-        text.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
+    private static func fold(_ text: String) -> [UInt8] {
+        Array(text.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil).utf8)
+    }
+
+    private static func holds(_ text: [UInt8], _ word: [UInt8]) -> Bool {
+        text.withUnsafeBytes { text in
+            word.withUnsafeBytes { word in memmem(text.baseAddress, text.count, word.baseAddress, word.count) != nil }
+        }
     }
 
     static func parseIndex(_ markdown: String) -> [Headphone] {
@@ -56,11 +63,17 @@ enum AutoEq {
     // the headphones holding every word of `query` in their name or source, case and accents aside; those with
     // every word in the name first ("airpods pro 2" isn't the AirPods Pro measured on a 5128).
     static func search(_ all: [Headphone], _ query: String) -> [Headphone] {
-        let words = fold(query).split(whereSeparator: \.isWhitespace)
+        let words = query.split(whereSeparator: \.isWhitespace).map { fold(String($0)) }
         guard !words.isEmpty else { return [] }
-        let found = all.filter { headphone in words.allSatisfy { headphone.folded.contains($0) } }
-        let byName = found.filter { headphone in words.allSatisfy { headphone.foldedName.contains($0) } }
-        return byName.count == found.count ? found : byName + found.filter { headphone in !words.allSatisfy { headphone.foldedName.contains($0) } }
+        var byName = [Headphone](), bySource = [Headphone]()
+        for headphone in all where words.allSatisfy({ holds(headphone.folded, $0) }) {
+            if words.allSatisfy({ holds(headphone.foldedName, $0) }) {
+                byName.append(headphone)
+            } else {
+                bySource.append(headphone)
+            }
+        }
+        return byName + bySource
     }
 
     // the index, from the cache unless `refresh` or it's a month old, else from GitHub; the cache still answers
@@ -139,8 +152,16 @@ enum AutoEq {
         return unknown || filters.isEmpty ? nil : filters
     }
 
+    // downloaded since launch, so trying corrections back and forth fetches each once. main queue only.
+    private static var downloaded = [String: [ParametricFilter]]()
+
     // the headphone's filters, or why not, on the main queue.
     static func download(_ headphone: Headphone, done: @escaping (Result<[ParametricFilter], DownloadError>) -> Void) {
+        if let filters = downloaded[headphone.path] {
+            eeveeLog("[EeveeSpotify][Equalizer] AutoEq %@ (%@): %d filters, downloaded before", headphone.name, headphone.source, filters.count)
+            done(.success(filters))
+            return
+        }
         guard let url = parametricURL(headphone.path) else {
             done(.failure(DownloadError(message: "autoeq_unreadable".localized)))
             return
@@ -150,6 +171,7 @@ enum AutoEq {
             let filters = status == 200 ? data.flatMap { String(data: $0, encoding: .utf8) }.flatMap(parseParametric) : nil
             DispatchQueue.main.async {
                 if let filters {
+                    downloaded[headphone.path] = filters
                     eeveeLog("[EeveeSpotify][Equalizer] AutoEq %@ (%@): %d filters", headphone.name, headphone.source, filters.count)
                     done(.success(filters))
                 } else {

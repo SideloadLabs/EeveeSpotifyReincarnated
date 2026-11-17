@@ -52,11 +52,12 @@ struct EqualizerSettingsView: View {
                 SettingsToggle(title: "equalizer".localized, icon: "slider.vertical.3", color: Color(hex: "#BF5AF2"), isOn: $options.enabled)
             }
 
-            Section(footer: turnDown(curve)) {
+            Section(footer: level(curve)) {
                 EqualizerCurveView(curve: curve, gains: gains, active: options.enabled, set: set)
                     .frame(height: 160)
                     .padding(.vertical, 8)
                 presetMenu
+                SettingsToggle(title: "equalizer_prevent_clipping".localized, icon: "waveform", color: .orange, isOn: $options.preventClipping)
             }
             .disabled(!options.enabled)
 
@@ -167,9 +168,11 @@ struct EqualizerSettingsView: View {
         }
     }
 
-    @ViewBuilder private func turnDown(_ curve: Equalizer.Curve) -> some View {
-        if options.enabled && curve.turnDown >= 0.05 {
-            Text("equalizer_headroom".localizeWithFormat(String(format: "%.1f", curve.turnDown)))
+    // how far it's turned down, or with clip prevention off, how far the boosts go over.
+    @ViewBuilder private func level(_ curve: Equalizer.Curve) -> some View {
+        if options.enabled && curve.peak >= 0.05 {
+            let decibels = String(format: "%.1f", curve.peak)
+            Text((options.preventClipping ? "equalizer_headroom" : "equalizer_clipping").localizeWithFormat(decibels))
         }
     }
 

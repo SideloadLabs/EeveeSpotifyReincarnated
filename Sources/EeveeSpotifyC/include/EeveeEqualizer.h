@@ -20,8 +20,9 @@ void EeveeEqualizerSetLog(void (^log)(NSString *message));
 double EeveeEqualizerFrequency(NSInteger band);
 
 // on, the sound goes through `gains`, EeveeEqualizerBandCount of them in dB, each within ±12, and the correction;
-// off, it fades back to as it was. applies at once, or as soon as Spotify's output starts.
-void EeveeEqualizerSet(BOOL on, const double *gains);
+// off, it fades back to as it was. with `preventClipping` the sound is turned down by the curve's highest point,
+// without it the boosts can clip. applies at once, or as soon as Spotify's output starts.
+void EeveeEqualizerSet(BOOL on, const double *gains, BOOL preventClipping);
 
 // the headphone correction under the bands, `count` filters (at most EeveeEqualizerMaxCorrection, 0 for none),
 // each a kind, a frequency in Hz, a gain in dB and a Q. it only plays while the equalizer is on.
@@ -29,8 +30,8 @@ void EeveeEqualizerSetCorrection(const EeveeEqualizerFilter *kinds, const double
                                  NSInteger count);
 
 // what `gains` and the correction do, for drawing: `count` points from 20 Hz to 20 kHz into `frequencies`, the
-// bands' response into `decibels` and the correction's into `correction`. returns how far the sound is turned
-// down so the two together can't clip, in dB (0 or less).
+// bands' response into `decibels` and the correction's into `correction`. returns how far clip prevention turns
+// the sound down for the two together, in dB (0 or less).
 double EeveeEqualizerCurve(const double *gains, NSInteger count, double *frequencies, double *decibels, double *correction);
 
 NS_ASSUME_NONNULL_END
