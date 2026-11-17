@@ -1,25 +1,42 @@
 # Equalizer
 
-15 bands from 25 Hz to 16 kHz, ±12 dB each, on Spotify's own sound after speed and pitch. Its page is
-Settings › Player › Equalizer, with presets and a curve of what it does. It applies as it changes. Tapping a
-band's value resets it; holding it opens a box to type one. Off, or with every band at 0, the sound passes
+15 bands from 25 Hz to 16 kHz, ±12 dB each, on Spotify's own sound after speed and pitch, with a headphone
+correction from [AutoEq](https://github.com/jaakkopasanen/AutoEq) under them. Its page is in eevee's settings,
+Listening › Equalizer. It applies as it changes. Off, or with every band at 0 and no correction, the sound passes
 through untouched.
 
+- **The curve** shows what the bands do, with a dot per band. A dot drags up and down, and a double tap puts it
+  back to 0. The correction, when there is one, is the dashed line.
+- **Bands** have a slider each. Tapping a band's value resets it; holding it opens a box to type one.
+- **Presets**: twelve built in, and your own, saved under a name from the current curve and deleted with a swipe.
+- **Headphones**: search AutoEq's list for yours and its correction is kept for the output playing now, so
+  AirPods and wired headphones each get their own. It plays under the bands while the equalizer is on.
+  AutoEq's list (about 850 KB) is fetched from GitHub when the page is opened and kept for a month; a
+  correction (under 1 KB) when it's picked. Nothing else goes over the network.
+
 The bands and presets are those of spoti.pw's equalizer by Vojtěch Škopek, as found in
-[Vitrine](https://github.com/My-Name-Is-Jeff/vitrine) (GPL-3.0, as is this project). The filter design and the
-render side are new; why is below.
+[Vitrine](https://github.com/My-Name-Is-Jeff/vitrine) (GPL-3.0, as is this project), and the draggable curve is
+spoti.pw's idea too. Saved presets and corrections kept per output are Vitrine's. The filter design, the render
+side and the parametric corrections are new; why is below.
 
 ## Files
 
 | File | What it does |
 |---|---|
 | `../include/EeveeEqualizer.h` | The C API the Swift side calls |
-| `EeveeEqualizer.m` | That API: keeps the sliders, designs them for the output's rate, logs |
+| `EeveeEqualizer.m` | That API: keeps the sliders and the correction, designs them for the output's rate, logs |
 | `Equalizer.h/.m` | The core, plain C: the design, the hand-over and the render side |
 | `../SpeedPitch/SpeedPitchEngine.m` | Runs it, in `processInPlace()`, from the render notify on the music's output |
 
-Swift side, in `Sources/EeveeSpotify/Player/`: `Equalizer.swift` (settings, presets, the calls),
-`EqualizerSettingsView.swift` (the page) and `ValuePrompt.swift` (the typing box, shared with speed & pitch).
+Swift side, in `Sources/EeveeSpotify/Player/`:
+
+| File | What it does |
+|---|---|
+| `Equalizer.swift` | Settings, presets, the output and its correction, the calls |
+| `AutoEq.swift` | AutoEq's index (parsed, searched, cached) and its parametric files |
+| `EqualizerSettingsView.swift` | The page and its curve |
+| `EqualizerHeadphonesView.swift` | The headphone search |
+| `ValuePrompt.swift` | The boxes to type a value or a name, shared with speed & pitch |
 
 ## The design
 
@@ -48,6 +65,21 @@ gets +2.9. Here a centre can be off by about 0.3 dB, in return for the whole cur
 The sound is turned down by the curve's highest point, so the boosts can't clip and no limiter is needed. The
 page says by how much.
 
+## Headphone corrections
+
+AutoEq publishes, for each of about 8,850 measured headphones, a parametric correction: ten RBJ filters
+(low shelf, peaks, high shelf, each with a frequency, gain and Q) and a preamp. They run here exactly as Equalizer
+APO and AutoEq itself define them, as up to 16 more sections after the bands, with no convolver and no delay.
+spoti.pw and Vitrine use AutoEq's GraphicEQ files instead, turned into a long FIR filter and convolved, which
+needs an FFT convolver and adds latency.
+
+The file's preamp isn't used: the turn-down covers the bands and the correction together. For the Sennheiser
+HD 650 (oratory1990) it comes to 6.07 dB, against the file's 6.1.
+
+A correction is kept under the output's port UID (`AVAudioSessionPortDescription.uid`), which stays the same
+for a Bluetooth device across connections, and is put in when the route changes. The bands stay the same
+everywhere: the correction belongs to the headphones, the bands to taste.
+
 ## The render thread
 
 - It runs in place in the music's render notify, after the pitch, in the hardware's format, so it adds no
@@ -70,4 +102,7 @@ Turn on debug logging, restart, play a song, and look for `[SpeedPitch]` lines: 
 - turning it off goes back to the plain sound;
 - the curve on the page matches what you hear (Bass lifts the lows, Podcast thins them);
 - it still applies after unplugging headphones or changing to a Bluetooth route;
-- it works along with speed and pitch.
+- it works along with speed and pitch;
+- a dot on the curve drags, and a double tap resets it, without scrolling the page;
+- a preset saved under a name shows in the preset menu and the list, and a swipe deletes it;
+- a headphone picked for one output plays only on that output, and comes back when it reconnects.

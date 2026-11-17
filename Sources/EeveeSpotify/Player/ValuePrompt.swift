@@ -1,7 +1,7 @@
 import UIKit
 
-// a box to type a value finer than a slider's steps, or past its ends. the speed & pitch menu and the
-// equalizer open it by holding a value.
+// boxes to type into, for the speed & pitch menu and the equalizer: a value finer than a slider's steps or past
+// its ends (opened by holding a value), and a name.
 enum ValuePrompt {
     static func make(title: String, value: Double, range: ClosedRange<Double>, text: (Double) -> String,
                      keyboard: UIKeyboardType, dark: Bool = false, set: @escaping (Double) -> Void) -> UIAlertController {
@@ -24,6 +24,32 @@ enum ValuePrompt {
         alert.addAction(ok)
         alert.preferredAction = ok
         return alert
+    }
+
+    // a box to type a name; OK only once there is one.
+    static func name(title: String, message: String?, placeholder: String, done: @escaping (String) -> Void) -> UIAlertController {
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        let typed = { [weak alert] in (alert?.textFields?.first?.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines) }
+        let ok = UIAlertAction(title: "OK".uiKitLocalized, style: .default) { _ in
+            if !typed().isEmpty { done(typed()) }
+        }
+        ok.isEnabled = false
+        alert.addTextField { field in
+            field.placeholder = placeholder
+            field.autocapitalizationType = .sentences
+            field.addAction(UIAction { _ in ok.isEnabled = !typed().isEmpty }, for: .editingChanged)
+        }
+        alert.addAction(UIAlertAction(title: "Cancel".uiKitLocalized, style: .cancel))
+        alert.addAction(ok)
+        alert.preferredAction = ok
+        return alert
+    }
+
+    // over whatever is on top, from a settings page.
+    static func present(_ controller: UIViewController) {
+        var host = WindowHelper.shared.rootViewController
+        while let presented = host.presentedViewController, !presented.isBeingDismissed { host = presented }
+        host.present(controller, animated: true)
     }
 
     // up to two decimals, without trailing zeros.

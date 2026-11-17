@@ -7,7 +7,6 @@ struct PlayerSettingsView: View {
     @State private var flagsDefault = FlagOverrides.areDefault(PlayerSettingsView.flags.map(\.1))
     @State private var resetHidden = false
     @State private var extras = UserDefaults.playerExtrasOptions
-    @State private var equalizer = UserDefaults.equalizerOptions
     private let launchOptions = UserDefaults.playerOptions
     private let launchExtras = UserDefaults.playerExtrasOptions
 
@@ -33,11 +32,6 @@ struct PlayerSettingsView: View {
         flagsDefault = FlagOverrides.areDefault(Self.flags.map(\.1))
     }
 
-    private var equalizerSummary: String {
-        guard equalizer.enabled else { return "equalizer_off".localized }
-        return Equalizer.preset(matching: equalizer.gains)?.name ?? "equalizer_custom".localized
-    }
-
     private var hiddenSummary: String {
         let count = UserDefaults.playerOptions.hiddenParts.count
         return count == 0 ? "player_hide_none".localized : "player_hide_count".localizeWithFormat(count)
@@ -53,12 +47,6 @@ struct PlayerSettingsView: View {
             Section {
                 SettingsLink(title: "player_hide_parts".localized, subtitle: hiddenSummary, icon: "eye.slash.fill", color: .gray) {
                     PlayerHideSettingsView()
-                }
-            }
-
-            Section {
-                SettingsLink(title: "equalizer".localized, subtitle: equalizerSummary, icon: "slider.vertical.3", color: .orange) {
-                    EqualizerSettingsView()
                 }
             }
 
@@ -116,7 +104,6 @@ struct PlayerSettingsView: View {
         }
         .onAppear {
             options = UserDefaults.playerOptions
-            equalizer = UserDefaults.equalizerOptions
             refreshFlags()
         }
         .onChange(of: flagsVersion) { _ in refreshFlags() }

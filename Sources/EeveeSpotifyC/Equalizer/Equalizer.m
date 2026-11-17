@@ -34,8 +34,33 @@ static EqualizerBiquad peak(double rate, double frequency, double gainDB) {
     return (EqualizerBiquad){(1 + alpha * a) / a0, -2 * c / a0, (1 - alpha * a) / a0, -2 * c / a0, (1 - alpha / a) / a0};
 }
 
+static const EqualizerBiquad kPassThrough = {1, 0, 0, 0, 0};
+
 static EqualizerBiquad band(double rate, int index, double gainDB) {
-    return usable(rate, index) ? peak(rate, kEqualizerFrequencies[index], gainDB) : (EqualizerBiquad){1, 0, 0, 0, 0};
+    return usable(rate, index) ? peak(rate, kEqualizerFrequencies[index], gainDB) : kPassThrough;
+}
+
+// a correction's filter as RBJ's cookbook has it, with a plain Q: what AutoEq fits its filters with, and what
+// Equalizer APO and the like run.
+static EqualizerBiquad filter(double rate, EqualizerFilter f) {
+    if (!(f.frequency > 0 && f.frequency < kHighest * rate) || !(f.q > 0) || !isfinite(f.gain)) return kPassThrough;
+    double w = 2 * M_PI * f.frequency / rate, c = cos(w), alpha = sin(w) / (2 * f.q), a = pow(10, fmax(-30, fmin(30, f.gain)) / 40);
+    double b0, b1, b2, a0, a1, a2, root = 2 * sqrt(a) * alpha;
+    switch (f.type) {
+        case EqualizerLowShelf:
+            b0 = a * ((a + 1) - (a - 1) * c + root), b1 = 2 * a * ((a - 1) - (a + 1) * c), b2 = a * ((a + 1) - (a - 1) * c - root);
+            a0 = (a + 1) + (a - 1) * c + root, a1 = -2 * ((a - 1) + (a + 1) * c), a2 = (a + 1) + (a - 1) * c - root;
+            break;
+        case EqualizerHighShelf:
+            b0 = a * ((a + 1) + (a - 1) * c + root), b1 = -2 * a * ((a - 1) + (a + 1) * c), b2 = a * ((a + 1) + (a - 1) * c - root);
+            a0 = (a + 1) - (a - 1) * c + root, a1 = 2 * ((a - 1) - (a + 1) * c), a2 = (a + 1) - (a - 1) * c - root;
+            break;
+        default:
+            b0 = 1 + alpha * a, b1 = -2 * c, b2 = 1 - alpha * a;
+            a0 = 1 + alpha / a, a1 = -2 * c, a2 = 1 - alpha / a;
+            break;
+    }
+    return (EqualizerBiquad){b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0};
 }
 
 // cos and sin of ω and 2ω, for responses at one frequency.
@@ -54,9 +79,9 @@ static double biquadDB(const EqualizerBiquad *q, Phase p) {
     return 10 * log10(fmax(nr * nr + ni * ni, 1e-30) / fmax(dr * dr + di * di, 1e-30));
 }
 
-static double cascadeDB(const EqualizerBiquad bands[kEqualizerBands], Phase p) {
+static double cascadeDB(const EqualizerBiquad *sections, int count, Phase p) {
     double total = 0;
-    for (int i = 0; i < kEqualizerBands; i++) total += biquadDB(&bands[i], p);
+    for (int i = 0; i < count; i++) total += biquadDB(&sections[i], p);
     return total;
 }
 
@@ -142,16 +167,15 @@ static void solve(const Solver *solver, const double error[kPoints], double gain
     }
 }
 
-void EqualizerDesignFor(double rate, const double gains[kEqualizerBands], EqualizerDesign *design) {
+void EqualizerDesignFor(double rate, const double gains[kEqualizerBands], const EqualizerFilter *correction, int correctionCount,
+                        EqualizerDesign *design) {
     double sliders[kEqualizerBands], own[kEqualizerBands] = {0};
     bool flat = true;
     for (int i = 0; i < kEqualizerBands; i++) {
         sliders[i] = isfinite(gains[i]) ? fmax(-kEqualizerGainLimit, fmin(kEqualizerGainLimit, gains[i])) : 0;
         flat = flat && sliders[i] == 0;
     }
-    design->rate = rate;
-    design->flat = flat;
-    design->gain = 1;
+    EqualizerBiquad *sections = design->sections;
     if (!flat) {
         const Solver *solver = solverFor(rate);
         // the curve the sliders ask for: theirs at the centres, halfway between two the mean of them.
@@ -159,28 +183,41 @@ void EqualizerDesignFor(double rate, const double gains[kEqualizerBands], Equali
         for (int k = 0; k < solver->count; k++) wanted[k] = k % 2 ? (sliders[k / 2] + sliders[k / 2 + 1]) / 2 : sliders[k / 2];
         solve(solver, wanted, own);
         for (int pass = 0; pass < kRefinements; pass++) {
-            for (int i = 0; i < kEqualizerBands; i++) design->bands[i] = band(rate, i, own[i]);
-            for (int k = 0; k < solver->count; k++) error[k] = wanted[k] - cascadeDB(design->bands, solver->phases[k]);
+            for (int i = 0; i < kEqualizerBands; i++) sections[i] = band(rate, i, own[i]);
+            for (int k = 0; k < solver->count; k++) error[k] = wanted[k] - cascadeDB(sections, kEqualizerBands, solver->phases[k]);
             solve(solver, error, change);
             for (int i = 0; i < kEqualizerBands; i++) own[i] = fmax(-kOwnLimit, fmin(kOwnLimit, own[i] + change[i]));
         }
     }
     // flat, the bands are 0 dB peaks, not left out: a fade to or from them moves each band's gain alone.
-    for (int i = 0; i < kEqualizerBands; i++) design->bands[i] = band(rate, i, own[i]);
-    if (flat) return;
-    // the loudest the cascade makes anything, up to just under the Nyquist frequency, taken back off.
+    for (int i = 0; i < kEqualizerBands; i++) sections[i] = band(rate, i, own[i]);
+    int filters = correction ? (correctionCount < kEqualizerMaxCorrection ? correctionCount : kEqualizerMaxCorrection) : 0;
+    if (filters < 0) filters = 0;
+    for (int i = 0; i < kEqualizerMaxCorrection; i++) sections[kEqualizerBands + i] = i < filters ? filter(rate, correction[i]) : kPassThrough;
+    design->count = kEqualizerBands + filters;
+    design->rate = rate;
+    design->flat = flat && filters == 0;
+    design->gain = 1;
+    if (design->flat) return;
+    // the loudest the whole cascade makes anything, up to just under the Nyquist frequency, taken back off.
+    // a correction's own preamp is left aside for this.
     double loudest = 0;
     for (int n = 0; n < kScan; n++) {
-        loudest = fmax(loudest, cascadeDB(design->bands, phaseAt(rate, 20 * pow(0.49 * rate / 20, (double)n / (kScan - 1)))));
+        loudest = fmax(loudest, cascadeDB(sections, design->count, phaseAt(rate, 20 * pow(0.49 * rate / 20, (double)n / (kScan - 1)))));
     }
     for (int i = 0; i < kEqualizerBands; i++) {
-        if (usable(rate, i)) loudest = fmax(loudest, cascadeDB(design->bands, phaseAt(rate, kEqualizerFrequencies[i])));
+        if (usable(rate, i)) loudest = fmax(loudest, cascadeDB(sections, design->count, phaseAt(rate, kEqualizerFrequencies[i])));
+    }
+    for (int i = 0; i < filters; i++) {
+        double f = correction[i].frequency;
+        if (f > 0 && f < kHighest * rate) loudest = fmax(loudest, cascadeDB(sections, design->count, phaseAt(rate, f)));
     }
     design->gain = pow(10, -loudest / 20);
 }
 
-double EqualizerResponse(const EqualizerDesign *design, double frequency) {
-    return cascadeDB(design->bands, phaseAt(design->rate, frequency));
+double EqualizerResponse(const EqualizerDesign *design, int first, int count, double frequency) {
+    if (first < 0 || count <= 0 || first + count > kEqualizerSections) return 0;
+    return cascadeDB(design->sections + first, count, phaseAt(design->rate, frequency));
 }
 
 #pragma mark - handing designs over
@@ -212,12 +249,14 @@ static struct {
     const void *owner;
     uint32_t channels;
     double rate;                    // the design's
-    EqualizerBiquad from[kEqualizerBands], to[kEqualizerBands], now[kEqualizerBands];
+    EqualizerBiquad from[kEqualizerSections], to[kEqualizerSections], now[kEqualizerSections];
+    int sections;                   // run now: the design's, or while fading the more of the two
+    int target;                     // the design's
     double gainFrom, gainTo, gainNow;
     uint32_t at, length;            // frames into the fade, at == length once it's over
     bool flat;                      // the design faded to is flat
     bool idle;                      // flat and faded: nothing runs, the filters are empty
-    double state[kEqualizerMaxChannels][kEqualizerBands][2];
+    double state[kEqualizerMaxChannels][kEqualizerSections][2];
 } sg_run;
 
 static const EqualizerDesign *take(void) {
@@ -235,12 +274,14 @@ static void startClean(void) {
     memcpy(sg_run.now, sg_run.to, sizeof sg_run.now);
     sg_run.gainNow = sg_run.gainTo;
     sg_run.at = sg_run.length;
+    sg_run.sections = sg_run.target;
     sg_run.idle = sg_run.flat;
     empty();
 }
 
 static void adopt(const EqualizerDesign *design, bool fade) {
-    memcpy(sg_run.to, design->bands, sizeof sg_run.to);
+    memcpy(sg_run.to, design->sections, sizeof sg_run.to);
+    sg_run.target = design->count;
     sg_run.gainTo = design->gain;
     sg_run.flat = design->flat;
     sg_run.rate = design->rate;
@@ -249,6 +290,10 @@ static void adopt(const EqualizerDesign *design, bool fade) {
         return;
     }
     memcpy(sg_run.from, sg_run.now, sizeof sg_run.from);
+    // sections coming into use start empty: they passed the sound through, and kept what they held last.
+    for (; sg_run.sections < sg_run.target; sg_run.sections++) {
+        for (int c = 0; c < kEqualizerMaxChannels; c++) memset(sg_run.state[c][sg_run.sections], 0, sizeof sg_run.state[c][0]);
+    }
     sg_run.gainFrom = sg_run.gainNow;
     sg_run.at = 0;
     sg_run.length = (uint32_t)ceil(kFadeSeconds * design->rate / kStep) * kStep;
@@ -271,9 +316,10 @@ static void process(float *const *lanes, uint32_t channels, uint32_t frames) {
             if (sg_run.at == sg_run.length) {
                 memcpy(sg_run.now, sg_run.to, sizeof sg_run.now);
                 sg_run.gainNow = sg_run.gainTo;
+                sg_run.sections = sg_run.target;
             } else {
                 double t = (double)sg_run.at / sg_run.length;
-                for (int i = 0; i < kEqualizerBands; i++) sg_run.now[i] = mix(&sg_run.from[i], &sg_run.to[i], t);
+                for (int i = 0; i < sg_run.sections; i++) sg_run.now[i] = mix(&sg_run.from[i], &sg_run.to[i], t);
                 sg_run.gainNow = sg_run.gainFrom + (sg_run.gainTo - sg_run.gainFrom) * t;
             }
         }
@@ -282,7 +328,7 @@ static void process(float *const *lanes, uint32_t channels, uint32_t frames) {
             float *lane = lanes[c] + start;
             double x[kStep];
             for (uint32_t n = 0; n < count; n++) x[n] = lane[n];
-            for (int i = 0; i < kEqualizerBands; i++) {
+            for (int i = 0; i < sg_run.sections; i++) {
                 EqualizerBiquad q = sg_run.now[i];
                 double s1 = sg_run.state[c][i][0], s2 = sg_run.state[c][i][1];
                 for (uint32_t n = 0; n < count; n++) {
@@ -299,7 +345,7 @@ static void process(float *const *lanes, uint32_t channels, uint32_t frames) {
     }
     // a NaN let in would stay in the filters for good.
     for (uint32_t c = 0; c < channels; c++) {
-        for (int i = 0; i < kEqualizerBands; i++) {
+        for (int i = 0; i < sg_run.sections; i++) {
             if (!isfinite(sg_run.state[c][i][0]) || !isfinite(sg_run.state[c][i][1])) {
                 empty();
                 return;
