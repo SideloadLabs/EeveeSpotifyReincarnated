@@ -1,0 +1,57 @@
+{
+  "name": "SideloadLabs Repo",
+  "identifier": "com.sideloadlabs.source",
+  "subtitle": "SideloadLabs latest ipas",
+  "description": "SideloadLabs' ipa files \n -Our Telegram Channel: https://t.me/compiledipas",
+  "iconURL": "https://avatars.githubusercontent.com/u/312393257?s=96&v=4",
+  "sourceURL": "https://raw.githubusercontent.com/SideloadLabs/SideloasLabs-AltSource/refs/heads/main/apps.json",
+  "apps": [
+    {
+      "name": "EeveeSpotifyReincarnated",
+      "bundleIdentifier": "com.spotify.client",
+      "developerName": "SideloadLabs",
+      "downloadURL": "https://files.catbox.moe/79bhql.ipa",
+      "iconURL": "https://files.catbox.moe/9fgova.JPG",
+      "localizedDescription": "Spotify Version: v9.2.0, EeveeSpotify Version: 7.5.0 Unpatched Version, pls use this if on Altstore/Sidestore, free cert",
+      "size": 160000000,
+      "subtitle": "This tweak makes Spotify think you have a Premium subscription, granting free listening, just like Spotilife, and provides some additional features like custom lyrics.",
+      "tintColor": "1DB954",
+      "version": "9.2.0",
+      "versionDate": "2026-11-15",
+      "versionDescription": "Updated to Spotify v9.2.0, Full release notes on github",
+      "versions": [
+        {
+          "version": "9.2.0",
+          "date": "2026-11-15",
+          "localizedDescription": "Updated to Spotify v9.2.0, Full release notes on github",
+          "downloadURL": "https://files.catbox.moe/79bhql.ipa",
+          "size": 160000000
+        }
+      ]
+    },
+    {
+      "name": "EeveeSpotifyReincarnated(PATCHED)",
+      "bundleIdentifier": "com.spotify.client.patched",
+      "developerName": "SideloadLabs",
+      "downloadURL": "https://files.catbox.moe/4jhcb9.ipa",
+      "iconURL": "https://files.catbox.moe/9fgova.JPG",
+      "localizedDescription": "Spotify Version: v9.2.0, EeveeSpotify Version: 7.5.0 Patched version, use this only if you're using paid cert, jailbroken, or trollstore",
+      "size": 16000000,
+      "subtitle": "This tweak makes Spotify think you have a Premium subscription, granting free listening, just like Spotilife, and provides some additional features like custom lyrics.",
+      "tintColor": "1DB954",
+      "version": "9.1.88",
+      "versionDate": "2026-11-15",
+      "versionDescription": "Updated to Spotify v9.2.0, Full release notes on github",
+      "versions": [
+        {
+          "version": "9.2.0",
+          "date": "2026-11-15",
+          "localizedDescription": "Updated to Spotify v9.2.0, Full release notes on github",
+          "downloadURL": "https://files.catbox.moe/4jhcb9.ipa",
+          "size": 16000000
+        }
+      ]
+    }
+  ],
+  "userInfo": {}
+}
