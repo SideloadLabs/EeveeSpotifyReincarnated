@@ -32,8 +32,11 @@ void SAPFetchOfflineLyricsMetadata(NSString *trackURI, void (^completion)(NSDict
                 for(NSDictionary *field in track)if([field[@"number"]unsignedIntValue]==4 && [field[@"wire"]unsignedIntValue]==2){
                     artist=SAPProtoString(SAPProtoFields(field[@"value"]),2);if(artist.length)break;
                 }
+                // nil: Spotify answered, but this ID has no usable title/artist (a
+                // definite miss). "unavailable": no answer, so the lookup may succeed later.
                 NSDictionary *result=nil;
-                if(!error && item && !SAPProtoNumber(item,1,0) && [identity isEqual:trackURI] && title.length && artist.length){
+                if(error || !item) result=@{@"unavailable":@YES};
+                else if(!SAPProtoNumber(item,1,0) && [identity isEqual:trackURI] && title.length && artist.length){
                     result=@{@"uri":trackURI,@"name":title,@"artist_name":artist};[cache setObject:result forKey:trackURI];
                 }
                 NSArray *callbacks=[waiting[trackURI]copy];[waiting removeObjectForKey:trackURI];

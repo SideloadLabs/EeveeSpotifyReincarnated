@@ -71,7 +71,12 @@ int main(void) {
         NSCAssert(metadataReplies==3 && metadataCalls==1,@"Verified metadata should be cached");
         for(metadataMode=1;metadataMode<=4;metadataMode++){
             NSString *uri=[NSString stringWithFormat:@"spotify:track:%022lu",(unsigned long)metadataMode];__block BOOL done=NO;
-            SAPFetchOfflineLyricsMetadata(uri,^(NSDictionary *row){NSCAssert(!row,@"Mismatch, incomplete metadata and native errors must not be accepted");done=YES;});
+            NSUInteger mode=metadataMode;
+            SAPFetchOfflineLyricsMetadata(uri,^(NSDictionary *row){
+                NSCAssert(!row[@"name"],@"Mismatch, incomplete metadata and native errors must not be accepted");
+                // A transport error is not an answer; a mismatch or incomplete entity is.
+                NSCAssert(mode==4?[row[@"unavailable"]boolValue]:!row,@"Native errors must be distinguishable from definite misses");
+                done=YES;});
             deadline=[NSDate dateWithTimeIntervalSinceNow:2];
             while(!done && deadline.timeIntervalSinceNow>0)[NSRunLoop.currentRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:.01]];
             NSCAssert(done,@"Metadata read never completed");

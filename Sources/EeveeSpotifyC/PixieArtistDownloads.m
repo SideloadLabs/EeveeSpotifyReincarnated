@@ -76,7 +76,8 @@ UIViewController *EeveePixieMakeLyricsController(void) {
 void EeveePixieFetchLyricsMetadata(NSString *trackURI, void (^completion)(NSDictionary *)) {
     // Resolve per call: Eevee may have initialized before the optional companion.
     void (*fetch)(NSString *,void (^)(NSDictionary *))=dlsym(RTLD_DEFAULT,"SAPFetchOfflineLyricsMetadata");
-    if(fetch)fetch(trackURI,completion);else completion(nil);
+    // Without the companion nothing was asked, which is not a definite miss.
+    if(fetch)fetch(trackURI,completion);else completion(@{@"unavailable":@YES});
 }
 
 dispatch_block_t EeveePixieReadDownloadedTrackURIs(void (^completion)(NSArray<NSString *> *)) {

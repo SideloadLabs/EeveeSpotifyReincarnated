@@ -97,8 +97,16 @@ struct Lyrics {
     init(serializedBytes: Data) throws {}
     var hasData: Bool { false }
 }
-enum LyricsError: Error { case noSuchSong }
-func writeDebugLog(_ message: String) {}
+enum LyricsError: Error { case noSuchSong, invalidSpicyKey }
+enum OfflineLyricsFetchError: Error { case noMetadata, metadataUnavailable }
+struct LyricsProviderHTTPError: Error { let status: Int }
+private let logLock = NSLock()
+private var debugLines: [String] = []
+func writeDebugLog(_ message: String) { logLock.lock(); debugLines.append(message); logLock.unlock() }
+func logged(_ text: String) -> Int {
+    logLock.lock(); defer { logLock.unlock() }
+    return debugLines.filter { $0.contains(text) }.count
+}
 private var libraryReads = 0
 private var libraryCallback: (([String]?) -> Void)?
 private var libraryCancels = 0
@@ -120,6 +128,13 @@ private let rateLimitedTwice = "0000000000000000000911"
 private let rateLimitedOnce = "0000000000000000000912"
 private let rateLimitCompanion = "0000000000000000000913"
 private let restoredRateLimitRetry = "0000000000000000000914"
+private let definiteMiss = "0000000000000000000951"
+private let noTitleTrack = "0000000000000000000952"
+private let titleLookupDown = "0000000000000000000953"
+private let serverDownTrack = "0000000000000000000954"
+private let rateLimitedLaunch = "0000000000000000000955"
+private let refusedTrack = "0000000000000000000956"
+private let afterRefusalTrack = "0000000000000000000957"
 private let followupReached = DispatchSemaphore(value: 0)
 private let followupStarted = DispatchSemaphore(value: 0)
 var fetched: Int { fetchLock.lock(); defer { fetchLock.unlock() }; return fetchedCount }
@@ -150,7 +165,12 @@ func downloadProviderLyrics(trackId id: String,
     }
     if id == disconnectedTrack && attempts(id) == 1 { throw URLError(.notConnectedToInternet) }
     if id == failingTrack { throw URLError(.timedOut) }
-    if id == rateLimitedTwice || id == restoredRateLimitRetry || (id == rateLimitedOnce && attempts(id) == 1) {
+    if id == noTitleTrack { throw OfflineLyricsFetchError.noMetadata }
+    if id == titleLookupDown { throw OfflineLyricsFetchError.metadataUnavailable }
+    if id == serverDownTrack { throw LyricsProviderHTTPError(status: 503) }
+    if id == refusedTrack || id == afterRefusalTrack { throw LyricsProviderHTTPError(status: 403) }
+    if id == rateLimitedTwice || id == restoredRateLimitRetry || id == rateLimitedLaunch
+        || (id == rateLimitedOnce && attempts(id) == 1) {
         throw LyricsRequestLimitError()
     }
     if id == rateLimitedOnce || id == rateLimitCompanion { return try Lyrics(serializedBytes: Data()) }
@@ -568,3 +588,51 @@ check(attempts(checkpointTrack) == 1 && attempts(deletedBeforeRelaunch) == 0 && 
       && attempts(restoredRateLimitRetry) == 1, "Checkpoint recovery restored an ineligible job or reset its 429 retry count")
 check(UserDefaults.container.data(forKey: checkpointKey) == nil, "A completed cold task still had a checkpoint")
 print("A cold launch restores only missing, eligible work and clears the persisted queue")
+
+// Every launch reads the downloaded library. Known results must not be asked again:
+// a definite miss for good, a temporary failure (after one end-of-queue 429 retry)
+// only the next day, a rejected key once for the whole provider.
+let outcomes = LyricsNotFoundStore.shared
+let launchSource = UserDefaults.lyricsSource.rawValue
+let launchTracks = [definiteMiss, noTitleTrack, titleLookupDown, serverDownTrack, rateLimitedLaunch]
+func launch(_ ids: [String]) {
+    downloader.refreshForCurrentSource(downloadedIds: Set(ids), reason: "downloaded library refresh")
+    RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+    pump(until: { EeveeOfflineLyricsDownloader.settingsSnapshot()["pending"] as? Int == 0 }, "Launch refresh did not finish")
+}
+func launchAttempts() -> [Int] { launchTracks.map(attempts) }
+let yesterday = Date().addingTimeInterval(-LyricsNotFoundStore.retryDelay - 1)
+launch(launchTracks)
+check(launchAttempts() == [1, 1, 1, 1, 2], "The first launch did not ask once, with one 429 retry at the end of the queue")
+check(outcomes.entries(source: launchSource).isSuperset(of: [definiteMiss, noTitleTrack]),
+      "A provider miss or a definite missing title was not remembered")
+let deferred = outcomes.waiting(source: launchSource)
+check(deferred.isSuperset(of: [titleLookupDown, serverDownTrack, rateLimitedLaunch])
+          && deferred.isDisjoint(with: [definiteMiss, noTitleTrack]),
+      "Temporary failures were not deferred to the next day, or a definite result was deferred")
+launch(launchTracks)
+launch(launchTracks)
+check(launchAttempts() == [1, 1, 1, 1, 2], "A later launch asked again for a known result")
+check(logged("downloaded library refresh: skipped 5 tracks with a known result") == 2,
+      "Repeated launches did not log the skipped known results")
+for id in [titleLookupDown, serverDownTrack, rateLimitedLaunch] { outcomes.retryLater(id, source: launchSource, now: yesterday) }
+launch(launchTracks)
+check(launchAttempts() == [1, 1, 2, 2, 4], "The next day did not retry exactly the temporary failures")
+NotificationCenter.default.post(name: removal, object: nil, userInfo: [
+    "context": "spotify:track:\(definiteMiss)", "token": "forget-removed", "phase": "begin"
+])
+check(!outcomes.entries(source: launchSource).contains(definiteMiss), "A removed download kept its remembered result")
+print("Launches skip known lyrics results and retry temporary failures only the next day")
+
+launch([refusedTrack])
+check(attempts(refusedTrack) == 1 && outcomes.refusal(source: launchSource) != nil
+      && !outcomes.waiting(source: launchSource).contains(refusedTrack)
+      && !outcomes.entries(source: launchSource).contains(refusedTrack),
+      "A rejected key was recorded against the track instead of the provider")
+launch([afterRefusalTrack])
+check(attempts(afterRefusalTrack) == 0 && logged("rejected access") == 1,
+      "An automatic download asked a provider that rejected access today")
+outcomes.providerRefused(source: launchSource, now: yesterday)
+launch([afterRefusalTrack])
+check(attempts(afterRefusalTrack) == 1, "The provider was not asked again the next day")
+print("A rejected provider key pauses automatic lyrics downloads until the next day")

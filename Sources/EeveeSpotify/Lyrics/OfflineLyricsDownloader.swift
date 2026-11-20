@@ -26,6 +26,7 @@ final class EeveeOfflineLyricsDownloader: NSObject {
         var priority: Operation.QueuePriority
         var isRateLimitRetry = false
         let metadataTimeout: TimeInterval
+        let queuedAt = Date()
 
         var key: String { "\(source.rawValue):\(id)" }
 
@@ -47,6 +48,10 @@ final class EeveeOfflineLyricsDownloader: NSObject {
     }
     private enum Outcome {
         case saved(Lyrics), skipped(Lyrics), failed(Error), cancelled
+    }
+    /// The provider rejected access after this job was queued; it is not asked again.
+    private struct ProviderRefusedError: Error, CustomStringConvertible {
+        var description: String { "lyrics provider rejected access; not asked again until tomorrow" }
     }
     private final class RefreshProgress {
         let source: LyricsSource
@@ -351,10 +356,26 @@ final class EeveeOfflineLyricsDownloader: NSObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
     }
 
-    /// Track IDs the provider definitively has no text for, per provider. Only the
-    /// automatic provider refresh skips them; a library download still asks again.
-    private static func rememberNotFound(_ id: String, source: LyricsSource) {
-        LyricsNotFoundStore.shared.record(id, source: source.rawValue)
+    /// Remembers a final failure so the automatic refresh does not repeat it on
+    /// every launch: a definite miss for good, anything temporary until tomorrow,
+    /// a rejected key once for the provider. A library download still asks again.
+    private static func rememberFailure(_ error: Error, job: Job) {
+        let store = LyricsNotFoundStore.shared
+        let source = job.source.rawValue
+        if case LyricsError.noSuchSong = error {
+            store.record(job.id, source: source)
+            NativeOfflineLyrics.shared.providerHasNoLyrics(trackId: job.id)
+        } else if case OfflineLyricsFetchError.noMetadata = error {
+            store.record(job.id, source: source)
+        } else if error is ProviderRefusedError {
+            return
+        } else if case LyricsError.invalidSpicyKey = error {
+            store.providerRefused(source: source)
+        } else if let http = error as? LyricsProviderHTTPError, http.status == 401 || http.status == 403 {
+            store.providerRefused(source: source)
+        } else {
+            store.retryLater(job.id, source: source)
+        }
     }
 
     /// After a provider switch (and at launch), queue the selected provider's text for
@@ -377,7 +398,16 @@ final class EeveeOfflineLyricsDownloader: NSObject {
             // The restart prompt can terminate this process before the scan returns.
             flushCheckpoint()
         }
-        let notFound = LyricsNotFoundStore.shared.entries(source: source.rawValue)
+        let outcomes = LyricsNotFoundStore.shared
+        // Automatic work never repeats a known outcome. An explicit refresh (the
+        // user changed the provider or its options) still skips definite misses.
+        if !userInitiated, let refused = outcomes.refusal(source: source.rawValue) {
+            writeDebugLog("[Lyrics] \(reason): \(source.description) rejected access at \(refused); automatic downloads wait until tomorrow")
+            completion?()
+            return
+        }
+        let notFound = outcomes.entries(source: source.rawValue)
+        let waiting = userInitiated ? [] : outcomes.waiting(source: source.rawValue)
         let checkStored = includeStored || downloadedIds == nil
         let candidatesFromLibrary = downloadedIds ?? (userInitiated ? knownDownloadedIds ?? [] : [])
         if userInitiated && knownDownloadedIds == nil { scheduleInitialLibraryRead() }
@@ -386,8 +416,12 @@ final class EeveeOfflineLyricsDownloader: NSObject {
             let store = OfflineLyricsStore.shared
             let candidates = candidatesFromLibrary.union(checkStored ? Set(store.savedTrackIds()).union(placeholders) : [])
             let retryable = store.automaticallyRetryableTrackIds(Array(candidates))
-            let missing = store.missingTrackIds(retryable, source: source.rawValue, options: options)
-                .filter { !notFound.contains($0) }
+            let lacking = store.missingTrackIds(retryable, source: source.rawValue, options: options)
+            let missing = lacking.filter { !notFound.contains($0) && !waiting.contains($0) }
+            let known = lacking.count - missing.count
+            if known > 0 {
+                writeDebugLog("[Lyrics] \(reason): skipped \(known) tracks with a known result (no lyrics, or retry tomorrow)")
+            }
             let order = missing.count > 1 ? Self.pixieCatalogOrder() : [:]
             let sorted = missing.sorted { (order[$0] ?? Int.max, $0) < (order[$1] ?? Int.max, $1) }
             DispatchQueue.main.async {
@@ -630,8 +664,11 @@ final class EeveeOfflineLyricsDownloader: NSObject {
             for callback in callbacks { callback(.failure(error)) }
             writeDebugLog("[Lyrics] HTTP 429 for \(job.id); retrying at the end of the queue")
         } else {
-            if case .failed(let error as LyricsRequestLimitError) = outcome {
-                writeDebugLog("[Lyrics] offline lyrics unavailable for \(job.id): HTTP 429 on retry (\(error))")
+            if case .failed(let error) = outcome {
+                if error is LyricsRequestLimitError {
+                    writeDebugLog("[Lyrics] offline lyrics unavailable for \(job.id): HTTP 429 on retry; next try tomorrow")
+                }
+                Self.rememberFailure(error, job: job)
             }
             pending[job.key] = nil
             deliver(outcome, to: job)
@@ -666,6 +703,10 @@ final class EeveeOfflineLyricsDownloader: NSObject {
         let metadata = title.isEmpty || artist.isEmpty ? nil : (title: title, artist: artist)
         while true {
             if cancelled() { return .cancelled }
+            // One rejection covers every job queued before it: do not ask again.
+            if let refused = LyricsNotFoundStore.shared.refusal(source: job.source.rawValue), refused >= job.queuedAt {
+                return .failed(ProviderRefusedError())
+            }
             do {
                 try foreground.whenNetworkAvailable(isCancelled: cancelled)
                 let lyrics = try downloadProviderLyrics(trackId: id, metadata: metadata,
@@ -682,10 +723,6 @@ final class EeveeOfflineLyricsDownloader: NSObject {
                     continue
                 }
                 if error is LyricsRequestLimitError { return .failed(error) }
-                if case LyricsError.noSuchSong = error {
-                    Self.rememberNotFound(id, source: job.source)
-                    NativeOfflineLyrics.shared.providerHasNoLyrics(trackId: id)
-                }
                 writeDebugLog("[Lyrics] offline lyrics unavailable for \(id): \(error)")
                 return .failed(error)
             }
@@ -751,6 +788,7 @@ final class EeveeOfflineLyricsDownloader: NSObject {
         if event["all"] as? Bool == true {
             Self.deleteSavedLyrics { error in if let error { writeDebugLog("[Lyrics] failed to clear offline lyrics: \(error)") } }
             NativeOfflineLyrics.shared.forgetNoLyrics(trackIds: nil)
+            LyricsNotFoundStore.shared.forget(nil)
             return
         }
         let context = event["context"] as? String ?? ""
@@ -784,6 +822,7 @@ final class EeveeOfflineLyricsDownloader: NSObject {
         }
         for id in removedIds { KaraokeLyricsStore.shared.remove(trackId: id) }
         NativeOfflineLyrics.shared.forgetNoLyrics(trackIds: ids)
+        LyricsNotFoundStore.shared.forget(ids)
         scheduleRateLimitRetriesIfReady()
         changed()
     }
