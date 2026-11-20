@@ -43,7 +43,7 @@ def compile_fixture(name, out, sdk, target):
             ROOT / ("tests/LyricsSettingsFixture.swift" if name == "lyrics" else "tests/SettingsFixture.swift"), *objects, "-framework", "UIKit", "-framework", "SwiftUI", "-o", app / "PixieUIFixture")
         scene = "SAPLyricsFixtureScene" if name == "lyrics" else "SAPFixtureSceneDelegate"
     else:
-        sources = [*source_group("artist_ui"), resolve_source("WireProto.m"), ROOT / "tests/ArtistDownloadsUIFixture.m"]
+        sources = [*source_group("artist_ui"), resolve_source("WireProto.m"), resolve_source("Localization.m"), ROOT / "tests/ArtistDownloadsUIFixture.m"]
         run(*common, *sources, "-framework", "UIKit", "-framework", "QuartzCore", "-framework", "ImageIO", "-framework", "CoreText", "-framework", "CoreGraphics", "-o", app / "PixieUIFixture")
         scene = "ArtistPickerFixtureScene"
     info = {"CFBundleIdentifier": bundle, "CFBundleExecutable": "PixieUIFixture", "CFBundleName": "Pixie UI Fixture",

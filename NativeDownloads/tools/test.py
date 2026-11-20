@@ -13,6 +13,8 @@ import json
 import os
 from pathlib import Path
 import platform
+import plistlib
+import shutil
 import subprocess
 import sys
 import time
@@ -71,7 +73,7 @@ FIXTURES = (
     Fixture("export_commands", "export", ("SpotifyCommands.m", "WireProto.m", "export_commands.m")),
     Fixture("export_metadata", "export", ("ExportAlbumMetadata.m", "ExportArtworkMetadata.m", "WireProto.m", "export_album_metadata.m"), diagnostics=True),
     Fixture("export_storage", "export", ("CacheStorageKey.m", "cache_storage_key.m")),
-    Fixture("export_workflow", "export", ("export_native_workflow.m", "WireProto.m", "NativeCacheMap.m", "CacheStorageKey.m", "CacheEnvelope.c", "OggExport.c", "OggArtwork.c", "ExportArtworkMetadata.m", "ExportLibrary.m", "MediaDecode.c")),
+    Fixture("export_workflow", "export", ("export_native_workflow.m", "Localization.m", "WireProto.m", "NativeCacheMap.m", "CacheStorageKey.m", "CacheEnvelope.c", "OggExport.c", "OggArtwork.c", "ExportArtworkMetadata.m", "ExportLibrary.m", "MediaDecode.c")),
     Fixture("audio_probe", "audio", ("AudioProbe.c", "test_probe.c"), diagnostics=True, frameworks=("Foundation", "AudioToolbox")),
     Fixture("av_hooks", "audio", ("AudioProbe.c", "AVAudioHooks.m", "av_hooks.m"), diagnostics=True, frameworks=("Foundation", "AudioToolbox", "AVFoundation", "CoreMedia")),
     Fixture("offline_flags", "config", ("OfflineFlags.m", "offline_flags.m"), diagnostics=True),
@@ -81,7 +83,7 @@ FIXTURES = (
     Fixture("native_setup_status", "config", ("native_setup_status.m",)),
     Fixture("key_mode_policy", "config", ("key_mode_policy.c",), frameworks=()),
     Fixture("process_scope", "config", ("process_scope.m",)),
-    Fixture("localization", "config", ("Localization.m", "localization.m"), scenarios=(("English", "-AppleLanguages", "(en-GB)"), ("English", "-AppleLanguages", "(ru-RU)"))),
+    Fixture("localization", "config", ("Localization.m", "localization.m"), scenarios=(("en", "-AppleLanguages", "(en-GB)"), ("ru", "-AppleLanguages", "(ru-RU, en)"), ("en", "-AppleLanguages", "(uk-UA, en)"))),
     Fixture("player_trace", "diagnostics", ("PlayerTrace.m", "WireProto.m", "player_trace.m"), diagnostics=True),
     Fixture("track_journal", "diagnostics", ("WireProto.m", "NativeErrorLog.m", "PlayerTrace.m", "track_journal.m"), groups=("journal",), diagnostics=True),
     Fixture("diagnostic_trace", "diagnostics", ("DiagnosticTrace.m", "NativeKeyTrace.m", "WireProto.m", "diagnostic_trace.m"), scenarios=tuple((s,) for s in ("normal", "rotation", "loss", "write_error", "reset", "off_reset", "noise"))),
@@ -133,6 +135,8 @@ def fixture_sources(test: Fixture) -> list[Path]:
         paths.extend(source(n) for n in ("DiagnosticsPreferences.m", "Localization.m", "DiagnosticTrace.m", "NativeKeyTrace.m", "WireProto.m", "trace_platform_stub.m"))
     if any(p.name in ("NativeCacheMap.m", "CacheStorageKey.m") for p in paths):paths.append(source("ExportKeyVault.m"))
     if any(p.name=="NativeCacheMap.m" for p in paths):paths.append(source("ExportCacheIndex.m"))
+    if any(b'#import "Localization.h"' in p.read_bytes() for p in paths):
+        paths.append(source("Localization.m"))
     return list(dict.fromkeys(paths))
 
 
@@ -153,6 +157,26 @@ def run_fixture(test: Fixture, build: Path, sanitize: bool):
     env = dict(os.environ, TMPDIR=str(home) + "/", PIXIE_TEST_BUILD_DIR=str(folder))
     # Diagnostic fixtures must not reuse a user's preference setting.
     binary = folder / test.name
+    if test.name == "localization":
+        contents = folder / "PixieLocalization.app/Contents"
+        resources = contents / "Resources"
+        bundle = resources / "EeveeSpotify.bundle"
+        bundle.mkdir(parents=True)
+        source_bundle = PROJECT / "layout/Library/Application Support/EeveeSpotify.bundle"
+        shutil.copyfile(source_bundle / "Info.plist", bundle / "Info.plist")
+        for language in ("en", "ru"):
+            locale = f"{language}.lproj"
+            (bundle / locale).mkdir()
+            shutil.copyfile(source_bundle / locale / "Pixie.strings", bundle / locale / "Pixie.strings")
+        (contents / "Info.plist").write_bytes(plistlib.dumps({
+            "CFBundleIdentifier": "test.pixie.localization",
+            "CFBundleExecutable": test.name,
+            "CFBundleDevelopmentRegion": "en",
+            "CFBundleLocalizations": ["en", "ru", "uk"],
+        }))
+        binary = contents / "MacOS" / test.name
+        binary.parent.mkdir()
+
     paths = fixture_sources(test)
     command = ["xcrun", "clang", "-arch", "arm64", "-fobjc-arc", "-std=gnu11", "-O1", "-g", "-DSAP_TESTING", "-DSAP_VAULT_TESTING=1"]
     if test.name == "page_contract":

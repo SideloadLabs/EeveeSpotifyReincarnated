@@ -181,8 +181,8 @@ int main(void) {
         NSString *written = [NSString stringWithContentsOfURL:table encoding:NSUTF8StringEncoding error:NULL];
         assert([written containsString:@"waiting_limit_exceeded"] && [written containsString:@"TOO_MANY_TRACKS"]);
         NSString *summary = SAPJournalSummaryText();
-        assert([summary containsString:@"Device licenses"] && [summary containsString:SAPL(@"Очередь ядра",@"Core queue")]);
-        assert([summary containsString:SAPL(@"Проблемные треки",@"Tracks with issues")]);
+        assert([summary containsString:@"Device licenses"] && [summary containsString:@"Core queue"]);
+        assert([summary containsString:@"Tracks with issues"]);
 
         // 9. Постоянный лог на диске: весь путь треков, переживает перезапуск.
         NSString *log = [NSString stringWithContentsOfURL:[NSURL fileURLWithPath:[NSTemporaryDirectory()
@@ -341,7 +341,7 @@ int main(void) {
         assert([decoded[@"generated_at"] isEqual:saved[@"generated_at"]]);
         assert([decoded[@"tracked_tracks"] unsignedIntegerValue]==1 && [SAPJournalReport()[@"tracked_tracks"] unsignedIntegerValue]==2);
         NSString *savedTableText=[NSString stringWithContentsOfURL:savedTable encoding:NSUTF8StringEncoding error:NULL];
-        assert([savedTableText containsString:SAPL(@"Треков в журнале: 1",@"Tracks in log: 1")]);
+        assert([savedTableText containsString:@"Tracks in log: 1"]);
         SAPJournalNoteNativeError(trackB,@7004,@"immediate_flush_test");SAPJournalDrainForTesting();
         NSString *flushedLog=[NSString stringWithContentsOfFile:[NSTemporaryDirectory() stringByAppendingPathComponent:@"SpotifyAudioProbeJournal.log"] encoding:NSUTF8StringEncoding error:NULL];
         assert([flushedLog containsString:@"immediate_flush_test"]);

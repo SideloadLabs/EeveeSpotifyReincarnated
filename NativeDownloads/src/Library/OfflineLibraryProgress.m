@@ -1,3 +1,4 @@
+#import "Localization.h"
 #import "OfflineLibraryProgress.h"
 // A page's immutable scope is indexed once. Event updates touch only the
 // cached aggregates; no whole-queue set copies are needed for progress frames.
@@ -77,9 +78,9 @@
     NSUInteger encoding=scope?aggregate.converting:self.converting.count;
     double fraction=self.packaging?self.packageFraction:(ids.count?(double)done/ids.count:0);
     if([self.phase isEqual:@"ready"])fraction=1;
-    NSString *message=self.message?:@"Preparing files…";
-    if(!self.terminal && !self.packaging && ![ids containsObject:self.currentURI])message=done==ids.count?@"Files prepared · Waiting for the remaining selection":@"Waiting for selected files…";
-    if(!self.terminal && !self.packaging && encoding)message=[NSString stringWithFormat:@"Converting to M4A · %lu active",(unsigned long)encoding];
+    NSString *message=self.message?:SAPLocalized(@"Preparing files…");
+    if(!self.terminal && !self.packaging && ![ids containsObject:self.currentURI])message=done==ids.count?SAPLocalized(@"Files prepared · Waiting for the remaining selection"):SAPLocalized(@"Waiting for selected files…");
+    if(!self.terminal && !self.packaging && encoding)message=[NSString stringWithFormat:SAPLocalized(@"Converting to M4A · %lu active"),(unsigned long)encoding];
     return @{@"visible":@(ids.count>0),@"phase":self.phase?:@"preparing",@"completed":@(done),@"total":@(ids.count),@"failed":@(failed),@"fraction":@(fraction),@"message":message,@"active":@(!self.terminal)};
 }
 - (NSString *)stateForTrackURI:(NSString *)uri {
