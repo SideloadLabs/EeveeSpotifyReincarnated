@@ -5,6 +5,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "NativeDownloads/tools"))
 import patch_lyrics_offline_cache as patcher
+import patch_lyrics_plugin_registration as registration
 
 # The 15 instructions of Spotify 9.2.0's offline branch at 0x100813f20.
 SHAPE = bytes.fromhex(
@@ -15,15 +16,15 @@ SHAPE = bytes.fromhex(
 BASE = 0x100000000
 
 
-def macho(code, uuid=b"\x11" * 16):
+def macho(code, uuid=b"\x11" * 16, base=BASE):
     header, segment, uuid_cmd = 32, 72 + 80, 24
     text_offset = header + segment + uuid_cmd
     size = text_offset + len(code)
     data = bytearray(size)
     struct.pack_into("<8I", data, 0, 0xFEEDFACF, 0x100000C, 0, 2, 2, segment + uuid_cmd, 0, 0)
-    struct.pack_into("<II16sQQQQiiII", data, 32, 0x19, segment, b"__TEXT", BASE, size, 0, size, 5, 5, 1, 0)
+    struct.pack_into("<II16sQQQQiiII", data, 32, 0x19, segment, b"__TEXT", base, size, 0, size, 5, 5, 1, 0)
     struct.pack_into("<16s16sQQIIIIIIII", data, 32 + 72, b"__text", b"__TEXT",
-                     BASE + text_offset, len(code), text_offset, 2, 0, 0, 0x80000400, 0, 0, 0)
+                     base + text_offset, len(code), text_offset, 2, 0, 0, 0x80000400, 0, 0, 0)
     struct.pack_into("<II16s", data, 32 + segment, 0x1B, uuid_cmd, uuid)
     data[text_offset:] = code
     return bytes(data), text_offset
@@ -65,3 +66,25 @@ assert result == twice and not report["applied"] and "ambiguous" in report["reas
 result, report = patcher.patch(b"not a binary" * 4)
 assert not report["applied"] and "Mach-O" in report["reason"]
 print("Native offline lyrics cache patch: shape match, single-instruction change, refusals and skips passed")
+
+skip = registration.SKIP_ADDRESS - registration.WINDOW_ADDRESS
+code = registration.ORIGINAL.ljust(skip, b"\0") + registration.SKIP_HEAD
+native, offset = macho(code, registration.UUID, base=registration.WINDOW_ADDRESS-text_offset)
+isolated, report = registration.patch(native)
+gate = offset + registration.BRANCH_INDEX
+assert report["applied"] and report["file_offset"] == gate
+assert native[:gate] == isolated[:gate] and native[gate+4:] == isolated[gate+4:]
+old, = struct.unpack_from("<I", native, gate)
+new, = struct.unpack_from("<I", isolated, gate)
+assert old & 0xFF00001F == 0x54000001 and new >> 26 == 5
+assert (old >> 5) & 0x7FFFF == new & 0x3FFFFFF == (registration.SKIP_ADDRESS-registration.BRANCH_ADDRESS)//4
+unknown, _ = macho(code, base=registration.WINDOW_ADDRESS-text_offset)
+assert registration.patch(unknown) == (unknown, {"applied": False, "reason": "unverified Spotify executable"})
+for modified in (isolated, native[:offset+skip] + b"\x00" + native[offset+skip+1:]):
+    try:
+        registration.patch(modified)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("The registration patch accepted an already patched branch or changed skip block")
+print("Offline lyrics plugin: only the registration gate follows its stock disabled branch")

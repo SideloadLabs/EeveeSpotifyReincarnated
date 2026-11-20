@@ -13,6 +13,7 @@
 #import "KeyModePolicy.h"
 #import "DiagnosticTrace.h"
 #import "NativeTracePatch.h"
+#import "NativeLyricsRegistrationPatch.h"
 #import "NativeSetupStatus.h"
 #import "NativeAlbumCommand.h"
 #import <UIKit/UIKit.h>
@@ -107,6 +108,23 @@ static BOOL supportedImage(uintptr_t image) {
     }
     return NO;
 }
+
+__attribute__((visibility("default"))) BOOL SAPNativeLyricsIsolatedFromAudio(void) {
+    if(memcmp(supportedUUID,SAPLyricsRegistrationUUID,sizeof(supportedUUID)))return NO;
+    for(uint32_t i=0;i<_dyld_image_count();i++) {
+        const char *path=_dyld_get_image_name(i);
+        if(!path || strcmp(strrchr(path,'/')?strrchr(path,'/')+1:path,"Spotify"))continue;
+        uintptr_t image=(uintptr_t)_dyld_get_image_header(i);
+        if(!supportedImage(image))continue;
+        uint8_t gate[sizeof(SAPLyricsRegistrationGuard)],skip[sizeof(SAPLyricsRegistrationSkipHead)];
+        return readMemory(image+SAPLyricsRegistrationOffset,gate,sizeof(gate)) &&
+               !memcmp(gate,SAPLyricsRegistrationGuard,sizeof(gate)) &&
+               readMemory(image+SAPLyricsRegistrationSkipOffset,skip,sizeof(skip)) &&
+               !memcmp(skip,SAPLyricsRegistrationSkipHead,sizeof(skip));
+    }
+    return NO;
+}
+
 // 2 means the signed runtime selector is installed; 0/1 are older fixed
 // binaries. -1 means these executable bytes are unknown and must not be used.
 static int keyModeKind(uintptr_t image) {
