@@ -1,46 +1,53 @@
 import Foundation
 
 class PetitLyricsRepository: LyricsRepository {
+    static let shared = PetitLyricsRepository()
     private let url = "https://p1.petitlyrics.com/api/GetPetitLyricsData.php"
     private let session: URLSession
 
-    init() {
-        let configuration = URLSessionConfiguration.default
+    init(configuration: URLSessionConfiguration = .default) {
         configuration.httpAdditionalHeaders = [
             "Content-Type": "application/x-www-form-urlencoded"
         ]
-        
+
         session = URLSession(configuration: configuration)
     }
-    
+
     private func perform(_ data: [String: Any]) throws -> PetitResponse {
         var finalData = data
 
         finalData["clientAppId"] = "p1110417"
         finalData["terminalType"] = 10
-        
+
         var request = URLRequest(url: URL(string: url)!)
-        
+
         request.httpMethod = "POST"
         request.httpBody = finalData.queryString.data(using: .utf8)
+        try LyricsDownloadHTTP.prepare(request)
 
         let semaphore = DispatchSemaphore(value: 0)
         var data: Data?
         var error: Error?
-        
-        let task = session.dataTask(with: request) { response, _, err in
+        var httpResponse: URLResponse?
+
+        let task = session.dataTask(with: request) { response, urlResponse, err in
             error = err
             data = response
+            httpResponse = urlResponse
             semaphore.signal()
         }
 
-        task.resume()
-        semaphore.wait()
+        try LyricsDownloadHTTP.start(task)
+        try LyricsDownloadHTTP.waitForResponse(semaphore, task: task)
 
         if let error = error {
             throw error
         }
+        try LyricsDownloadHTTP.validate(httpResponse, request: request)
 
+        if let http = httpResponse as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+            throw LyricsProviderHTTPError(status: http.statusCode)
+        }
         guard let data,
               let response = try? XMLDecoder().decode(PetitResponse.self, from: data) else {
             throw LyricsError.decodingError
@@ -48,8 +55,8 @@ class PetitLyricsRepository: LyricsRepository {
 
         return response
     }
-    
-    
+
+
     private func searchSong(_ title: String, artist: String) throws -> PetitSong {
         let response = try perform(
             ["key_title": title, "key_artist": artist, "max_count": 1]
@@ -104,6 +111,9 @@ class PetitLyricsRepository: LyricsRepository {
                 throw LyricsError.decodingError
             }
             
+            guard lyrics.lines.contains(where: { !$0.linestring.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else {
+                throw LyricsError.decodingError
+            }
             return LyricsDto(
                 lines: lyrics.lines.map {
                     LyricsLineDto(
@@ -118,7 +128,8 @@ class PetitLyricsRepository: LyricsRepository {
             )
             
         case .plain:
-            guard let stringLyrics = String(data: lyricsData, encoding: .utf8) else {
+            guard let stringLyrics = String(data: lyricsData, encoding: .utf8),
+                  !stringLyrics.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 throw LyricsError.decodingError
             }
             let lines = stringLyrics.components(separatedBy: "\n")

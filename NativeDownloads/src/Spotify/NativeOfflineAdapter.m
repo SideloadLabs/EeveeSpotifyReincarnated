@@ -1,3 +1,4 @@
+#import "OfflineLyrics.h"
 #include "TargetProfile.h"
 #import "Localization.h"
 #import "NativeOffline.h"
@@ -338,6 +339,7 @@ void SAPInstallNativeOffline(void) {
                     @"track_count":@([trackURLs isKindOfClass:NSArray.class]?[(NSArray *)trackURLs count]:0),
                     @"result_observed":@NO});
                 SAPTraceWithOperation(trace,^{originalMakeEntity(receiver,entitySelector,url,trackURLs);});
+                SAPRequestOfflineLyrics(urlText(url),[trackURLs isKindOfClass:NSArray.class]?trackURLs:nil);
                 SAP_TRACE("native_entity","handler_returned",trace,@{@"download_completion_confirmed":@NO});
             });
             class_replaceMethod(cls,entitySelector,replacement,method_getTypeEncoding(entityMethod));entityHookInstalled=YES;
@@ -353,6 +355,7 @@ void SAPInstallNativeOffline(void) {
                 SAP_JOURNAL_ACTION(@"native_entity_add_called",@{@"entity_uri":urlText(url)?:@"",
                     @"track_count":NSNull.null,@"result_observed":@NO});
                 SAPTraceWithOperation(trace,^{originalMakeEntityOnly(receiver,entityOnly,url);});
+                SAPRequestOfflineLyrics(urlText(url),nil);
                 SAP_TRACE("native_entity","handler_returned",trace,@{@"download_completion_confirmed":@NO});
             });
             class_replaceMethod(cls,entityOnly,replacement,method_getTypeEncoding(entityOnlyMethod));
@@ -368,6 +371,7 @@ void SAPInstallNativeOffline(void) {
                 SAP_JOURNAL_ACTION(@"native_entity_remove_called",@{@"entity_uri":urlText(url)?:@"",
                     @"result_observed":@NO});
                 SAPTraceWithOperation(trace,^{originalResetEntity(receiver,resetSelector,url);});
+                SAPRemoveOfflineLyrics(urlText(url),nil);
                 SAP_TRACE("native_entity","handler_returned",trace,@{@"removal_completion_confirmed":@NO});
             });
             class_replaceMethod(cls,resetSelector,replacement,method_getTypeEncoding(resetMethod));

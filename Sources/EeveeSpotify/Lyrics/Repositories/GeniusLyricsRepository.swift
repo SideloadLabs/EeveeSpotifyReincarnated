@@ -6,22 +6,21 @@ class GeniusLyricsRepository: LyricsRepository {
     private let apiUrl = "https://api.genius.com"
     private let session: URLSession
 
-    init() {
-        let configuration = URLSessionConfiguration.default
+    init(configuration: URLSessionConfiguration = .default) {
         configuration.httpAdditionalHeaders = [
             "X-Genius-iOS-Version": "6.21.0",
             "X-Genius-Logged-Out": "true",
             "User-Agent": "Genius/1109 \(URLSessionHelper.CFNetworkVersion) \(URLSessionHelper.DarwinVersion)"
         ]
-        
+
         session = URLSession(configuration: configuration)
-        
+
         jsonDecoder = JSONDecoder()
         jsonDecoder.keyDecodingStrategy = .convertFromSnakeCase
     }
-    
+
     private func perform(
-        _ path: String, 
+        _ path: String,
         query: [String:Any] = [:]
     ) throws -> GeniusDataResponse? {
         var stringUrl = "\(apiUrl)\(path)"
@@ -30,45 +29,52 @@ class GeniusLyricsRepository: LyricsRepository {
             let queryString = query.queryString
             stringUrl += "?\(queryString)"
         }
-        
-        let request = URLRequest(url: URL(string: stringUrl)!)
+
+        guard let url = URL(string: stringUrl) else { throw LyricsError.decodingError }
+        let request = URLRequest(url: url)
+        try LyricsDownloadHTTP.prepare(request)
 
         let semaphore = DispatchSemaphore(value: 0)
         var data: Data?
         var error: Error?
+        var httpResponse: URLResponse?
 
-        let task = session.dataTask(with: request) { response, _, err in
+        let task = session.dataTask(with: request) { response, urlResponse, err in
             error = err
             data = response
+            httpResponse = urlResponse
             semaphore.signal()
         }
 
-        task.resume()
-        semaphore.wait()
+        try LyricsDownloadHTTP.start(task)
+        try LyricsDownloadHTTP.waitForResponse(semaphore, task: task)
 
-        if let error = error {
+        if let error {
             throw error
         }
+        try LyricsDownloadHTTP.validate(httpResponse, request: request)
 
+        if let http = httpResponse as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+            throw LyricsProviderHTTPError(status: http.statusCode)
+        }
         guard let data,
               let rootResponse = try? jsonDecoder.decode(GeniusRootResponse.self, from: data) else {
             throw LyricsError.decodingError
         }
         return rootResponse.response
     }
-    
-    
+
+
     private func searchSong(_ query: String) throws -> [GeniusHit] {
         let data = try perform("/search/song", query: ["q": query])
         
         guard
-            case .sections(let sectionsResponse) = data,
-            let section = sectionsResponse.sections.first
+            case .sections(let sectionsResponse) = data
         else {
             throw LyricsError.decodingError
         }
         
-        return section.hits
+        return sectionsResponse.sections.flatMap(\.hits)
     }
 
     private func getSongInfo(_ songId: Int) throws -> GeniusSong {
@@ -120,7 +126,7 @@ class GeniusLyricsRepository: LyricsRepository {
         var lines = rawLines
             .map { $0.trimmingCharacters(in: .whitespaces) }
         
-        lines.removeAll { $0 ~= "\\[.*\\]" }
+        lines.removeAll { $0 ~= "^\\[[^\\]]*\\]$" }
 
         lines = Array(
             lines
@@ -133,7 +139,11 @@ class GeniusLyricsRepository: LyricsRepository {
     
     func getLyrics(_ query: LyricsSearchQuery, options: LyricsOptions) throws -> LyricsDto {
         let strippedTitle = query.title.strippedTrackTitle
-        let hits = try searchSong("\(strippedTitle) \(query.primaryArtist)")
+        let searchTitle = strippedTitle.isEmpty ? query.title : strippedTitle
+        var hits = try searchSong("\(searchTitle) \(query.primaryArtist)")
+        if hits.isEmpty, searchTitle != query.title {
+            hits = try searchSong("\(query.title) \(query.primaryArtist)")
+        }
     
         guard !hits.isEmpty else {
             throw LyricsError.noSuchSong
@@ -143,14 +153,15 @@ class GeniusLyricsRepository: LyricsRepository {
         
         let song = mostRelevantHitResult(
             hits: hits,
-            strippedTitle: strippedTitle,
+            strippedTitle: searchTitle,
             primaryArtist: query.primaryArtist,
             romanized: options.romanization,
             hasFoundRomanizedLyrics: &hasFoundRomanizedLyrics
         )
         
         let songInfo = try getSongInfo(song.id)
-        let plainLines = songInfo.lyrics.plain.components(separatedBy: "\n")
+        let plainLines = mapLyricsLines(songInfo.lyrics.plain.components(separatedBy: "\n"))
+        guard !plainLines.isEmpty else { throw LyricsError.noSuchSong }
         
         var romanization = LyricsRomanizationStatus.original
         
@@ -162,7 +173,7 @@ class GeniusLyricsRepository: LyricsRepository {
         }
     
         return LyricsDto(
-            lines: mapLyricsLines(plainLines).map { line in LyricsLineDto(content: line) },
+            lines: plainLines.map { line in LyricsLineDto(content: line) },
             timeSynced: false,
             romanization: romanization
         )

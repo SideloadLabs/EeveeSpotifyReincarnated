@@ -483,3 +483,12 @@ lyrics_source_restart_popup = "Restart Spotify so the new lyrics source is used 
 restart_later = "Later";
 manage_downloads = "Manage downloads";
 manage_downloads_subtitle = "Офлайн-загрузки Pixie";
+
+// Pixie background lyrics downloads
+
+// Offline custom text
+"lyrics_unsynchronized" = "Не синхронизирован";
+"lyrics_not_saved" = "Текст этой песни ещё не сохранён.";
+
+lyrics_downloads = "Скачивание текстов";
+lyrics_downloads_subtitle = "Тексты вместе с музыкой, сохранённые тексты и очистка";

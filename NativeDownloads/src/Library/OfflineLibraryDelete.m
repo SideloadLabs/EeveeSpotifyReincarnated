@@ -1,3 +1,4 @@
+#import "OfflineLyrics.h"
 #import "OfflineLibraryDelete.h"
 #import "TrackDownload.h"
 #import "SpotifyTransport.h"
@@ -132,6 +133,7 @@ static NSArray *albumTracks(NSData *data,NSString *uri,NSMutableDictionary *proo
 - (void)finish:(NSString *)error{if(self.finished)return;self.finished=YES;[self stopRead];for(dispatch_source_t timer in @[self.retry?:NSNull.null,self.phaseDeadline?:NSNull.null])if((id)timer!=NSNull.null)dispatch_source_cancel(timer);self.retry=nil;self.phaseDeadline=nil;
  NSMutableArray *results=NSMutableArray.array;BOOL retained=NO;
  for(NSString *u in self.uris){BOOL offline=self.latestStates[u]&&[self.latestStates[u]unsignedIntegerValue]==0;BOOL library=self.latestSaved[u]&&![self.latestSaved[u]boolValue];for(NSString *album in self.albumMembership[u])if([self.saved[album]boolValue]&&(!self.latestSaved[album]||[self.latestSaved[album]boolValue]))library=NO;
+  if(offline)SAPRemoveOfflineLyrics(u,@[u]);
   if(!offline){retained=YES;[self note:self.latestStates[u]?@"Spotify still reports a download, pending policy, expired item, or error state.":@"Offline removal was not confirmed by an exact native readback." uri:u];}
   if(!library){retained=YES;[self note:@"Saved-library removal was not confirmed by an exact native readback." uri:u];}
   NSString *detail=[self.notes[u]array]?[[self.notes[u]array]componentsJoinedByString:@" "]:@"";

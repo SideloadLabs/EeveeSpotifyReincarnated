@@ -23,7 +23,7 @@ struct LyricsUncensorFill {
     /// self-censor like "f**k" or "sh*t", which we deliberately leave
     /// alone — those are the original artist/source's own stylistic
     /// choice, not something to "fix").
-    private static let fullCensorPattern = try! NSRegularExpression(pattern: #"\b\*{3,}\b"#)
+    private static let fullCensorPattern = try! NSRegularExpression(pattern: #"(?<![\p{L}\p{N}*])\*{3,}(?![\p{L}\p{N}*])"#)
 
     /// Returns a new array of line texts with censored tokens filled in
     /// where a confident match was found, otherwise unchanged. Operates
@@ -35,7 +35,7 @@ struct LyricsUncensorFill {
         query: LyricsSearchQuery,
         options: LyricsOptions
     ) -> [String] {
-        guard lines.contains(where: { containsFullCensor($0) }) else {
+        guard !query.title.isEmpty, !query.primaryArtist.isEmpty, lines.contains(where: { containsFullCensor($0) }) else {
             return lines // nothing to do — avoid fallback network calls entirely
         }
 
@@ -46,8 +46,10 @@ struct LyricsUncensorFill {
 
         var result = lines
         for source in fallbackSources {
-            guard let fallbackLines = try? source.getLyrics(query, options: options).lines.map(\.content),
-                  !fallbackLines.isEmpty else { continue }
+            let fallbackLines: [String]
+            do { fallbackLines = try source.getLyrics(query, options: options).lines.map(\.content) }
+            catch let error as URLError where [.notConnectedToInternet, .cancelled].contains(error.code) { break }
+            catch { continue }
 
             result = attemptFill(censored: result, candidate: fallbackLines)
 
@@ -76,6 +78,7 @@ struct LyricsUncensorFill {
             guard containsFullCensor(line) else { continue }
 
             let censoredWords = line.split(separator: " ")
+            guard censoredWords.contains(where: { !containsFullCensor(String($0)) }) else { continue }
             guard let match = candidate.first(where: { candidateLine in
                 let candidateWords = candidateLine.split(separator: " ")
                 return candidateWords.count == censoredWords.count
@@ -127,40 +130,19 @@ struct LyricsUncensorFill {
     /// the honest option rather than a fabricated split.
     static func fillKaraoke(
         lines: [KaraokeLineDto],
-        query: LyricsSearchQuery,
-        options: LyricsOptions
+        original: [String], resolved: [String]
     ) -> [KaraokeLineDto] {
-        let plainLines = lines.map(\.plainText)
-        guard plainLines.contains(where: { containsFullCensor($0) }) else {
-            return lines
-        }
-
-        let fallbackSources: [LyricsRepository] = [
-            LrclibLyricsRepository.shared,
-            GeniusLyricsRepository.shared,
-        ]
-
-        var resolvedPlainLines = plainLines
-        for source in fallbackSources {
-            guard let fallbackLines = try? source.getLyrics(query, options: options).lines.map(\.content),
-                  !fallbackLines.isEmpty else { continue }
-
-            resolvedPlainLines = attemptFill(censored: resolvedPlainLines, candidate: fallbackLines)
-
-            if !resolvedPlainLines.contains(where: { containsFullCensor($0) }) {
-                break
-            }
-        }
-
-        guard resolvedPlainLines != plainLines else { return lines } // nothing resolved, no rebuild needed
-
+        guard original != resolved else { return lines }
+        var replacements: [String: String] = [:]
+        for (before, after) in zip(original, resolved) where before != after { replacements[before] = after }
         var output = lines
         for (index, line) in lines.enumerated() {
-            guard plainLines[index] != resolvedPlainLines[index] else { continue }
+            let plain = line.plainText
+            guard let resolved = replacements[plain] else { continue }
             output[index] = rebuildLineWithResolvedWords(
                 original: line,
-                originalPlainWords: plainLines[index].split(separator: " "),
-                resolvedPlainWords: resolvedPlainLines[index].split(separator: " ")
+                originalPlainWords: plain.split(separator: " "),
+                resolvedPlainWords: resolved.split(separator: " ")
             )
         }
         return output

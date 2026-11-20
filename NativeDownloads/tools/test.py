@@ -53,6 +53,7 @@ FIXTURES = (
     Fixture("offline_library_catalog", "library", ("OfflineLibraryCatalog.m", "WireProto.m", "offline_library_catalog.m")),
     # Allow CI scheduling headroom around this fixture's 25 ms mock responses.
     Fixture("offline_catalog_transport", "transport", ("OfflineLibraryCatalog.m", "SpotifyTransportRegistry.m", "SpotifyServiceCalls.m", "SpotifyTransportHooks.m", "WireProto.m", "offline_catalog_transport.m"), scenarios=tuple((s,) for s in ("candidate_churn", "service_route", "stream_route", "method_route", "slow_route", "cancel_reopen", "cancel_late_route", "service_isolation", "invalid_proof", "weak_route", "bridge_last", "late_reply", "cancel_before_send", "exhaustion", "stream_once", "persisted_route", "persisted_invalid")), defines=("SAP_TEST_SERVICE_TIMEOUT_SECONDS=0.2",)),
+    Fixture("offline_lyrics", "transport", ("OfflineLyrics.m", "WireProto.m", "offline_lyrics.m")),
     Fixture("spotify_cache_clear", "library", ("SpotifyCacheClear.m", "WireProto.m", "spotify_cache_clear.m"), scenarios=tuple((s,) for s in ("normal", "stats_unreadable", "error", "not_invoked", "busy"))),
     Fixture("offline_library_delete", "library", ("OfflineLibraryDelete.m", "WireProto.m", "offline_library_delete.m")),
     Fixture("offline_library_export", "library", ("OfflineLibraryExport.m", "offline_library_export.m")),

@@ -3,6 +3,7 @@
 #import "OfflineDevices.h"
 #import "TrackExport.h"
 #import "OfflineLibraryUI.h"
+#import "OfflineLibraryCatalog.h"
 #import "NativeDownloadQuality.h"
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
@@ -386,6 +387,229 @@ static UITableViewCell *SAPPlainSettingsCell(NSString *label,NSString *value) {
 - (void)tableView:(UITableView *)table didSelectRowAtIndexPath:(NSIndexPath *)index {[table deselectRowAtIndexPath:index animated:YES];if(index.section==1)[self enableCurrent];}
 @end
 
+// Eevee owns the sidecar and queue. The companion only presents controls and
+// obtains a fresh, validated native catalog for the explicit backfill action.
+static Class SAPLyricsBridge(void) {return NSClassFromString(@"EeveeOfflineLyricsDownloader");}
+static NSDictionary *SAPLyricsSnapshot(void) {
+    Class cls=SAPLyricsBridge();SEL selector=NSSelectorFromString(@"settingsSnapshot");
+    return [cls respondsToSelector:selector]?((id(*)(id,SEL))objc_msgSend)(cls,selector):@{};
+}
+// The native catalog read belongs to the download action, not to a page's lifetime.
+static dispatch_block_t SAPLyricsCatalogCancel;
+static id SAPLyricsCatalogObserver;
+@interface SAPLyricsSettings : SAPSettingsTable
+@property(nonatomic,strong) NSDictionary *lyrics;
+@property(nonatomic,strong) id lyricsObserver;
+@property(nonatomic) BOOL scanning,clearing;
+@property(nonatomic) NSUInteger scanCompleted,scanTotal;
+@property(nonatomic,strong) UIView *progressHeader,*progressPanel;
+@property(nonatomic,strong) UILabel *progressTitle,*progressDetail;
+@property(nonatomic,strong) UIProgressView *progressBar;
+@property(nonatomic,strong) UIButton *progressAction;
+@property(nonatomic,strong) NSLayoutConstraint *progressActionHeight;
+@property(nonatomic) BOOL updatingProgressPanel,displayedScan,displayedRefresh;
+@end
+@implementation SAPLyricsSettings
+- (void)viewDidLoad {[super viewDidLoad];self.title=SAPL(@"Тексты песен",@"Lyrics");}
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];__weak typeof(self) weak=self;
+    self.lyricsObserver=[NSNotificationCenter.defaultCenter addObserverForName:@"EeveeOfflineLyricsSettingsChanged" object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note){[weak refresh];}];
+}
+- (void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];if(self.lyricsObserver)[NSNotificationCenter.defaultCenter removeObserver:self.lyricsObserver];self.lyricsObserver=nil;
+}
+- (void)dealloc {if(_lyricsObserver)[NSNotificationCenter.defaultCenter removeObserver:_lyricsObserver];}
+- (void)viewDidLayoutSubviews {[super viewDidLayoutSubviews];[self layoutProgressPanel:NO];}
+- (void)refresh {
+    self.lyrics=SAPLyricsSnapshot();self.scanning=[self.lyrics[@"scan_active"]boolValue];
+    self.scanCompleted=[self.lyrics[@"scan_completed"]unsignedIntegerValue];self.scanTotal=[self.lyrics[@"scan_total"]unsignedIntegerValue];
+    [self.tableView reloadData];
+    [self updateProgressPanel];
+}
+- (BOOL)busy {return self.scanning || ([self.lyrics[@"batch"][@"active"]boolValue] && ![self.lyrics[@"batch"][@"kind"]isEqual:@"refresh"]);}
+// Match Downloaded tracks' active progress panel, including its fixed-height
+// one-line labels and Cancel capsule. Lyrics have no package to retain/share.
+- (void)updateProgressPanel {
+    if(self.updatingProgressPanel || !self.isViewLoaded)return;
+    self.updatingProgressPanel=YES;
+    NSDictionary *batch=self.lyrics[@"batch"];
+    BOOL refresh=[batch[@"kind"]isEqual:@"refresh"] && !self.scanning;
+    if(![self downloadsOn] || (!self.scanning && ![batch[@"active"]boolValue])) {
+        if(self.progressHeader && self.tableView.tableHeaderView==self.progressHeader)self.tableView.tableHeaderView=nil;
+        self.updatingProgressPanel=NO;return;
+    }
+    BOOL continuing=self.tableView.tableHeaderView==self.progressHeader && self.displayedScan==self.scanning && self.displayedRefresh==refresh;
+    if(!self.progressHeader) {
+        self.progressHeader=UIView.new;self.progressHeader.autoresizingMask=UIViewAutoresizingFlexibleWidth;
+        self.progressPanel=UIView.new;self.progressPanel.backgroundColor=[UIColor colorWithWhite:1 alpha:0.1008];self.progressPanel.translatesAutoresizingMaskIntoConstraints=NO;
+        self.progressPanel.layer.cornerRadius=24;self.progressPanel.layer.cornerCurve=kCACornerCurveContinuous;
+        self.progressTitle=UILabel.new;self.progressTitle.font=[UIFont preferredFontForTextStyle:UIFontTextStyleFootnote];self.progressTitle.textColor=UIColor.labelColor;self.progressTitle.adjustsFontForContentSizeCategory=YES;
+        self.progressTitle.numberOfLines=1;self.progressTitle.lineBreakMode=NSLineBreakByTruncatingTail;
+        self.progressDetail=UILabel.new;self.progressDetail.font=[UIFont preferredFontForTextStyle:UIFontTextStyleCaption1];self.progressDetail.textColor=UIColor.secondaryLabelColor;self.progressDetail.adjustsFontForContentSizeCategory=YES;
+        self.progressDetail.numberOfLines=1;self.progressDetail.lineBreakMode=NSLineBreakByTruncatingTail;
+        self.progressDetail.adjustsFontSizeToFitWidth=YES;self.progressDetail.minimumScaleFactor=0.75;
+        for(UILabel *label in @[self.progressTitle,self.progressDetail]) {
+            label.translatesAutoresizingMaskIntoConstraints=NO;[label setContentCompressionResistancePriority:UILayoutPriorityDefaultLow forAxis:UILayoutConstraintAxisHorizontal];
+        }
+        self.progressBar=[[UIProgressView alloc]initWithProgressViewStyle:UIProgressViewStyleDefault];self.progressBar.progressTintColor=UIColor.systemGreenColor;self.progressBar.translatesAutoresizingMaskIntoConstraints=NO;
+        self.progressAction=[UIButton buttonWithType:UIButtonTypeSystem];self.progressAction.translatesAutoresizingMaskIntoConstraints=NO;
+        UIButtonConfiguration *button=[UIButtonConfiguration filledButtonConfiguration];button.buttonSize=UIButtonConfigurationSizeSmall;button.baseForegroundColor=UIColor.whiteColor;button.baseBackgroundColor=UIColor.systemGray4Color;button.cornerStyle=UIButtonConfigurationCornerStyleCapsule;
+        button.contentInsets=NSDirectionalEdgeInsetsMake(5,10,5,10);button.titleLineBreakMode=NSLineBreakByTruncatingTail;
+        button.titleTextAttributesTransformer=^NSDictionary *(NSDictionary *attributes){NSMutableDictionary *result=[attributes mutableCopy];result[NSFontAttributeName]=[UIFont preferredFontForTextStyle:UIFontTextStyleCaption1];return result;};
+        self.progressAction.configuration=button;[self.progressAction setTitle:@"Cancel" forState:UIControlStateNormal];
+        [self.progressAction addTarget:self action:@selector(cancelDownload) forControlEvents:UIControlEventTouchUpInside];
+        self.progressAction.titleLabel.numberOfLines=1;self.progressAction.titleLabel.adjustsFontSizeToFitWidth=YES;self.progressAction.titleLabel.minimumScaleFactor=0.6;
+        self.progressActionHeight=[self.progressAction.heightAnchor constraintEqualToConstant:30];
+        [self.progressHeader addSubview:self.progressPanel];
+        for(UIView *child in @[self.progressTitle,self.progressDetail,self.progressBar,self.progressAction])[self.progressPanel addSubview:child];
+        [NSLayoutConstraint activateConstraints:@[
+            [self.progressPanel.leadingAnchor constraintEqualToAnchor:self.progressHeader.layoutMarginsGuide.leadingAnchor],
+            [self.progressPanel.trailingAnchor constraintEqualToAnchor:self.progressHeader.layoutMarginsGuide.trailingAnchor],
+            [self.progressPanel.topAnchor constraintEqualToAnchor:self.progressHeader.topAnchor constant:8],
+            [self.progressPanel.bottomAnchor constraintEqualToAnchor:self.progressHeader.bottomAnchor constant:-8],
+            [self.progressAction.topAnchor constraintEqualToAnchor:self.progressPanel.topAnchor constant:10],
+            [self.progressAction.trailingAnchor constraintEqualToAnchor:self.progressPanel.trailingAnchor constant:-14],
+            [self.progressAction.widthAnchor constraintEqualToConstant:76],self.progressActionHeight,
+            [self.progressTitle.leadingAnchor constraintEqualToAnchor:self.progressPanel.leadingAnchor constant:16],
+            [self.progressTitle.trailingAnchor constraintEqualToAnchor:self.progressAction.leadingAnchor constant:-12],
+            [self.progressTitle.centerYAnchor constraintEqualToAnchor:self.progressAction.centerYAnchor],
+            [self.progressDetail.leadingAnchor constraintEqualToAnchor:self.progressPanel.leadingAnchor constant:16],
+            [self.progressDetail.trailingAnchor constraintEqualToAnchor:self.progressPanel.trailingAnchor constant:-16],
+            [self.progressDetail.topAnchor constraintEqualToAnchor:self.progressAction.bottomAnchor constant:8],
+            [self.progressBar.leadingAnchor constraintEqualToAnchor:self.progressPanel.leadingAnchor constant:16],
+            [self.progressBar.trailingAnchor constraintEqualToAnchor:self.progressPanel.trailingAnchor constant:-16],
+            [self.progressBar.topAnchor constraintEqualToAnchor:self.progressDetail.bottomAnchor constant:10],
+            [self.progressBar.heightAnchor constraintEqualToConstant:4],
+            [self.progressBar.bottomAnchor constraintEqualToAnchor:self.progressPanel.bottomAnchor constant:-14]]];
+    }
+    NSUInteger done=self.scanning?self.scanCompleted:[batch[@"completed"]unsignedIntegerValue];
+    NSUInteger total=self.scanning?self.scanTotal:[batch[@"total"]unsignedIntegerValue];
+    NSString *title=refresh?SAPL(@"Обновление текстов · %lu / %lu",@"Updating lyrics · %lu / %lu"):SAPL(@"Скачиваю тексты · %lu / %lu",@"Downloading lyrics · %lu / %lu");
+    if(self.scanning)title=SAPL(@"Проверяю загрузки · %lu / %lu",@"Checking downloads · %lu / %lu");
+    self.progressTitle.text=[NSString stringWithFormat:title,(unsigned long)done,(unsigned long)total];
+    self.progressDetail.text=self.scanning?SAPL(@"Подготовка скачивания текстов…",@"Preparing lyrics download…"):
+        [NSString stringWithFormat:SAPL(@"Сохранено %@ · уже было %@ · ошибок %@ · не найдено %@",@"Saved %@ · already saved %@ · failed %@ · not found %@"),
+            batch[@"saved"]?:@0,batch[@"skipped"]?:@0,batch[@"failed"]?:@0,batch[@"not_found"]?:@0];
+    float fraction=total?MIN(1,(float)done/total):0;
+    BOOL animate=continuing && self.progressBar.window!=nil && fraction>self.progressBar.progress && !UIAccessibilityIsReduceMotionEnabled();
+    if(!continuing || fraction!=self.progressBar.progress || UIAccessibilityIsReduceMotionEnabled())[self.progressBar setProgress:fraction animated:animate];
+    self.displayedScan=self.scanning;
+    self.displayedRefresh=refresh;
+    [self layoutProgressPanel:YES];self.updatingProgressPanel=NO;
+}
+- (void)layoutProgressPanel:(BOOL)insert {
+    if(!self.progressHeader || (!insert && self.tableView.tableHeaderView!=self.progressHeader))return;
+    CGFloat width=self.tableView.bounds.size.width;UIEdgeInsets margins=self.tableView.layoutMargins;
+    UIEdgeInsets headerMargins=UIEdgeInsetsMake(0,MAX(16,margins.left),0,MAX(16,margins.right));
+    if(!UIEdgeInsetsEqualToEdgeInsets(headerMargins,self.progressHeader.layoutMargins))self.progressHeader.layoutMargins=headerMargins;
+    CGFloat actionHeight=ceil(MAX(30,MAX(self.progressTitle.font.lineHeight,[UIFont preferredFontForTextStyle:UIFontTextStyleCaption1].lineHeight+10)));
+    if(fabs(self.progressActionHeight.constant-actionHeight)>.5)self.progressActionHeight.constant=actionHeight;
+    CGFloat height=16+10+actionHeight+8+ceil(self.progressDetail.font.lineHeight)+10+4+14;
+    CGSize size=CGSizeMake(width,height);BOOL resized=!CGSizeEqualToSize(self.progressHeader.bounds.size,size);
+    if(resized)self.progressHeader.frame=(CGRect){CGPointZero,size};
+    if(self.tableView.tableHeaderView!=self.progressHeader || resized)self.tableView.tableHeaderView=self.progressHeader;
+}
+- (void)cancelDownload {
+    dispatch_block_t cancel=SAPLyricsCatalogCancel;SAPLyricsCatalogCancel=nil;
+    Class cls=SAPLyricsBridge();SEL selector=NSSelectorFromString(@"cancelDownloads");
+    if([cls respondsToSelector:selector])((void(*)(id,SEL))objc_msgSend)(cls,selector);
+    if(cancel)cancel();
+    [self refresh];
+}
+// Everything except the switch appears only while lyrics downloading is on.
+- (BOOL)downloadsOn {return [self.lyrics[@"enabled"]boolValue];}
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)table {return [self downloadsOn]?2:1;}
+- (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section {return section==0?([self downloadsOn]?2:1):2;}
+- (NSString *)tableView:(UITableView *)table titleForHeaderInSection:(NSInteger)section {return section==0?SAPL(@"Скачивание",@"Downloading"):SAPL(@"Сохранённые тексты",@"Saved lyrics");}
+- (NSString *)tableView:(UITableView *)table titleForFooterInSection:(NSInteger)section {
+    if(section==1)return SAPL(@"Удаление текстов не удаляет музыку. При удалении скачанной песни её сохранённые тексты тоже удаляются.",@"Deleting lyrics keeps your music. Removing a downloaded song also removes its saved lyrics.");
+    return [NSString stringWithFormat:SAPL(@"Источник: %@. Тексты сохраняются вместе с музыкой. Уже сохранённые тексты остаются при отключении. Караоке работает со своим переключателем. Пауза между запросами к одному сайту — не менее 0,5 секунды. Одновременно обрабатываются до двух песен.",@"Source: %@. Save lyrics alongside music. Turning this off keeps existing lyrics. Karaoke keeps its own switch. Up to two songs load at once, with at least 0.5 seconds between requests to each site."),self.lyrics[@"source"]?:@"—"];
+}
+- (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)index {
+    if(index.section==1) {
+        if(index.row==0){
+            NSUInteger count=[self.lyrics[@"tracks"]unsignedIntegerValue];
+            // Russian genitive after "для N": 1, 21, 31… песни; otherwise песен.
+            NSString *songs=(count%10==1&&count%100!=11)?@"песни":@"песен";
+            NSString *title=[NSString stringWithFormat:SAPL(@"Есть текст для %lu %@",@"Lyrics for %lu %@"),(unsigned long)count,SAPL(songs,count==1?@"song":@"songs")];
+            UITableViewCell *cell=SAPSettingsCell(table,title,nil,@"music.note.list",UIColor.systemPurpleColor,NO);
+            UILabel *size=[UILabel new];size.text=[NSByteCountFormatter stringFromByteCount:[self.lyrics[@"bytes"]longLongValue] countStyle:NSByteCountFormatterCountStyleFile];
+            size.textColor=UIColor.secondaryLabelColor;size.font=[UIFont preferredFontForTextStyle:UIFontTextStyleBody];[size sizeToFit];
+            cell.accessoryView=size;cell.selectionStyle=UITableViewCellSelectionStyleNone;return cell;
+        }
+        UITableViewCell *cell=SAPSettingsCell(table,SAPL(@"Удалить скачанные тексты",@"Delete saved lyrics"),nil,@"trash.fill",UIColor.systemRedColor,NO);
+        cell.userInteractionEnabled=!self.clearing;return cell;
+    }
+    if(index.row==0) {
+        NSString *title=SAPL(@"Скачивать тексты песен",@"Download lyrics");
+        UITableViewCell *cell=SAPSettingsCell(table,title,nil,@"text.quote",UIColor.systemPurpleColor,NO);
+        UISwitch *toggle=[UISwitch new];toggle.on=[self.lyrics[@"enabled"]boolValue];toggle.enabled=SAPLyricsBridge()!=Nil && !self.clearing;toggle.accessibilityLabel=title;
+        [toggle addTarget:self action:@selector(enabledChanged:) forControlEvents:UIControlEventValueChanged];cell.accessoryView=toggle;cell.selectionStyle=UITableViewCellSelectionStyleNone;return cell;
+    }
+    NSString *detail=nil;
+    if(![self.lyrics[@"available"]boolValue])detail=SAPL(@"Сначала выберите источник текстов в настройках EeveeSpotify",@"Choose a lyrics provider in EeveeSpotify settings first");
+    BOOL allSaved=[self.lyrics[@"all_saved"]boolValue];
+    BOOL checking=[self.lyrics[@"statistics_loading"]boolValue];
+    if(![self busy] && checking)detail=SAPL(@"Проверяю сохранённые тексты…",@"Checking saved lyrics…");
+    else if(![self busy] && [self.lyrics[@"library_known"]boolValue] && !allSaved)
+        detail=[NSString stringWithFormat:SAPL(@"Осталось скачать тексты для %@ песен",@"Missing lyrics for %@ songs"),self.lyrics[@"library_missing"]?:@0];
+    NSString *title=allSaved?([self.lyrics[@"library_total"]unsignedIntegerValue]?SAPL(@"Все тексты уже скачаны",@"All lyrics are downloaded"):SAPL(@"Нет скачанных песен",@"No downloaded songs")):SAPL(@"Скачать недостающие тексты",@"Download missing lyrics");
+    UITableViewCell *cell=SAPSettingsCell(table,title,detail,allSaved?@"checkmark.circle.fill":@"arrow.down.circle.fill",UIColor.systemGreenColor,NO);
+    cell.userInteractionEnabled=[self.lyrics[@"enabled"]boolValue]&&[self.lyrics[@"available"]boolValue]&&![self busy]&&!self.clearing&&!allSaved&&!checking;
+    if(!cell.userInteractionEnabled)cell.selectionStyle=UITableViewCellSelectionStyleNone;
+    return cell;
+}
+- (void)enabledChanged:(UISwitch *)toggle {
+    if(!toggle.on && SAPLyricsCatalogCancel){SAPLyricsCatalogCancel();SAPLyricsCatalogCancel=nil;self.scanning=NO;}
+    Class cls=SAPLyricsBridge();SEL selector=NSSelectorFromString(@"setDownloadsEnabled:");
+    if([cls respondsToSelector:selector])((void(*)(id,SEL,BOOL))objc_msgSend)(cls,selector,toggle.on);
+    [UIView transitionWithView:self.tableView duration:0.25 options:UIViewAnimationOptionTransitionCrossDissolve animations:^{[self refresh];} completion:nil];
+}
+- (void)showError:(NSString *)error {
+    UIAlertController *alert=[UIAlertController alertControllerWithTitle:SAPL(@"Тексты песен",@"Lyrics") message:error preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleCancel handler:nil]];[self presentViewController:alert animated:YES completion:nil];
+}
+- (void)downloadExisting {
+    if([self busy] || self.clearing || [self.lyrics[@"all_saved"]boolValue])return;
+    self.scanning=YES;
+    if(!SAPLyricsCatalogObserver)SAPLyricsCatalogObserver=[NSNotificationCenter.defaultCenter addObserverForName:@"EeveeOfflineLyricsSettingsChanged" object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note){
+        if(SAPLyricsCatalogCancel && ![SAPLyricsSnapshot()[@"scan_active"]boolValue]){dispatch_block_t cancel=SAPLyricsCatalogCancel;SAPLyricsCatalogCancel=nil;cancel();}
+    }];
+    Class bridge=SAPLyricsBridge();SEL begin=NSSelectorFromString(@"beginLibraryScan");
+    if([bridge respondsToSelector:begin])((void(*)(id,SEL))objc_msgSend)(bridge,begin);
+    [self refresh];__weak typeof(self) weak=self;
+    SAPLyricsCatalogCancel=SAPFetchOfflineLibrary(^(NSUInteger done,NSUInteger total){
+        Class cls=SAPLyricsBridge();SEL update=NSSelectorFromString(@"libraryScanProgress:total:");
+        if([cls respondsToSelector:update])((void(*)(id,SEL,NSInteger,NSInteger))objc_msgSend)(cls,update,(NSInteger)done,(NSInteger)total);
+        [weak refresh];
+    },^(NSArray *tracks,NSString *error){
+        typeof(self) self=weak;SAPLyricsCatalogCancel=nil;self.scanning=NO;
+        if(![SAPLyricsSnapshot()[@"scan_active"]boolValue]){[self refresh];return;}
+        if(!tracks){Class cls=SAPLyricsBridge();SEL end=NSSelectorFromString(@"endLibraryScan");if([cls respondsToSelector:end])((void(*)(id,SEL))objc_msgSend)(cls,end);[self refresh];[self showError:error?:SAPL(@"Не удалось проверить список скачанных песен",@"Could not verify downloaded songs")];return;}
+        Class cls=SAPLyricsBridge();SEL selector=NSSelectorFromString(@"downloadForTracks:");
+        if([cls respondsToSelector:selector])((void(*)(id,SEL,id))objc_msgSend)(cls,selector,tracks);
+        [self refresh];
+        if(!tracks.count)[self showError:SAPL(@"Spotify не сообщил о скачанных песнях",@"Spotify reported no downloaded songs")];
+    });
+}
+- (void)deleteAll {
+    if(self.clearing)return;
+    UIAlertController *alert=[UIAlertController alertControllerWithTitle:SAPL(@"Удалить все скачанные тексты?",@"Delete all saved lyrics?") message:SAPL(@"Музыка останется. Очередь текстов будет остановлена. Тексты можно скачать снова.",@"Your music stays. Pending lyrics downloads will stop. You can download lyrics again.") preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:SAPL(@"Отмена",@"Cancel") style:UIAlertActionStyleCancel handler:nil]];
+    [alert addAction:[UIAlertAction actionWithTitle:SAPL(@"Удалить тексты",@"Delete lyrics") style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action){
+        if(SAPLyricsCatalogCancel){SAPLyricsCatalogCancel();SAPLyricsCatalogCancel=nil;self.scanning=NO;}
+        self.clearing=YES;[self refresh];Class cls=SAPLyricsBridge();SEL selector=NSSelectorFromString(@"deleteSavedLyricsWithCompletion:");
+        if([cls respondsToSelector:selector])((void(*)(id,SEL,id))objc_msgSend)(cls,selector,^(NSString *error){self.clearing=NO;[self refresh];if(error)[self showError:error];});
+        else {self.clearing=NO;[self refresh];}
+    }]];[self presentViewController:alert animated:YES completion:nil];
+}
+- (void)tableView:(UITableView *)table didSelectRowAtIndexPath:(NSIndexPath *)index {
+    [table deselectRowAtIndexPath:index animated:YES];
+    if(index.section==1 && index.row==1){[self deleteAll];return;}
+    if(index.section==0 && index.row==1){[self downloadExisting];return;}
+}
+@end
+
 @interface SAPDownloadsSettings : SAPSettingsTable
 @property(nonatomic) BOOL checkingCompatibility;
 @property(nonatomic) BOOL qualityOffer;
@@ -422,7 +646,7 @@ static UITableViewCell *SAPPlainSettingsCell(NSString *label,NSString *value) {
 }
 - (NSString *)tableView:(UITableView *)table titleForHeaderInSection:(NSInteger)section {
     if(self.qualityOffer){if(section==0)return nil;section--;}
-    return @[@"Download",@"Download compatibility",@"Export",@"Diagnostics",@"Me"][section];
+    return @[@"Download",@"Download compatibility",@"Export",@"Diagnostics"][section];
 }
 - (NSString *)tableView:(UITableView *)table titleForFooterInSection:(NSInteger)section {
     if(self.qualityOffer){if(section==0)return nil;section--;}
@@ -687,6 +911,8 @@ static void SAPAttachSettings(UIViewController *host) {
 static void SAPSettingsLoaded(id self,SEL selector) {originalSettingsLoad(self,selector);SAPAttachSettings(self);}
 static void SAPSettingsLayout(id self,SEL selector) {originalSettingsLayout(self,selector);SAPAttachSettings(self);}
 __attribute__((visibility("default"))) UIViewController *SAPCreateDownloadsSettings(void) {return [SAPDownloadsSettings new];}
+// Lyrics downloads live in EeveeSpotify's Lyrics settings, opened through this entry point.
+__attribute__((visibility("default"))) UIViewController *SAPCreateLyricsSettings(void) {return [SAPLyricsSettings new];}
 void SAPInstallDownloadSettings(void) {
     if(!NSThread.isMainThread){dispatch_async(dispatch_get_main_queue(),^{SAPInstallDownloadSettings();});return;}
     if(settingsInstalled)return;
