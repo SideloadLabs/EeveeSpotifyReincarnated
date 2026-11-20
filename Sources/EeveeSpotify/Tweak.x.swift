@@ -222,6 +222,8 @@ struct EeveeSpotify: Tweak {
             return
         }
 
+        RetiredLyricsSession.install()
+
         // Local-only premium force; independent of patching, so premium UI survives everything else being off.
         activateEeveePremiumForce()
 
@@ -244,6 +246,8 @@ struct EeveeSpotify: Tweak {
             LocalPlaylistDownloadGroup().activate()
         }
         HideJam.activate()
+        NativeOfflineLyrics.shared.start()
+        EeveeOfflineLyricsDownloader.shared.start()
         activateRemoteFlags()
         activateRatingPromptBlock()
 
@@ -348,6 +352,16 @@ struct EeveeSpotify: Tweak {
                     V91LyricsGroup().activate()
                 } else {
                     writeDebugLog("[INIT] Skipped V91LyricsGroup (NPVScrollViewController missing)")
+                }
+
+                if NativeOfflineLyrics.shared.isActive,
+                   let cls = NSClassFromString("SPTPlayerTrack"),
+                   class_getInstanceMethod(cls, NSSelectorFromString("metadata")) != nil,
+                   class_getInstanceMethod(cls, NSSelectorFromString("URI")) != nil {
+                    NativeLyricsAvailabilityGroup().activate()
+                    writeDebugLog("[INIT] Native lyrics availability: has_lyrics for tracks with saved provider lyrics")
+                } else {
+                    writeDebugLog("[INIT] Skipped NativeLyricsAvailabilityGroup (native offline lyrics inactive or SPTPlayerTrack metadata/URI missing)")
                 }
 
             }

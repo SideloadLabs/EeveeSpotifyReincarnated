@@ -1,3 +1,4 @@
+import EeveeSpotifyC
 import SwiftUI
 
 struct EeveeLyricsSettingsView: View {
@@ -20,6 +21,24 @@ struct EeveeLyricsSettingsView: View {
                 if viewModel.lyricsSource.supportsCustomLyricsView {
                     karaokeAppearanceSection()
                     SettingsResetSection(visible: karaokeOptions != KaraokeOptions()) { karaokeOptions = KaraokeOptions() }
+                }
+            }
+
+            if EeveePixieLyricsAvailable() {
+                Section {
+                    Button {
+                        if let page = EeveePixieMakeLyricsController() {
+                            SettingsNavigator.navigationController?.pushViewController(page, animated: true)
+                        }
+                    } label: {
+                        SettingsLabel(
+                            title: "lyrics_downloads".localized,
+                            subtitle: "lyrics_downloads_subtitle".localized,
+                            icon: "arrow.down.circle.fill",
+                            color: .purple,
+                            chevron: true
+                        )
+                    }
                 }
             }
 

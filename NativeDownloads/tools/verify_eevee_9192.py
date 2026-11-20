@@ -12,9 +12,11 @@ import patch_key_request_mode as mode
 import patch_native_restrictions as quota
 import patch_native_trace as trace
 import patch_export as export
+import patch_lyrics_offline_cache as lyrics_cache
 from export_release_materials import notices
 from pixie_target import PROFILE
 from signing_metadata import embedded_entitlements
+from lyrics_background_config import BACKGROUND_PROCESSING_MARKER, patch_info
 
 APP = 'Payload/Spotify.app/'
 EXECUTABLE = APP + 'Spotify'
@@ -31,6 +33,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('input', type=Path)
     parser.add_argument('--output', type=Path)
+    parser.add_argument('--signing-bundle-identifier', help='Bundle identifier used to package the lyrics task')
     parser.add_argument('--report', type=Path)
     args = parser.parse_args()
     with ZipFile(args.input) as source:
@@ -58,6 +61,7 @@ def main():
         prepared, _ = mode.patch(prepared, runtime_selectable=False)
         patched, trace_report = trace.patch(prepared)
         patched, export_report = export.patch(patched)
+        patched, lyrics_cache_report = lyrics_cache.patch(patched, PROFILE["spotify_version"])
         # Code outside the explicit observation entries/padding spans (the three diagnostic
         # boundaries and the Pixie 1.4 export boundaries) must remain byte-for-byte unchanged.
         spans = []
@@ -69,6 +73,9 @@ def main():
             _, address, cave, _, _ = point
             spans.extend([(address-quota.PREFERRED, address-quota.PREFERRED+4),
                           (cave-quota.PREFERRED, cave-quota.PREFERRED+len(export.trampoline(point)))])
+        if lyrics_cache_report["applied"]:
+            offset = lyrics_cache_report["file_offset"]
+            spans.append((offset, offset + 4))
         position = 0
         for start, end in sorted(spans):
             require(prepared[position:start] == patched[position:start], 'Unexpected diagnostic change')
@@ -96,6 +103,7 @@ def main():
                   'manager_setter_slot': 65, 'restriction_fields_unchanged': ['0x2b8', '0x2c0', '0x2c8', '0x2d0', '0x2d8'],
                   'hook_target_names_present': required, 'rejected_invalid_patch_cases': rejected,
                   'quota': quota_report, 'diagnostic_boundaries': trace_report, 'export_boundaries': export_report,
+                  'offline_lyrics_cache': lyrics_cache_report,
                   'phone_runtime_tested': False}
         if args.output:
             with ZipFile(args.output) as result:
@@ -105,7 +113,14 @@ def main():
                 changed = [entry.filename for entry in source.infolist()
                            if (entry.CRC, entry.file_size) !=
                            (result.getinfo(entry.filename).CRC, result.getinfo(entry.filename).file_size)]
-                require(set(changed) == {EXECUTABLE, EEVEE}, 'Unexpected changed original IPA entries')
+                expected_changes = {EXECUTABLE, EEVEE}
+                info_name = APP + 'Info.plist'
+                expected_info = patch_info(source.read(info_name), signing_bundle_identifier=args.signing_bundle_identifier,
+                                           background_processing=BACKGROUND_PROCESSING_MARKER in result.read(EEVEE))
+                require(result.read(info_name) == expected_info, 'Unexpected app configuration changes')
+                if expected_info != source.read(info_name):
+                    expected_changes.add(info_name)
+                require(set(changed) == expected_changes, 'Unexpected changed original IPA entries')
                 packaged = result.read(EXECUTABLE)
                 require(embedded_entitlements(packaged) == embedded_entitlements(original),
                         'Executable entitlements changed')

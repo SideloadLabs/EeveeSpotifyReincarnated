@@ -235,3 +235,7 @@ int main(int argc,const char **argv) { @autoreleasepool {
     puts([[NSString stringWithFormat:@"PASS: offline catalog transport %@",scenario]UTF8String]);
     return 0;
 } }
+
+void SAPRequestOfflineLyrics(NSString *uri, NSArray *tracks) {}
+
+void SAPRemoveOfflineLyrics(NSString *uri, NSArray *tracks) {}
