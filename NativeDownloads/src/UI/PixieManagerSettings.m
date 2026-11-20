@@ -663,7 +663,8 @@ static id SAPLyricsCatalogObserver;
     }
     if(section==1) {
         NSDictionary *mode=self.snapshot[@"key_request_mode"];
-        return [NSString stringWithFormat:SAPLocalized(@"%@\n\nOnly change settings in this menu if downloads are not working."),mode[@"detail"]?:@""];
+        // The adapter reports a fixed English sentence; it is a Pixie.strings key.
+        return [NSString stringWithFormat:SAPLocalized(@"%@\n\nOnly change settings in this menu if downloads are not working."),SAPLocalized(mode[@"detail"]?:@"")];
     }
     if(section==2)return SAPLocalized(@"Export downloaded Spotify audio to external apps or Files from Pixie or Spotify’s Share as file option. Choose a destination in the share sheet. The selected format applies to future exports.");
     if(section==3)return SAPLocalized(@"Enable Diagnostics for detailed passive events.");
