@@ -1,11 +1,5 @@
-// lifts Spotify's core mixer limit with the speed, so the core keeps up above 1.2x.
-//
-// the list player's mixer hands audio out through a token bucket: 10 s of frames up front, refilled at
-// sample rate x 1.2 / 1000 frames per ms (52 at 44.1 kHz). at 1.5x the engine drains it in about 30 s, then
-// the core runs at 1.2x and the sound pauses to catch up. the bucket reads time through Spotify's import of
-// std::chrono::steady_clock::now() (a pointer the core copies when it starts), so that import is rebound
-// and the bucket's two reads get a clock that runs max(1, speed) times as fast. every other caller gets the
-// real time. see README.md, "Spotify's mixer limit".
+// lifts Spotify's core mixer limit with the speed, so the core keeps up above 1.2x (README.md, "Spotify's mixer
+// limit"): the token bucket's two reads of steady_clock::now() get a clock running max(1, speed) times as fast.
 #import <dlfcn.h>
 #import <stdatomic.h>
 #if __has_feature(ptrauth_calls)
@@ -42,8 +36,7 @@ static int64_t warped(int64_t now) {
     }
 }
 
-// which of the bucket's two reads this is, told by the code it returns to (both reach the clock through tail
-// calls), 0 for neither:
+// which of the bucket's two reads this is, by the code it returns to, 0 for neither:
 // - elapsed time: ldp of the tokens and the last read from [bucket + 0x30], then a divide by 1,000,000
 // - the last read: str x0 to [bucket + 0x38], after add x0, bucket, #0x10 (its clock) and the bl
 static unsigned bucketRead(void *returnAddress) {
@@ -67,12 +60,13 @@ static unsigned bucketRead(void *returnAddress) {
     return 0;
 }
 
-// any thread, the render threads included: no locks, no allocation, no log. the bucket's reads are warped only
-// once both have been seen: with one warped and the other not, a Spotify build that changed one of them would
-// have the bucket subtract times from two timelines. the warped one is never behind the real one, so the first
-// read that goes over only refills the bucket early.
-static int64_t now(void *returnAddress) {
+// any thread: no locks, allocation or log. warped only once both reads are seen, so the bucket never subtracts
+// times from two timelines; the warped one is never behind, so the first read over only refills early.
+static BOOL sg_inline;   // hooked inline, every caller in the process comes through
+static int64_t now(void) {
+    void *returnAddress = __builtin_return_address(0);
     int64_t real = sg_realNow();
+    if (sg_inline && !EeveeCalledFromSpotify(returnAddress)) return real;
     unsigned read = bucketRead(returnAddress);
     if (!read) return real;
     unsigned seen = atomic_load_explicit(&sg_readsSeen, memory_order_relaxed);
@@ -80,22 +74,13 @@ static int64_t now(void *returnAddress) {
     return seen == kBothReads ? warped(real) : real;
 }
 
-static int64_t reboundNow(void) {
-    return now(__builtin_return_address(0));
-}
-
-// the inline hook catches every caller in the process; only Spotify's are looked at.
-static int64_t inlineNow(void) {
-    void *returnAddress = __builtin_return_address(0);
-    return EeveeCalledFromSpotify(returnAddress) ? now(returnAddress) : sg_realNow();
-}
-
 BOOL SpeedPitchMixerLimitInstall(void) {
-    BOOL taken = EeveeRebindImport(kSteadyNow, (void *)reboundNow, (void **)&sg_realNow) && sg_realNow;
+    BOOL taken = EeveeRebindImport(kSteadyNow, (void *)now, (void **)&sg_realNow) && sg_realNow;
     if (!taken) {
         sg_realNow = NULL;
+        sg_inline = YES;
         void *function = dlsym(RTLD_DEFAULT, kSteadyNow);
-        taken = function && EeveeHookFunctionInline(function, (void *)inlineNow, (void **)&sg_realNow) && sg_realNow;
+        taken = function && EeveeHookFunctionInline(function, (void *)now, (void **)&sg_realNow) && sg_realNow;
     }
     if (!taken) {
         sg_realNow = NULL;
@@ -121,7 +106,6 @@ void SpeedPitchMixerLimitSetSpeed(float speed) {
     atomic_store_explicit(&sg_rate, rate, memory_order_relaxed);
     atomic_fetch_add_explicit(&sg_seq, 1, memory_order_release);
     unsigned seen = atomic_load(&sg_readsSeen);
-    SPLog(@"mixer limit: follows %.2fx (Spotify's mixer %@)", rate,
-          seen == kBothReads ? @"seen" : seen == kElapsedRead ? @"only its elapsed-time read seen, so it stays at 1.2x"
-          : seen == kLastRead ? @"only its last-read store seen, so it stays at 1.2x" : @"not seen yet");
+    SPLog(@"mixer limit: follows %.2fx (Spotify's mixer %@)", rate, seen == kBothReads ? @"seen" : !seen ? @"not seen yet"
+          : seen == kElapsedRead ? @"only its elapsed-time read seen, so it stays at 1.2x" : @"only its last-read store seen, so it stays at 1.2x");
 }

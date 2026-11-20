@@ -26,7 +26,6 @@ struct EeveeTimePitch {
     float *outputData[kEeveeTimePitchMaxChannels];
     atomic_uint underruns, failures, largestPull;
     atomic_uint_fast64_t consumed;
-    double latency;
 };
 
 static OSStatus input(void *refCon, AudioUnitRenderActionFlags *flags, const AudioTimeStamp *timestamp, UInt32 bus,
@@ -52,72 +51,46 @@ static OSStatus input(void *refCon, AudioUnitRenderActionFlags *flags, const Aud
     return noErr;
 }
 
+// a new Apple converter of `subType` in `format`, pulling input(); NULL on failure.
+static AudioUnit makeUnit(OSType subType, const AudioStreamBasicDescription *format, EeveeTimePitch *owner) {
+    AudioComponentDescription description = {kAudioUnitType_FormatConverter, subType, kAudioUnitManufacturer_Apple, 0, 0};
+    AudioComponent component = AudioComponentFindNext(NULL, &description);
+    AudioUnit unit = NULL;
+    if (!component || AudioComponentInstanceNew(component, &unit) != noErr) return NULL;
+    UInt32 maxFrames = kEeveeTimePitchMaxFrames;
+    AURenderCallbackStruct callback = {input, owner};
+    OSStatus status = AudioUnitSetProperty(unit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, format, sizeof *format);
+    if (!status) status = AudioUnitSetProperty(unit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, format, sizeof *format);
+    if (!status) status = AudioUnitSetProperty(unit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &maxFrames, sizeof maxFrames);
+    if (!status) status = AudioUnitSetProperty(unit, kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Input, 0, &callback, sizeof callback);
+    if (!status) status = AudioUnitInitialize(unit);
+    if (!status) return unit;
+    AudioComponentInstanceDispose(unit);
+    return NULL;
+}
+
 EeveeTimePitch *EeveeTimePitchCreate(double sampleRate, UInt32 channels, EeveeTimePitchSource source, void *context) {
     if (sampleRate <= 0 || channels < 1 || channels > kEeveeTimePitchMaxChannels) return NULL;
-    AudioComponentDescription description = {
-        .componentType = kAudioUnitType_FormatConverter,
-        .componentSubType = kAudioUnitSubType_NewTimePitch,
-        .componentManufacturer = kAudioUnitManufacturer_Apple,
-    };
-    AudioComponent component = AudioComponentFindNext(NULL, &description);
-    if (!component) return NULL;
     EeveeTimePitch *unit = calloc(1, sizeof *unit);
     if (!unit) return NULL;
     unit->sampleRate = sampleRate;
     unit->channels = channels;
     unit->source = source;
     unit->context = context;
-    if (AudioComponentInstanceNew(component, &unit->unit) != noErr) {
-        free(unit);
-        return NULL;
-    }
-    AudioStreamBasicDescription format = {
-        .mSampleRate = sampleRate,
-        .mFormatID = kAudioFormatLinearPCM,
-        .mFormatFlags = kAudioFormatFlagsNativeFloatPacked | kAudioFormatFlagIsNonInterleaved,
-        .mBytesPerPacket = sizeof(float),
-        .mFramesPerPacket = 1,
-        .mBytesPerFrame = sizeof(float),
-        .mChannelsPerFrame = channels,
-        .mBitsPerChannel = 32,
-    };
-    UInt32 maxFrames = kEeveeTimePitchMaxFrames;
-    AURenderCallbackStruct callback = {input, unit};
-    OSStatus status = AudioUnitSetProperty(unit->unit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &format, sizeof format);
-    if (!status) status = AudioUnitSetProperty(unit->unit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &format, sizeof format);
-    if (!status) status = AudioUnitSetProperty(unit->unit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &maxFrames, sizeof maxFrames);
-    if (!status) status = AudioUnitSetProperty(unit->unit, kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Input, 0, &callback, sizeof callback);
-    if (!status) status = AudioUnitSetParameter(unit->unit, kNewTimePitchParam_Rate, kAudioUnitScope_Global, 0, 1, 0);
-    if (!status) status = AudioUnitInitialize(unit->unit);
     atomic_store(&unit->rate, 1);
-    // Varispeed pulls the same source; resampling moves speed and pitch together.
-    AudioComponentDescription varispeed = {
-        .componentType = kAudioUnitType_FormatConverter,
-        .componentSubType = kAudioUnitSubType_Varispeed,
-        .componentManufacturer = kAudioUnitManufacturer_Apple,
+    AudioStreamBasicDescription format = {
+        .mSampleRate = sampleRate, .mFormatID = kAudioFormatLinearPCM,
+        .mFormatFlags = kAudioFormatFlagsNativeFloatPacked | kAudioFormatFlagIsNonInterleaved,
+        .mBytesPerPacket = sizeof(float), .mFramesPerPacket = 1, .mBytesPerFrame = sizeof(float),
+        .mChannelsPerFrame = channels, .mBitsPerChannel = 32,
     };
-    AudioComponent variComponent = source ? AudioComponentFindNext(NULL, &varispeed) : NULL;
-    if (!status && variComponent && AudioComponentInstanceNew(variComponent, &unit->vari) == noErr) {
-        OSStatus vstatus = AudioUnitSetProperty(unit->vari, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &format, sizeof format);
-        if (!vstatus) vstatus = AudioUnitSetProperty(unit->vari, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &format, sizeof format);
-        if (!vstatus) vstatus = AudioUnitSetProperty(unit->vari, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &maxFrames, sizeof maxFrames);
-        if (!vstatus) vstatus = AudioUnitSetProperty(unit->vari, kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Input, 0, &callback, sizeof callback);
-        if (!vstatus) vstatus = AudioUnitInitialize(unit->vari);
-        if (vstatus) {
-            AudioComponentInstanceDispose(unit->vari);
-            unit->vari = NULL;
-        }
-    }
-    if (status) {
-        AudioComponentInstanceDispose(unit->unit);
+    unit->unit = makeUnit(kAudioUnitSubType_NewTimePitch, &format, unit);
+    if (!unit->unit) {
         free(unit);
         return NULL;
     }
-    Float64 latency = 0;
-    UInt32 size = sizeof latency;
-    if (AudioUnitGetProperty(unit->unit, kAudioUnitProperty_Latency, kAudioUnitScope_Global, 0, &latency, &size) == noErr) {
-        unit->latency = latency;
-    }
+    // Varispeed pulls the same source; resampling moves speed and pitch together.
+    if (source) unit->vari = makeUnit(kAudioUnitSubType_Varispeed, &format, unit);
     unit->output.list.mNumberBuffers = channels;
     for (UInt32 c = 0; c < channels; c++) {
         if (!source) unit->fifo[c] = calloc(kFifoFrames, sizeof(float));
@@ -189,12 +162,9 @@ bool EeveeTimePitchProcess(EeveeTimePitch *unit, float *const *channels, UInt32 
     for (UInt32 c = 0; c < unit->channels; c++) {
         const float *in = channels[c];
         for (UInt32 i = 0; i < frames; i++) unit->fifo[c][(unit->written + i) & (kFifoFrames - 1)] = in[i];
-    }
-    unit->written += frames;
-
-    for (UInt32 c = 0; c < unit->channels; c++) {
         unit->output.list.mBuffers[c] = (AudioBuffer){1, frames * (UInt32)sizeof(float), unit->outputData[c]};
     }
+    unit->written += frames;
     if (EeveeTimePitchRender(unit, frames, &unit->output.list) != noErr) return false;
     for (UInt32 c = 0; c < unit->channels; c++) {
         const float *out = unit->output.list.mBuffers[c].mData;
@@ -203,22 +173,7 @@ bool EeveeTimePitchProcess(EeveeTimePitch *unit, float *const *channels, UInt32 
     return true;
 }
 
-UInt32 EeveeTimePitchUnderruns(const EeveeTimePitch *unit) {
-    return atomic_load((atomic_uint *)&unit->underruns);
-}
-
-UInt32 EeveeTimePitchFailures(const EeveeTimePitch *unit) {
-    return atomic_load((atomic_uint *)&unit->failures);
-}
-
-double EeveeTimePitchLatency(const EeveeTimePitch *unit) {
-    return unit->latency;
-}
-
-UInt32 EeveeTimePitchLargestPull(const EeveeTimePitch *unit) {
-    return atomic_load((atomic_uint *)&unit->largestPull);
-}
-
-uint64_t EeveeTimePitchConsumed(const EeveeTimePitch *unit) {
-    return atomic_load((atomic_uint_fast64_t *)&unit->consumed);
+EeveeTimePitchStats EeveeTimePitchReadStats(EeveeTimePitch *unit) {
+    return (EeveeTimePitchStats){atomic_load(&unit->underruns), atomic_load(&unit->failures), atomic_load(&unit->largestPull),
+                                 atomic_load(&unit->consumed) / unit->sampleRate};
 }

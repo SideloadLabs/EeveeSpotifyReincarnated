@@ -1,12 +1,5 @@
-// keeps Spotify's progress bar and lyrics in step with the speed. every Spotify class and method name the
-// feature uses is here; each hook group only goes in when its methods exist, and a missing one is logged.
-//
-// between its player's reports Spotify counts the position itself: -[SPTPlayerState position] is the
-// reported position plus the time since, times -playbackSpeed, so playbackSpeed is scaled by our speed.
-// once the speed leaves 1x, -position answers from our own clock instead: Spotify's position at that
-// moment plus the song the engine has handed over since, times Spotify's own speed (a podcast's). a seek,
-// skip, stop, new track or stall hands the clock back to Spotify's, and the next report away from 1x starts
-// ours again. while the music plays elsewhere (Connect) or not through the engine, neither applies.
+// keeps Spotify's progress bar and lyrics in step with the speed (README.md, the progress bar). every Spotify
+// name the feature uses is here; a hook group only goes in when its methods exist.
 %config(generator=internal);
 
 #import <objc/message.h>
@@ -35,21 +28,19 @@ static SPTPlayerState *sg_playerState;
 // Spotify's own answer in the last -position on this thread, before ours replaced it.
 static _Thread_local double sg_spotifyPosition;
 
-// our clock: `on` while it counts, from `position` seconds into the song when SpeedPitchEnginePlayedSeconds()
-// was `played`, each second since holding `rate` of the song (Spotify's own speed: 1, or a podcast's).
-// `armed` starts it at the first report stamped at or after `notBefore`; `away` when it was handed back
-// because the music played elsewhere, which starts it again as soon as the music is back.
+// our clock: `on` while it counts, from `position` when SpeedPitchEnginePlayedSeconds() was `played`, at `rate`
+// (Spotify's own speed). `armed` starts it at the first report from `notBefore`; `away` after the music
+// played elsewhere.
 static struct {
     BOOL on, armed, away;
     CFAbsoluteTime notBefore;
     double position, played, rate;
 } sg_clock;
 
-// Spotify's player saying it plays this long with no song through the engine means the music is elsewhere:
-// on another device over Connect, or through Spotify's own connection (the pitch-only fallback, at 1x).
+// Spotify playing this long with nothing through the engine: the music is elsewhere (Connect, or Spotify's
+// own connection).
 static const double kAwayAfter = 3;
-// since when Spotify's player has said it plays (not paused, stopped or buffering), 0 while it doesn't.
-static _Atomic double sg_playingSince;
+static _Atomic double sg_playingSince;     // since when Spotify's player says it plays, 0 while it doesn't
 
 // -playbackSpeed asked for Spotify's own speed, without ours.
 static _Thread_local BOOL sg_native;
@@ -57,8 +48,7 @@ static _Thread_local BOOL sg_native;
 // -position may be asked again from inside itself; only the outer one corrects.
 static _Thread_local BOOL sg_correcting;
 
-// the newest report, to spot a seek made elsewhere (another device over Connect): a report more than kSeekGap
-// seconds from where the one before would be by then, both made since the speed last changed.
+// the newest report, to spot a seek made elsewhere: one more than kSeekGap from where the last would be by then.
 static struct {
     CFAbsoluteTime stamp;
     double asOf, speed;
@@ -80,8 +70,7 @@ static double nativeSpeed(SPTPlayerState *state) {
     return speed;
 }
 
-// whether the music plays here, through the engine, so at our speed. paused or buffering there's nothing to
-// tell by, and right after it starts the output gets kAwayAfter to begin.
+// whether the music plays through the engine, at our speed; not paused there's nothing to tell by.
 static BOOL playsHere(void) {
     double since = atomic_load_explicit(&sg_playingSince, memory_order_relaxed);
     return since <= 0 || CFAbsoluteTimeGetCurrent() - since < kAwayAfter || SpeedPitchEngineSecondsSincePlayed() < kAwayAfter;
@@ -100,10 +89,8 @@ static void handBack(void) {
     SpeedPitchEngineResetUnit();
 }
 
-// each report Spotify's player makes. away from 1x its core sometimes can't keep up and stalls: the mixer
-// hands over zeros and the core reports speed 0 where it stopped, then resumes from there. our clock counted
-// the zeros and is ahead by then, so a stall hands the clock back to Spotify's. after a return to 1x our clock
-// keeps counting (Spotify's is still behind) until a seek, skip or stall, so a stall still hands it back then.
+// each report Spotify's player makes. a stall (speed 0 where the core stopped) leaves our clock ahead, having
+// counted the zeros the mixer handed over, so it hands the clock back to Spotify's.
 static void noteState(id state) {
     if (![state isKindOfClass:objc_getClass("SPTPlayerState")]) return;
     dispatch_block_t note = ^{
@@ -135,7 +122,7 @@ static void noteState(id state) {
     noteState(state);
 }
 
-// the rest of the observer calls, as eevee's karaoke observer has them, in case Spotify sends one unchecked.
+// the rest of the observer calls, in case Spotify sends one unchecked.
 - (void)player:(id)player didEncounterError:(id)error {}
 - (void)player:(id)player didMoveToRelativeTrack:(NSInteger)relativeIndex {}
 - (void)player:(id)player queueDidChange:(id)queue {}
@@ -176,20 +163,19 @@ static EeveeSpeedPitchObserver *sg_observer;
     if (seekedAway || (sg_clock.on && track && ![track isEqualToString:sg_clockTrack])) {
         sg_clock = (typeof(sg_clock)){.armed = SpeedPitchEngineSpeed() != 1};
     }
-    // elsewhere Spotify's clock is the right one: it counts at the remote device's speed, or the 1x of Spotify's
-    // own connection.
+    // elsewhere Spotify's clock is the right one, at the other device's speed.
     BOOL wentAway = sg_clock.on && !here;
     if (wentAway) sg_clock = (typeof(sg_clock)){.armed = SpeedPitchEngineSpeed() != 1, .away = YES};
     // back only once song comes through again: paused on the other device there's nothing to tell by.
     BOOL back = !sg_clock.away || SpeedPitchEngineSecondsSincePlayed() < 1;
     if (!sg_clock.on && sg_clock.armed && here && back && track && stamp >= sg_clock.notBefore) {
-        // back from elsewhere, from where Spotify's clock had it then, at its own speed (as it showed).
+        // back from elsewhere: from where Spotify's clock had it.
         double from = !sg_clock.away ? position : asOf + (self.isPaused ? 0 : (now - stamp) * native);
         sg_clock = (typeof(sg_clock)){.on = YES, .position = from, .played = played, .rate = native > 0 ? native : 1};
         sg_clockTrack = track;
     }
     if (sg_clock.on) {
-        // Spotify's own speed changed (a podcast's) on its newest report: what came through before counts at the old one.
+        // Spotify's own speed changed (a podcast's): what came before counts at the old one.
         if (native > 0 && native != sg_clock.rate && stamp >= sg_lastReport.stamp) {
             sg_clock.position += (played - sg_clock.played) * sg_clock.rate;
             sg_clock.played = played;
@@ -226,35 +212,24 @@ static EeveeSpeedPitchObserver *sg_observer;
 %end
 %end
 
-%group EeveeSpeedPitchSeek
+// without these the clock spots jumps in Spotify's reports instead.
+%group EeveeSpeedPitchHandBack
 %hook SPTEsperantoPlayer
 - (id)seekTo:(double)position relative:(long long)relative options:(id)options creatorTimestampPositionMs:(double)creator {
     handBack();
     return %orig;
 }
-%end
-%end
 
-%group EeveeSpeedPitchSkipNext
-%hook SPTEsperantoPlayer
 - (id)skipToNextTrackWithOptions:(id)options track:(id)track loggingParams:(id)params {
     handBack();
     return %orig;
 }
-%end
-%end
 
-%group EeveeSpeedPitchSkipPrevious
-%hook SPTEsperantoPlayer
 - (id)skipToPreviousTrackWithOptions:(id)options track:(id)track loggingParams:(id)params {
     handBack();
     return %orig;
 }
-%end
-%end
 
-%group EeveeSpeedPitchStop
-%hook SPTEsperantoPlayer
 - (id)stop {
     handBack();
     return %orig;
@@ -262,19 +237,19 @@ static EeveeSpeedPitchObserver *sg_observer;
 %end
 %end
 
-// a group only goes in when all its methods exist, so a Spotify update that renames one only loses that piece.
 static BOOL hasMethods(NSString *className, NSArray<NSString *> *selectors) {
     Class cls = NSClassFromString(className);
     if (!cls) {
         SPLog(@"%@ is missing", className);
         return NO;
     }
+    BOOL all = YES;
     for (NSString *selector in selectors) {
         if (class_getInstanceMethod(cls, NSSelectorFromString(selector))) continue;
         SPLog(@"-[%@ %@] is missing", className, selector);
-        return NO;
+        all = NO;
     }
-    return YES;
+    return all;
 }
 
 BOOL SpeedPitchClockInstall(void) {
@@ -289,17 +264,9 @@ BOOL SpeedPitchClockInstall(void) {
     if (hasMethods(player, @[@"addPlayerObserver:"])) {
         %init(EeveeSpeedPitchObserve);
     }
-    if (hasMethods(player, @[@"seekTo:relative:options:creatorTimestampPositionMs:"])) {
-        %init(EeveeSpeedPitchSeek);
-    }
-    if (hasMethods(player, @[@"skipToNextTrackWithOptions:track:loggingParams:"])) {
-        %init(EeveeSpeedPitchSkipNext);
-    }
-    if (hasMethods(player, @[@"skipToPreviousTrackWithOptions:track:loggingParams:"])) {
-        %init(EeveeSpeedPitchSkipPrevious);
-    }
-    if (hasMethods(player, @[@"stop"])) {
-        %init(EeveeSpeedPitchStop);
+    if (hasMethods(player, @[@"seekTo:relative:options:creatorTimestampPositionMs:", @"skipToNextTrackWithOptions:track:loggingParams:",
+                             @"skipToPreviousTrackWithOptions:track:loggingParams:", @"stop"])) {
+        %init(EeveeSpeedPitchHandBack);
     }
     return hooked;
 }

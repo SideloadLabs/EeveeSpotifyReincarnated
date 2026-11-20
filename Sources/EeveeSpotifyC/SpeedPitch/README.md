@@ -128,7 +128,8 @@ Everything Spotify-specific is checked at launch; a missing piece is logged and 
   Without them speed stays off (pitch still works).
 - `SPTEsperantoPlayer`: `addPlayerObserver:` (stall detection), `seekTo:relative:options:creatorTimestampPositionMs:`,
   `skipToNextTrackWithOptions:track:loggingParams:`, `skipToPreviousTrackWithOptions:track:loggingParams:`, `stop`.
-  Without these the clock falls back to spotting jumps of more than 3 s in Spotify's reports.
+  The last four go in together. Without them the clock falls back to spotting jumps of more than 3 s in
+  Spotify's reports.
 - The ⋯ menu: `NowPlaying_ModesImpl.HeaderElementsUnit` (the player header, whose ⋯ is the view labelled
   `Context menu`) and `ContextMenu_InternalImpl.ContextMenuViewController` (the sheet). Without them the
   row is left out (`menu skipped` in the log).
@@ -157,8 +158,6 @@ Turn on debug logging, restart, play a song, then export the debug log and look 
   after a few seconds of playing, or the first change can say `not seen yet` before the mixer has run
 - `-[SPTEsperantoPlayer …] is missing` / `SPTPlayerState is missing`: a hook was skipped on this version
 - `menu table …, header …, footer …`: the first player ⋯ menu, and where the row went
-- `menu font …, from Spotify's rows`: the typeface the row took from Spotify's own rows. Without this line
-  none were found, and the row used `SpotifyMixUI-Regular` (or the system font if that's gone)
 
 Then check, at 1.5× and 0.75×, with *Pitch follows speed* both on and off:
 

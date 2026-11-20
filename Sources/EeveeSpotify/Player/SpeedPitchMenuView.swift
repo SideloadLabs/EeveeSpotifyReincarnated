@@ -1,10 +1,8 @@
 import CoreText
 import UIKit
 
-// the Speed & pitch row in the player's ⋯ menu: a row like Spotify's own that opens in place onto the speed
-// and pitch sliders; holding a value opens a box to type one. it sits in the menu table's header (or footer,
-// when Spotify uses the header), so opening it resizes that view inside a table update and the rows under it
-// move with it.
+// the Speed & pitch row in the player's ⋯ menu, which opens in place onto the sliders. it's the menu table's
+// header (or footer), so opening it resizes that view inside a table update.
 final class SpeedPitchMenuView: UIView {
     private static let rowHeight: CGFloat = 56
     private static let sliderHeight: CGFloat = 72
@@ -98,7 +96,6 @@ final class SpeedPitchMenuView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        adoptRowFont()
         let width = bounds.width, margin = Self.margin, rowHeight = Self.rowHeight
         row.frame = CGRect(x: 0, y: 0, width: width, height: rowHeight)
         icon.frame = CGRect(x: margin, y: (rowHeight - 24) / 2, width: 24, height: 24)
@@ -129,7 +126,6 @@ final class SpeedPitchMenuView: UIView {
 
     // what the engine has now, onto the controls (not while a finger is on one).
     func refresh() {
-        adoptRowFont()
         let speedAvailable = SpeedPitch.speedAvailable
         if !speedSlider.isTracking { shownSpeed = SpeedPitch.speed }
         if !pitchSlider.isTracking { shownPitch = SpeedPitch.semitones }
@@ -294,31 +290,14 @@ final class SpeedPitchMenuView: UIView {
         askValue(for: value)
     }
 
-    private func askValue(for value: UIView) {
-        if value === speedValue {
-            ask("speed_pitch_speed".localized, value: shownSpeed, range: SpeedPitch.typedSpeedRange, text: Self.speedText,
-                keyboard: .decimalPad) { [weak self] in self?.setSpeed($0) }
-        } else {
-            ask("speed_pitch_pitch".localized, value: shownPitch, range: SpeedPitch.typedPitchRange, text: Self.pitchText,
-                keyboard: .numbersAndPunctuation) { [weak self] in self?.setPitch($0) }
-        }
-    }
-
     // dark like the sheet it opens over.
-    private func ask(_ title: String, value: Double, range: ClosedRange<Double>, text: (Double) -> String,
-                     keyboard: UIKeyboardType, set: @escaping (Double) -> Void) {
-        guard let host = presenter() else { return }
-        host.present(ValuePrompt.make(title: title, value: value, range: range, text: text, keyboard: keyboard, dark: true, set: set),
-                     animated: true)
-    }
-
-    // the controller on top of the sheet this row is in.
-    private func presenter() -> UIViewController? {
-        var responder: UIResponder? = next
-        while let current = responder, !(current is UIViewController) { responder = current.next }
-        var host = responder as? UIViewController
-        while let presented = host?.presentedViewController, !presented.isBeingDismissed { host = presented }
-        return host
+    private func askValue(for value: UIView) {
+        let speed = value === speedValue
+        ValuePrompt.present(ValuePrompt.make(
+            title: (speed ? "speed_pitch_speed" : "speed_pitch_pitch").localized, value: speed ? shownSpeed : shownPitch,
+            range: speed ? SpeedPitch.typedSpeedRange : SpeedPitch.typedPitchRange, text: speed ? Self.speedText : Self.pitchText,
+            keyboard: speed ? .decimalPad : .numbersAndPunctuation, dark: true
+        ) { [weak self] in speed ? self?.setSpeed($0) : self?.setPitch($0) })
     }
 
     @objc private func followsChanged() {
@@ -399,62 +378,23 @@ final class SpeedPitchMenuView: UIView {
         UIColor(white: 1, alpha: UIAccessibility.isDarkerSystemColorsEnabled ? 0.8 : 0.65)
     }
 
-    // the face of Spotify's own menu rows, read off them, so the row follows whatever font Spotify ships.
-    private static var rowFont: UIFont?
-    // until those rows are found; nil (the system font) if Spotify renames it.
-    private static let standIn = UIFont(name: "SpotifyMixUI-Regular", size: 16)
+    // the face of Spotify's own menu rows (16 pt), or the system font if Spotify drops it.
+    private static let face = UIFont(name: "SpotifyMixUI-Bold", size: 16)
 
     private func applyFonts() {
         let name = Self.font(.subheadline)
-        title.font = Self.titleFont()
+        title.font = Self.font(.body, upTo: 16)
         summary.font = Self.digits(name)
         for label in [speedName, pitchName, followsName] { label.font = name }
-        for button in [speedValue, pitchValue] { button.titleLabel?.font = Self.digits(Self.font(.subheadline, bold: true)) }
-    }
-
-    // the table makes its rows before laying out its header, so this usually lands before the menu is drawn;
-    // refresh() tries again as it appears.
-    private func adoptRowFont() {
-        guard Self.rowFont == nil, let table, let found = Self.spotifyRowFont(in: table) else { return }
-        Self.rowFont = found
-        eeveeLog("[EeveeSpotify][SpeedPitch] menu font %@ %.1f, from Spotify's rows", found.fontName, found.pointSize)
-        applyFonts()
-        setNeedsLayout()
-    }
-
-    // the face most of the rows' labels use, so the track's own title at the top isn't the one taken.
-    private static func spotifyRowFont(in table: UITableView) -> UIFont? {
-        var faces: [String: (font: UIFont, count: Int)] = [:]
-        var queue: [UIView] = table.visibleCells
-        while let view = queue.popLast() {
-            queue += view.subviews
-            guard let label = view as? UILabel, !label.isHidden, label.text?.isEmpty == false else { continue }
-            // styled text carries its own font, which the label's font property may not reflect.
-            guard let font = label.attributedText?.attribute(.font, at: 0, effectiveRange: nil) as? UIFont ?? label.font else { continue }
-            faces["\(font.fontName) \(font.pointSize)", default: (font, 0)].count += 1
-        }
-        return faces.values.max { $0.count < $1.count }?.font
+        for button in [speedValue, pitchValue] { button.titleLabel?.font = Self.digits(name) }
     }
 
     // a text style's size, stopping at extra large so the row still fits.
-    private static func size(_ style: UIFont.TextStyle) -> CGFloat {
+    private static func font(_ style: UIFont.TextStyle, upTo limit: CGFloat = .infinity) -> UIFont {
         var category = UIApplication.shared.preferredContentSizeCategory
         if category > .extraLarge { category = .extraLarge }
-        return UIFont.preferredFont(forTextStyle: style, compatibleWith: UITraitCollection(preferredContentSizeCategory: category)).pointSize
-    }
-
-    private static func font(_ style: UIFont.TextStyle, bold: Bool = false) -> UIFont {
-        let points = size(style)
-        guard let face = rowFont ?? standIn else { return .systemFont(ofSize: points, weight: bold ? .semibold : .regular) }
-        let descriptor = face.fontDescriptor
-        guard bold, let boldFace = descriptor.withSymbolicTraits(descriptor.symbolicTraits.union(.traitBold)) else { return face.withSize(points) }
-        return UIFont(descriptor: boldFace, size: points)
-    }
-
-    // as Spotify sets its own row titles.
-    private static func titleFont() -> UIFont {
-        guard let rowFont else { return font(.body) }
-        return rowFont.withSize(min(rowFont.pointSize, size(.body)))
+        let points = min(limit, UIFont.preferredFont(forTextStyle: style, compatibleWith: UITraitCollection(preferredContentSizeCategory: category)).pointSize)
+        return face?.withSize(points) ?? .systemFont(ofSize: points, weight: .semibold)
     }
 
     // digits of one width where the face has them, so a value doesn't shuffle as it counts.

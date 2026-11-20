@@ -9,12 +9,11 @@ const double kEqualizerGainLimit = 12;
 
 #pragma mark - design
 
-// a band's width at half its gain, in octaves: wider than the 2/3 octave between bands, so neighbours add up
-// to a flat line instead of rippling between their centres.
+// a band's width at half its gain, in octaves: wider than the 2/3 octave between bands, so neighbours add up flat.
 static const double kBandwidth = 0.9;
 // a band's own gain can go past its slider's, to make up for its neighbours.
 static const double kOwnLimit = 30;
-// the curve is met at the bands and halfway between them, the halfway points counting half as much.
+// the curve is met at the bands and halfway between them, those counting half.
 static const double kHalfwayWeight = 0.5;
 static const int kRefinements = 3;
 // past this fraction of the rate a band can't be shaped; it's left out.
@@ -26,27 +25,13 @@ static bool usable(double rate, int index) {
     return kEqualizerFrequencies[index] < kHighest * rate;
 }
 
-// RBJ's peaking EQ with its bandwidth prewarped, so a band near the top is as wide as one in the middle
-// (with a plain Q the 16 kHz band is about a quarter octave wide).
-static EqualizerBiquad peak(double rate, double frequency, double gainDB) {
-    double w = 2 * M_PI * frequency / rate, s = sin(w), c = cos(w);
-    double alpha = s * sinh(M_LN2 / 2 * kBandwidth * w / s), a = pow(10, gainDB / 40), a0 = 1 + alpha / a;
-    return (EqualizerBiquad){(1 + alpha * a) / a0, -2 * c / a0, (1 - alpha * a) / a0, -2 * c / a0, (1 - alpha / a) / a0};
-}
-
 static const EqualizerBiquad kPassThrough = {1, 0, 0, 0, 0};
 
-static EqualizerBiquad band(double rate, int index, double gainDB) {
-    return usable(rate, index) ? peak(rate, kEqualizerFrequencies[index], gainDB) : kPassThrough;
-}
-
-// a correction's filter as RBJ's cookbook has it, with a plain Q: what AutoEq fits its filters with, and what
-// Equalizer APO and the like run.
-static EqualizerBiquad filter(double rate, EqualizerFilter f) {
-    if (!(f.frequency > 0 && f.frequency < kHighest * rate) || !(f.q > 0) || !isfinite(f.gain)) return kPassThrough;
-    double w = 2 * M_PI * f.frequency / rate, c = cos(w), alpha = sin(w) / (2 * f.q), a = pow(10, fmax(-30, fmin(30, f.gain)) / 40);
+// RBJ's cookbook filter at ω `w`, with `alpha` from its bandwidth or Q.
+static EqualizerBiquad rbj(EqualizerFilterType type, double w, double alpha, double gainDB) {
+    double c = cos(w), a = pow(10, fmax(-30, fmin(30, gainDB)) / 40);
     double b0, b1, b2, a0, a1, a2, root = 2 * sqrt(a) * alpha;
-    switch (f.type) {
+    switch (type) {
         case EqualizerLowShelf:
             b0 = a * ((a + 1) - (a - 1) * c + root), b1 = 2 * a * ((a - 1) - (a + 1) * c), b2 = a * ((a + 1) - (a - 1) * c - root);
             a0 = (a + 1) + (a - 1) * c + root, a1 = -2 * ((a - 1) + (a + 1) * c), a2 = (a + 1) + (a - 1) * c - root;
@@ -61,6 +46,21 @@ static EqualizerBiquad filter(double rate, EqualizerFilter f) {
             break;
     }
     return (EqualizerBiquad){b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0};
+}
+
+// a band: a peak with its bandwidth prewarped, so the 16 kHz band is as wide as the others (with a plain Q it
+// shrinks to a quarter octave).
+static EqualizerBiquad band(double rate, int index, double gainDB) {
+    if (!usable(rate, index)) return kPassThrough;
+    double w = 2 * M_PI * kEqualizerFrequencies[index] / rate;
+    return rbj(EqualizerPeak, w, sin(w) * sinh(M_LN2 / 2 * kBandwidth * w / sin(w)), gainDB);
+}
+
+// a correction's filter with a plain Q, as AutoEq fits them and Equalizer APO runs them.
+static EqualizerBiquad filter(double rate, EqualizerFilter f) {
+    if (!(f.frequency > 0 && f.frequency < kHighest * rate) || !(f.q > 0) || !isfinite(f.gain)) return kPassThrough;
+    double w = 2 * M_PI * f.frequency / rate;
+    return rbj(f.type, w, sin(w) / (2 * f.q), f.gain);
 }
 
 // cos and sin of ω and 2ω, for responses at one frequency.
@@ -85,9 +85,8 @@ static double cascadeDB(const EqualizerBiquad *sections, int count, Phase p) {
     return total;
 }
 
-// the bands' gains are solved by weighted least squares, after Välimäki and Liski's accurate cascade graphic
-// EQ: each band's effect at the points is taken as linear in its gain (measured at 12 dB), and the real
-// cascade then corrects that a few times.
+// the bands' gains by weighted least squares (Välimäki and Liski's accurate cascade graphic EQ): each band's
+// effect taken as linear in its gain, then corrected against the real cascade.
 typedef struct {
     double rate;                                        // 0 while unused
     int count;                                          // points under kHighest, from the lowest
@@ -97,7 +96,7 @@ typedef struct {
     double factor[kEqualizerBands][kEqualizerBands];    // Cholesky factor of the normal equations, lower
 } Solver;
 
-// one for the output's rate and one for the curve the page draws, which take turns while a slider moves.
+// the output's rate and the page's curve take turns while a slider moves.
 static Solver sg_solvers[2];
 static int sg_lastSolver;
 
@@ -191,16 +190,15 @@ void EqualizerDesignFor(double rate, const double gains[kEqualizerBands], const 
     }
     // flat, the bands are 0 dB peaks, not left out: a fade to or from them moves each band's gain alone.
     for (int i = 0; i < kEqualizerBands; i++) sections[i] = band(rate, i, own[i]);
-    int filters = correction ? (correctionCount < kEqualizerMaxCorrection ? correctionCount : kEqualizerMaxCorrection) : 0;
-    if (filters < 0) filters = 0;
+    int filters = correction && correctionCount > 0 ? (correctionCount < kEqualizerMaxCorrection ? correctionCount : kEqualizerMaxCorrection) : 0;
     for (int i = 0; i < kEqualizerMaxCorrection; i++) sections[kEqualizerBands + i] = i < filters ? filter(rate, correction[i]) : kPassThrough;
     design->count = kEqualizerBands + filters;
     design->rate = rate;
     design->flat = flat && filters == 0;
     design->gain = 1;
     if (design->flat) return;
-    // the loudest the whole cascade makes anything, up to just under the Nyquist frequency, taken back off.
-    // a correction's own preamp is left aside for this.
+    // the loudest the cascade makes anything, up to just under Nyquist, is taken back off (the correction's
+    // own preamp aside).
     double loudest = 0;
     for (int n = 0; n < kScan; n++) {
         loudest = fmax(loudest, cascadeDB(sections, design->count, phaseAt(rate, 20 * pow(0.49 * rate / 20, (double)n / (kScan - 1)))));
@@ -222,8 +220,7 @@ double EqualizerResponse(const EqualizerDesign *design, int first, int count, do
 
 #pragma mark - handing designs over
 
-// a triple buffer: the config side fills its own slot and swaps it for the shared one, marked fresh; the render
-// thread swaps its slot for the shared one when it's fresh. neither waits for the other.
+// a triple buffer: each side swaps its own slot for the shared one, marked fresh going in. neither waits.
 enum { kFresh = 4 };
 
 static EqualizerDesign sg_slots[3];
@@ -310,8 +307,7 @@ static EqualizerBiquad mix(const EqualizerBiquad *a, const EqualizerBiquad *b, d
                              a->a1 + (b->a1 - a->a1) * t, a->a2 + (b->a2 - a->a2) * t};
 }
 
-// the coefficients move along the fade between steps; a straight line between two stable biquads stays stable.
-// the gain moves every frame.
+// the coefficients step along the fade (a line between stable biquads stays stable); the gain moves every frame.
 static void process(float *const *lanes, uint32_t channels, uint32_t frames) {
     for (uint32_t start = 0; start < frames; start += kStep) {
         uint32_t count = frames - start < kStep ? frames - start : kStep;

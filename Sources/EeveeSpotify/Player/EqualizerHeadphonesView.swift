@@ -6,14 +6,9 @@ import SwiftUI
 struct EqualizerHeadphonesView: View {
     let output: Equalizer.Output
 
-    private struct Found {
-        let query: String
-        let headphones: [AutoEq.Headphone]
-    }
-
     @State private var all = [AutoEq.Headphone]()
     @State private var query = ""
-    @State private var found: Found?            // nil while the search is empty: the list is all of them
+    @State private var found: [AutoEq.Headphone]?   // nil while the search is empty: the list is all of them
     @State private var shown = Self.chunk
     @State private var loading = true
     @State private var failure: String?
@@ -32,10 +27,8 @@ struct EqualizerHeadphonesView: View {
         NumberFormatter.localizedString(from: NSNumber(value: number), number: .decimal)
     }
 
-    private var listed: [AutoEq.Headphone] { found?.headphones ?? all }
-
     var body: some View {
-        let listed = listed
+        let listed = found ?? all
         List {
             Section(header: Text(output.name), footer: Text("autoeq_credit".localized)) {
                 HStack(spacing: 10) {
@@ -128,7 +121,7 @@ struct EqualizerHeadphonesView: View {
             let headphones = AutoEq.search(all, query)
             DispatchQueue.main.async {
                 guard query == self.query else { return }
-                found = Found(query: query, headphones: headphones)
+                found = headphones
                 shown = Self.chunk
             }
         }

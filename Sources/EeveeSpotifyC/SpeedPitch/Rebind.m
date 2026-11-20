@@ -12,7 +12,6 @@
 #import "Rebind.h"
 #import "SpeedPitchPrivate.h"
 
-// the slide from the image's own __TEXT, so it can't come from a different dyld index than the header.
 static BOOL imageSlide(const struct mach_header_64 *header, intptr_t *slide) {
     const struct load_command *command = (const struct load_command *)(header + 1);
     for (uint32_t i = 0; i < header->ncmds; i++, command = (const struct load_command *)((const char *)command + command->cmdsize)) {
@@ -23,9 +22,7 @@ static BOOL imageSlide(const struct mach_header_64 *header, intptr_t *slide) {
     return NO;
 }
 
-// Spotify's binary: the image named Spotify (a dylib under LiveContainer), else the one named as the
-// bundle's executable (an install whose executable was renamed). the first lookup is logged, so a missing
-// image isn't mistaken for a missing import.
+// the image named Spotify (a dylib under LiveContainer), else the bundle's executable.
 static const struct mach_header_64 *spotifyImage(intptr_t *slide) {
     static BOOL logged;
     NSString *executable = NSBundle.mainBundle.infoDictionary[@"CFBundleExecutable"];
@@ -48,24 +45,8 @@ static const struct mach_header_64 *spotifyImage(intptr_t *slide) {
     return NULL;
 }
 
-// the page's current and maximum protection, for the log when a write is refused.
-static NSString *protectionOf(vm_address_t address) {
-    vm_address_t region = address;
-    vm_size_t size = 0;
-    vm_region_basic_info_data_64_t info;
-    mach_msg_type_number_t count = VM_REGION_BASIC_INFO_COUNT_64;
-    mach_port_t object = MACH_PORT_NULL;
-    if (vm_region_64(mach_task_self(), &region, &size, VM_REGION_BASIC_INFO_64, (vm_region_info_t)&info, &count, &object) != KERN_SUCCESS) return @"unknown";
-    // vm_region_64 moves on to the next mapping when there is none at `address`.
-    if (region > address) return @"unmapped";
-    return [NSString stringWithFormat:@"now %d, at most %d, shared %d", info.protection, info.max_protection, info.shared];
-}
-
-// writes one pointer, making its page writable first. a page dyld made read only after binding (__DATA_CONST,
-// __AUTH_CONST) is copied, then made read only again; if the copy is refused it is made writable without one,
-// and failing that the slot is left alone. don't map a copy of the page over it with vm_remap instead: on a
-// jailbroken iPhone 11 (iOS 17.5.1), where both were refused, that left the range unmapped and Spotify died
-// of SIGBUS at launch.
+// a read-only page (__DATA_CONST, __AUTH_CONST) is copied and made read only again. not vm_remap: on
+// Dopamine (iOS 17.5.1) that left the range unmapped and Spotify died of SIGBUS.
 static BOOL writeSlot(void **slot, void *value, BOOL readOnly) {
     vm_size_t page = vm_page_size;
     vm_address_t start = (vm_address_t)slot & ~(page - 1);
@@ -77,7 +58,7 @@ static BOOL writeSlot(void **slot, void *value, BOOL readOnly) {
     }
     if (result != KERN_SUCCESS) {
         static atomic_int logged;
-        if (atomic_fetch_add(&logged, 1) < 3) SPLog(@"rebind: vm_protect failed (%d), the page %@", result, protectionOf(start));
+        if (atomic_fetch_add(&logged, 1) < 3) SPLog(@"rebind: vm_protect failed (%d)", result);
         return NO;
     }
     *slot = value;
@@ -110,7 +91,6 @@ BOOL EeveeRebindImport(const char *symbol, void *replacement, void **original) {
     const char *strings = (const char *)(base + symtab->stroff);
     const uint32_t *indirect = (const uint32_t *)(base + dysymtab->indirectsymoff);
 
-    // the symbol's index among the undefined ones, found once instead of comparing names per slot.
     uint32_t wanted = UINT32_MAX;
     for (uint32_t i = dysymtab->iundefsym; i < dysymtab->iundefsym + dysymtab->nundefsym && i < symtab->nsyms; i++) {
         uint32_t offset = symbols[i].n_un.n_strx;
@@ -159,48 +139,36 @@ BOOL EeveeRebindImport(const char *symbol, void *replacement, void **original) {
 
 typedef void (*MSHookFunctionPointer)(void *symbol, void *replace, void **result);
 
-// MSHookFunction from ElleKit's or Substrate's library where a rootless or rootful jailbreak keeps it, else
-// as the process already has it.
-static MSHookFunctionPointer hooker(void) {
+// ElleKit's or Substrate's MSHookFunction, only when it comes from a jailbreak: a substrate bundled in the IPA
+// (or in LiveContainer's folder) isn't one. roothide keeps its files under /var/containers, so that isn't checked.
+static MSHookFunctionPointer jailbreakHooker(void) {
     static MSHookFunctionPointer found;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
-        // the jailbreak's paths first: an IPA can bundle its own substrate, which is in the process on any phone.
         const char *paths[] = {"/var/jb/usr/lib/libellekit.dylib", "/var/jb/usr/lib/libsubstrate.dylib",
                                "/usr/lib/libellekit.dylib", "/usr/lib/libsubstrate.dylib"};
-        for (size_t i = 0; !found && i < sizeof paths / sizeof *paths; i++) {
+        MSHookFunctionPointer hook = NULL;
+        for (size_t i = 0; !hook && i < sizeof paths / sizeof *paths; i++) {
             void *handle = dlopen(paths[i], RTLD_NOW);
-            if (handle) found = (MSHookFunctionPointer)dlsym(handle, "MSHookFunction");
+            if (handle) hook = (MSHookFunctionPointer)dlsym(handle, "MSHookFunction");
         }
-        if (!found) found = (MSHookFunctionPointer)dlsym(RTLD_DEFAULT, "MSHookFunction");
-        SPLog(@"rebind: MSHookFunction %@", found ? @"is there" : @"is not there");
+        if (!hook) hook = (MSHookFunctionPointer)dlsym(RTLD_DEFAULT, "MSHookFunction");
+        Dl_info info;
+        if (!hook || !dladdr((const void *)hook, &info) || !info.dli_fname) return;
+        NSString *image = @(info.dli_fname), *bundle = NSBundle.mainBundle.bundlePath;
+        BOOL own = (bundle.length && [image hasPrefix:bundle]) || [image containsString:@"/mobile/Containers/"];
+        SPLog(@"rebind: MSHookFunction comes from %@, %@", image, own ? @"the app's own: no jailbreak" : @"the jailbreak's");
+        if (!own) found = hook;
     });
     return found;
 }
 
-// a hooker bundled inside the IPA is no jailbreak: only one loaded from outside the app's bundle counts.
-BOOL EeveeJailbroken(void) {
-    static BOOL jailbroken;
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-        MSHookFunctionPointer hook = hooker();
-        Dl_info info;
-        if (!hook || !dladdr((const void *)hook, &info) || !info.dli_fname) return;
-        NSString *image = [NSString stringWithUTF8String:info.dli_fname];
-        // the app's bundle, or its folder under LiveContainer (/var/mobile/Containers/...). not every
-        // /var/containers path: roothide keeps the jailbreak's files in /var/containers/Bundle/Application/.jbroot-*.
-        NSString *bundle = NSBundle.mainBundle.bundlePath;
-        jailbroken = !(bundle.length && [image hasPrefix:bundle]) && ![image containsString:@"/mobile/Containers/"];
-        SPLog(@"rebind: MSHookFunction comes from %@, %@", image, jailbroken ? @"the jailbreak's" : @"the app's own: no jailbreak");
-    });
-    return jailbroken;
-}
-
 BOOL EeveeHookFunctionInline(void *function, void *replacement, void **original) {
-    if (!EeveeJailbroken()) return NO;
-    // finds Spotify's code now rather than on the first hooked call, which can come on an audio thread.
+    MSHookFunctionPointer hook = jailbreakHooker();
+    if (!hook) return NO;
+    // finds Spotify's code now, not on the first hooked call, which can come on an audio thread.
     EeveeCalledFromSpotify(NULL);
-    hooker()(function, replacement, original);
+    hook(function, replacement, original);
     return *original != NULL;
 }
 
@@ -215,7 +183,6 @@ BOOL EeveeCalledFromSpotify(void *returnAddress) {
         start = (uintptr_t)getsegmentdata(header, SEG_TEXT, &size);
         end = start + size;
     });
-    // on arm64e a return address carries a pointer authentication code in its top bits.
 #if __has_feature(ptrauth_calls)
     returnAddress = ptrauth_strip(returnAddress, ptrauth_key_return_address);
 #endif

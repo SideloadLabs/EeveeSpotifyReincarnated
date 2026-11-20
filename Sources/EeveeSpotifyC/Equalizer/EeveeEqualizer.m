@@ -4,7 +4,8 @@
 #import "../Shared/LogSink.h"
 #import "Equalizer.h"
 
-_Static_assert(EeveeEqualizerBandCount == kEqualizerBands && EeveeEqualizerMaxCorrection == kEqualizerMaxCorrection, "one size");
+_Static_assert(EeveeEqualizerBandCount == kEqualizerBands && EeveeEqualizerMaxCorrection == kEqualizerMaxCorrection
+               && (int)EeveeEqualizerFilterHighShelf == (int)EqualizerHighShelf, "one size");
 
 // a change settles this long before the report line, so a dragged slider makes one line, not one per step.
 static const double kReportAfter = 3;
@@ -95,8 +96,8 @@ void EeveeEqualizerSetCorrection(const EeveeEqualizerFilter *kinds, const double
     EqualizerFilter next[kEqualizerMaxCorrection] = {0};
     int filters = (int)MAX(0, MIN(count, kEqualizerMaxCorrection));
     for (int i = 0; i < filters; i++) {
-        EqualizerFilterType type = kinds[i] == EeveeEqualizerFilterLowShelf ? EqualizerLowShelf
-                                   : kinds[i] == EeveeEqualizerFilterHighShelf ? EqualizerHighShelf : EqualizerPeak;
+        // the same order as EqualizerFilterType.
+        EqualizerFilterType type = kinds[i] >= EeveeEqualizerFilterPeak && kinds[i] <= EeveeEqualizerFilterHighShelf ? (EqualizerFilterType)kinds[i] : EqualizerPeak;
         next[i] = (EqualizerFilter){type, frequencies[i], gains[i], qs[i]};
     }
     BOOL same = filters == sg_correctionCount;
