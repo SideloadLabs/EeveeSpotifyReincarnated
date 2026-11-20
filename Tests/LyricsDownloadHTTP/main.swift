@@ -26,7 +26,7 @@ do {
     fatalError("503 became noSuchSong")
 } catch let error as LyricsProviderHTTPError { check(error.status == 503, "HTTP status was lost") }
 try LyricsDownloadHTTP.perform(isCancelled: { false }) {
-    try LyricsDownloadHTTP.validate(response(404), request: request)
+    try LyricsDownloadHTTP.validate(response(404), request: request, accepting: [404])
 }
 do {
     try LyricsDownloadHTTP.perform(isCancelled: { true }) { fatalError("cancelled download started HTTP") }
@@ -66,7 +66,7 @@ let task = URLSession.shared.dataTask(with: request) { _, _, _ in }
 do {
     try LyricsDownloadHTTP.perform(isCancelled: { stopped }) {
         stopped = true
-        try LyricsDownloadHTTP.waitForResponse(DispatchSemaphore(value: 0), task: task)
+        try LyricsDownloadHTTP.wait(DispatchSemaphore(value: 0), task: task)
     }
     fatalError("an expired download kept waiting for HTTP")
 } catch let error as URLError {

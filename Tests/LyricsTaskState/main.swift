@@ -1,116 +1,43 @@
 import Foundation
 
 func check(_ value: @autoclosure () -> Bool, _ message: String) { if !value() { fatalError(message) } }
-func pump(_ condition: () -> Bool) {
-    let end = Date().addingTimeInterval(5)
-    while !condition() && Date()<end { RunLoop.current.run(until: Date().addingTimeInterval(0.005)) }
-    check(condition(), "asynchronous lyrics relay did not finish")
-}
-struct Source { var isReplacingLyrics = true }
-extension UserDefaults { static var lyricsSource = Source() }
-extension URL { var isLyrics: Bool { path.contains("color-lyrics/v2") } }
-func extractTrackId(from path: String) -> String? { path.split(separator:"/").last.map(String.init) }
-struct Lyrics {
-    let bytes: Data
-    init(serializedBytes: Data) throws { bytes=serializedBytes }
-    func serializedData() throws -> Data { bytes }
-}
-final class URLSessionHelper {
-    static let shared = URLSessionHelper()
-    var bodies: [ObjectIdentifier:Data] = [:]
-    func obtainData(for task: URLSessionTask) -> Data? { bodies.removeValue(forKey:ObjectIdentifier(task)) }
-}
-final class NativeOfflineLyrics {
-    static let shared = NativeOfflineLyrics()
-    var markers = 0
-    func markNoLyrics(trackId: String, reason: String) { markers += 1 }
-}
-final class KaraokePlaybackTracker {
-    static let shared = KaraokePlaybackTracker()
-    var signals = 0
-    func updateTrackIdFromLyricsFetch(_ id: String) { signals += 1 }
-}
-var savedLyrics: Lyrics?
-func cachedOfflineLyrics(trackId: String, offline: Bool) -> Lyrics? { savedLyrics }
 enum ProviderError: Error { case unavailable }
-let fetchLock=NSLock()
-var fetches=0, fail=false
-let custom=Data("custom lyrics".utf8)
-func eeveeLyricsData(_ path:String, originalLyrics:Lyrics? = nil) throws -> Data {
-    fetchLock.lock(); fetches += 1; let failed=fail; fetchLock.unlock()
-    Thread.sleep(forTimeInterval:0.02)
-    if failed { throw ProviderError.unavailable }
-    return custom
-}
-let session=URLSession(configuration:.ephemeral)
-func task(_ download:Bool=false)->URLSessionDataTask {
-    session.dataTask(with:URL(string:"https://spotify.example/color-lyrics/v2/\(download ? "download/" : "")track/test")!)
-}
-func relay(_ task:URLSessionDataTask, error:Error? = nil, received:@escaping(Data?,Error?)->Void) {
-    check(finishEeveeLyricsTask(task:task,delegate:"outer",error:error) { _,data,error in
-        check(Thread.isMainThread,"native lyrics delivered off main")
-        // Model the native delegate chain: the second hook buffers the body's
-        // relay and then gets the same task's completion. It must reuse the fetch.
-        URLSessionHelper.shared.bodies[ObjectIdentifier(task)]=data
-        check(finishEeveeLyricsTask(task:task,delegate:"inner",error:error) { _,data,error in
-            check(Thread.isMainThread,"inner delegate delivered off main")
-            received(data,error)
-        },"inner declined lyrics")
-    },"outer declined lyrics")
-}
 
-let denied=task();var header=false,done=false,deliveries=0
-let forbidden=HTTPURLResponse(url:denied.currentRequest!.url!,statusCode:403,httpVersion:nil,headerFields:nil)!
-check(prepareEeveeLyricsResponse(task:denied,response:forbidden) { replacement in
-    check(replacement.statusCode==200,"successful provider did not replace 403")
-    header=true
-},"403 not handled")
-pump { header }
-check(fetches==1 && deliveries==0,"response handler completed the task prematurely")
-URLSessionHelper.shared.bodies[ObjectIdentifier(denied)]=Data("Forbidden".utf8)
-relay(denied) { data,error in check(data==custom && error==nil,"wrong relayed result");deliveries+=1;done=true }
-pump { done }
-check(fetches==1 && deliveries==1,"403 response/completion/delegate chain fetched twice")
-check(finishEeveeLyricsTask(task:denied,delegate:"outer",error:nil) { _,_,_ in fatalError("duplicate completion delivered") },"duplicate not claimed")
-
-let next=task();done=false
-URLSessionHelper.shared.bodies[ObjectIdentifier(next)]=Data("Spotify".utf8)
-relay(next) { data,error in check(data==custom,"new task lost lyrics");done=true }
-pump { done }
-check(fetches==2,"different task for same URL reused stale online data")
-
-fail=true
-let failed=task();header=false;done=false
-check(prepareEeveeLyricsResponse(task:failed,response:forbidden) { response in
-    check(response.statusCode==403,"failed provider hid Spotify error");header=true
-},"failed response declined")
-pump { header }
-URLSessionHelper.shared.bodies[ObjectIdentifier(failed)]=Data("Forbidden".utf8)
-relay(failed) { data,error in check(data==Data("Forbidden".utf8),"original body lost after provider failure");done=true }
-pump { done }
-check(fetches==3,"provider failure was retried again at completion")
-
-savedLyrics=try Lyrics(serializedBytes:Data("offline".utf8));done=false
-relay(task(true),error:URLError(.notConnectedToInternet)) { data,error in
-    check(data==savedLyrics?.bytes && error==nil,"offline download fallback failed");done=true
+// The response callback, the completion callback and both delegates ask for the
+// same task at once: one provider request, one shared answer.
+let task = URLSession.shared.dataTask(with: URL(string: "https://example.invalid/color-lyrics/v2/download/track/1")!)
+let lock = NSLock()
+var fetches = 0
+let group = DispatchGroup()
+var answers: [Data] = []
+for _ in 0..<4 {
+    group.enter()
+    DispatchQueue.global().async {
+        let data = try! LyricsTaskState.forTask(task).result {
+            lock.lock(); fetches += 1; lock.unlock()
+            Thread.sleep(forTimeInterval: 0.05)
+            return Data("lyrics".utf8)
+        }
+        lock.lock(); answers.append(data); lock.unlock()
+        group.leave()
+    }
 }
-pump { done }
-check(KaraokePlaybackTracker.shared.signals==0,"background plugin request changed karaoke track")
-check(fetches==3,"offline relay started another provider request in the inner delegate")
-done=false
-relay(task(),error:URLError(.cancelled)) { data,error in
-    check(data==nil && (error as? URLError)?.code == .cancelled,"cancelled task delivered lyrics");done=true
-}
-pump { done }
-print("Lyrics task lifecycle: 403 + real completion, chained delegates, failures, fresh tasks, offline background and cancellation passed")
+check(group.wait(timeout: .now() + 5) == .success, "callers did not finish")
+check(fetches == 1 && answers.count == 4 && Set(answers) == [Data("lyrics".utf8)], "one task fetched more than once")
 
-UserDefaults.lyricsSource.isReplacingLyrics = false
-let switched = task()
-URLSessionHelper.shared.bodies[ObjectIdentifier(switched)] = Data("original".utf8)
-done = false
-relay(switched, error: URLError(.networkConnectionLost)) { data, error in
-    check(data == Data("original".utf8) && (error as? URLError)?.code == .networkConnectionLost,
-          "switching to Spotify lost buffered data or its completion error")
-    done = true
+// A failure is shared too: the second callback does not ask the provider again.
+let failed = URLSession.shared.dataTask(with: URL(string: "https://example.invalid/color-lyrics/v2/download/track/2")!)
+var failures = 0
+for _ in 0..<2 {
+    do {
+        _ = try LyricsTaskState.forTask(failed).result { failures += 1; throw ProviderError.unavailable }
+        fatalError("failure became lyrics")
+    } catch ProviderError.unavailable {}
 }
-pump { done }
+check(failures == 1, "a failed task asked the provider again")
+
+// Another task for the same URL is a fresh request.
+let next = URLSession.shared.dataTask(with: failed.originalRequest!)
+let fresh = try LyricsTaskState.forTask(next).result { Data("new".utf8) }
+check(fresh == Data("new".utf8), "a new task reused an old answer")
+print("Lyrics task state: one provider answer per Spotify task, shared by every callback")

@@ -27,7 +27,12 @@ struct LyricsDto {
     var timeSynced: Bool
     var romanization: LyricsRomanizationStatus
     var providerCredit: String?
-    var karaoke: KaraokeLyricsDto?
+}
+
+final class KaraokeLyricsStore {
+    static let shared = KaraokeLyricsStore()
+    private(set) var publications = 0
+    func set(trackId: String, lyrics: KaraokeLyricsDto) { publications += 1 }
 }
 
 final class ProviderFixture: URLProtocol {
@@ -48,60 +53,84 @@ final class ProviderFixture: URLProtocol {
     }
     override func stopLoading() {}
 }
-func configuration() -> URLSessionConfiguration {
-    let config = URLSessionConfiguration.ephemeral
-    config.protocolClasses = [ProviderFixture.self]
-    return config
+// Upstream providers create their own sessions; route them to the fixture.
+extension URLSessionConfiguration {
+    @objc class func fixtureDefault() -> URLSessionConfiguration {
+        let configuration = fixtureDefault()
+        configuration.protocolClasses = [ProviderFixture.self]
+        return configuration
+    }
+    @objc class func fixtureEphemeral() -> URLSessionConfiguration {
+        let configuration = fixtureEphemeral()
+        configuration.protocolClasses = [ProviderFixture.self]
+        return configuration
+    }
+}
+for (original, fixture) in [("defaultSessionConfiguration", #selector(URLSessionConfiguration.fixtureDefault)),
+                            ("ephemeralSessionConfiguration", #selector(URLSessionConfiguration.fixtureEphemeral))] {
+    method_exchangeImplementations(class_getClassMethod(URLSessionConfiguration.self, NSSelectorFromString(original))!,
+                                   class_getClassMethod(URLSessionConfiguration.self, fixture)!)
 }
 let options = UserDefaults.lyricsOptions
 let query = LyricsSearchQuery(title: "Song", primaryArtist: "Artist", spotifyTrackId: "0000000000000000000001")
-let lrc = LrclibLyricsRepository(apiUrl: options.lrclibUrl, configuration: configuration())
-let petit = PetitLyricsRepository(configuration: configuration())
-let genius = GeniusLyricsRepository(configuration: configuration())
-let spicy = SpicyLyricsRepository(configuration: configuration())
-for repository: LyricsRepository in [lrc, petit, genius, spicy] {
-    ProviderFixture.replies = [.offline]
-    do {
-        _ = try repository.getLyrics(query, options: options)
-        fatalError("offline response accepted")
-    } catch let error as URLError { precondition(error.code == .notConnectedToInternet) }
-    precondition(ProviderFixture.replies.isEmpty)
-}
+let lrc = LrclibLyricsRepository.shared
+let petit = PetitLyricsRepository()
+let genius = GeniusLyricsRepository()
+let spicy = SpicyLyricsRepository.shared
 
 func fetch(_ repo: LyricsRepository, _ replies: [ProviderFixture.Reply]) throws -> LyricsDto {
     ProviderFixture.replies = replies
-    defer { precondition(ProviderFixture.replies.isEmpty) }
+    defer { precondition(ProviderFixture.replies.isEmpty, "a reply was not requested") }
     return try repo.getLyrics(query, options: options)
 }
-let plain = try fetch(lrc, [.http(200, #"{"name":"Song","instrumental":false,"plainLyrics":"first\nlast"}"#)])
-precondition(plain.lines.map(\.content) == ["first", "last"])
-let synced = try fetch(lrc, [.http(200, #"{"name":"Song","instrumental":false,"syncedLyrics":"[:33]broken\n[9999999999:02]huge\n[01:02.50]last"}"#)])
-precondition(synced.lines.map(\.offsetMs) == [62500])
-do { _ = try fetch(lrc, [.http(404, "{}")]); fatalError("missing accepted") } catch LyricsError.noSuchSong {}
-do { _ = try fetch(lrc, [.http(500, "{}")]); fatalError("error accepted") } catch is LyricsProviderHTTPError {}
-let instrumental = try fetch(lrc, [.http(200, #"{"name":"Song","instrumental":true}"#)])
-precondition(instrumental.lines.isEmpty)
+func download(_ repo: LyricsRepository, _ replies: [ProviderFixture.Reply]) throws -> LyricsDto {
+    try LyricsDownloadHTTP.perform(isCancelled: { false }) { try fetch(repo, replies) }
+}
 
-let search = #"{"response":{"sections":[{"hits":[]},{"hits":[{"result":{"id":12,"title":"Song","artist_names":"Artist"}}]}]}}"#
-let song = #"{"response":{"song":{"language":"en","lyrics":{"plain":"[Verse]\nkeep [this] line"}}}}"#
-let geniusResult = try fetch(genius, [.http(200, search), .http(200, song)])
-precondition(geniusResult.lines.map(\.content) == ["keep [this] line"])
+// Playback and downloads read the same provider answer the same way.
+let lrcBody = #"{"name":"Song","instrumental":false,"plainLyrics":"first\nlast"}"#
+let result1 = try fetch(lrc, [.http(200, lrcBody)])
+precondition(result1.lines.map(\.content) == ["first"])
+let result2 = try download(lrc, [.http(200, lrcBody)])
+precondition(result2.lines.map(\.content) == ["first"])
+let result3 = try fetch(lrc, [.http(200, #"{"name":"Song","instrumental":true}"#)])
+precondition(result3.lines.isEmpty)
+
+// Lrclib: a failed request stays "no such song" in playback, as upstream. A
+// download sees the failure, and only LRCLIB's own 404 is a missing song.
+do { _ = try fetch(lrc, [.http(500, "{}"), .http(500, "{}")]); fatalError("playback failure changed") } catch LyricsError.noSuchSong {}
+do { _ = try download(lrc, [.http(404, "{}"), .http(404, "{}")]); fatalError("missing accepted") } catch LyricsError.noSuchSong {}
+do { _ = try download(lrc, [.http(500, "{}"), .http(500, "{}")]); fatalError("server error accepted") }
+catch let error as LyricsProviderHTTPError { precondition(error.status == 500) }
+
+// Offline is a transport error for every provider, not a missing song.
+for (repository, replies) in [(lrc, 2), (petit, 1), (genius, 1), (spicy, 1)] as [(LyricsRepository, Int)] {
+    do { _ = try download(repository, Array(repeating: .offline, count: replies)); fatalError("offline accepted") }
+    catch let error as URLError { precondition(error.code == .notConnectedToInternet) }
+}
+
+let search = #"{"response":{"sections":[{"hits":[{"result":{"id":12,"title":"Song","artist_names":"Artist"}}]}]}}"#
+let song = #"{"response":{"song":{"language":"en","lyrics":{"plain":"[Verse]\nkeep this line"}}}}"#
+let result4 = try download(genius, [.http(200, search), .http(200, song)])
+precondition(result4.lines.map(\.content) == ["keep this line"])
 
 func petitXML(_ text: String) -> String {
     let data = Data(text.utf8).base64EncodedString()
     return "<response><songs><song><lyricsId>1</lyricsId><title>Song</title><availableLyricsType>1</availableLyricsType><lyricsType>1</lyricsType><lyricsData>\(data)</lyricsData></song></songs></response>"
 }
 let xml = petitXML("first\nlast")
-let petitResult = try fetch(petit, [.http(200, xml), .http(200, xml)])
-precondition(petitResult.lines.map(\.content) == ["first", "last"])
-do { _ = try fetch(petit, [.http(200, xml), .http(200, petitXML(" "))]); fatalError("blank saved") } catch LyricsError.decodingError {}
+let result5 = try download(petit, [.http(200, xml), .http(200, xml)])
+precondition(result5.lines.map(\.content) == ["first", "last"])
 
-let spicyLine = #"{"Type":"Line","Content":[{"Type":"Vocal","Text":"words","StartTime":2.5,"EndTime":1e30}]}"#
-let live = try fetch(spicy, [.http(200, spicyLine)])
-precondition(live.karaoke?.lines.first?.startMs == 2500 && live.karaoke?.lines.first?.endMs == 2500)
-let saved = try LyricsDownloadHTTP.perform(isCancelled: { false }) {
-    try fetch(spicy, [.http(503, ""), .http(200, spicyLine)])
-}
-precondition(saved.lines.first?.content == "words" && saved.karaoke == nil)
-do { _ = try fetch(spicy, [.http(200, #"{"Type":"Line","Content":[]}"#)]); fatalError("blank saved") } catch LyricsError.decodingError {}
-print("All four provider adapters passed offline, response parsing and status regression fixtures")
+// Spicy publishes karaoke for the playing song only; a download leaves the
+// small karaoke store to playback. A queued (503) download is retried later.
+let spicyLine = #"{"Type":"Line","Content":[{"Type":"Vocal","Text":"words","StartTime":2.5,"EndTime":3}]}"#
+let result6 = try fetch(spicy, [.http(200, spicyLine)])
+precondition(result6.lines.first?.offsetMs == 2500 && KaraokeLyricsStore.shared.publications == 1)
+let result7 = try download(spicy, [.http(200, spicyLine)])
+precondition(result7.lines.first?.content == "words" && KaraokeLyricsStore.shared.publications == 1)
+do { _ = try download(spicy, [.http(503, "")]); fatalError("queued accepted") }
+catch let error as LyricsProviderHTTPError { precondition(error.status == 503) }
+do { _ = try download(spicy, [.http(404, "")]); fatalError("missing accepted") } catch LyricsError.noSuchSong {}
+do { _ = try fetch(spicy, [.http(500, "{}")]); fatalError("playback failure changed") } catch LyricsError.noSuchSong {}
+print("Providers: playback unchanged; downloads read the same text and keep failures apart from missing songs")

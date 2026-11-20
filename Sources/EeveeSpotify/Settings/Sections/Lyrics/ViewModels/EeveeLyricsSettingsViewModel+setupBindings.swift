@@ -5,8 +5,6 @@ extension EeveeLyricsSettingsViewModel {
     func setupBindings() {
         $lyricsOptions
             .map(\.lrclibUrl)
-            .removeDuplicates()
-            .debounce(for: .milliseconds(350), scheduler: DispatchQueue.main)
             .map { urlString -> AnyPublisher<LrclibURLState, Never> in
                 guard let url = URL(string: urlString) else {
                     return Just(.invalidURL).eraseToAnyPublisher()
@@ -17,14 +15,18 @@ extension EeveeLyricsSettingsViewModel {
                 }
                 
                 return URLSession.shared.dataTaskPublisher(for: url)
-                    .map { _ in LrclibURLState.ok }
+                    .map { _ in
+                        LrclibLyricsRepository.shared.apiUrl = urlString
+                        return LrclibURLState.ok
+                    }
                     .catch { _ in Just(LrclibURLState.unreachableURL) }
                     .eraseToAnyPublisher()
             }
             .switchToLatest()
             .receive(on: DispatchQueue.main)
             .assign(to: &$lrclibURLState)
-        
+
+        // Saved lyrics belong to the options they were fetched with.
         $lyricsOptions
             .map(\.downloadOptions)
             .removeDuplicates()
@@ -32,7 +34,6 @@ extension EeveeLyricsSettingsViewModel {
             .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
             .sink { _ in
                 LyricsNotFoundStore.shared.resetForLookupOptionsChange()
-                invalidateLyricsForSourceChange()
                 NativeOfflineLyrics.shared.reconcileAll()
                 EeveeOfflineLyricsDownloader.shared.refreshForCurrentSource(userInitiated: true)
             }
@@ -40,9 +41,13 @@ extension EeveeLyricsSettingsViewModel {
 
         $lyricsSource
             .dropFirst()
-            .removeDuplicates()
-            .sink { newSource in
-
+            .sink { [weak self] newSource in
+                guard let self = self else { return }
+                
+                if newSource == .lrclib {
+                    self.lyricsOptions.lrclibUrl = LrclibLyricsRepository.originalApiUrl
+                }
+                
                 UserDefaults.lyricsSource = newSource
 
                 // Everything cached for the old provider (prefetch, custom lyrics

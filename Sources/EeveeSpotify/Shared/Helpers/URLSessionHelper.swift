@@ -23,13 +23,13 @@ class URLSessionHelper {
         let dv = String(
             bytes: Data(bytes: &sysinfo.release, count: Int(_SYS_NAMELEN)),
             encoding: .ascii
-        )?.trimmingCharacters(in: .controlCharacters) ?? "unknown"
+        )!.trimmingCharacters(in: .controlCharacters)
         return "Darwin/\(dv)"
     }
 
     static var CFNetworkVersion: String {
-        let version = Bundle(identifier: "com.apple.CFNetwork")?
-            .object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
+        let dictionary = Bundle(identifier: "com.apple.CFNetwork")?.infoDictionary!
+        let version = dictionary?["CFBundleShortVersionString"] as! String
         return "CFNetwork/\(version)"
     }
 

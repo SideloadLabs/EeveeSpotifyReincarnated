@@ -6,7 +6,6 @@ struct LyricsDto {
     var romanization: LyricsRomanizationStatus
     var translation: LyricsTranslationDto?
     var providerCredit: String? = nil
-    var karaoke: KaraokeLyricsDto? = nil
     
     func toSpotifyLyricsData(source: String) -> LyricsData {
         var lyricsData = LyricsData.with {
@@ -37,9 +36,9 @@ struct LyricsDto {
             lyricsData.lines = sortedLines.map { line in
                 LyricsLine.with {
                     $0.content = (shouldRomanize && romanization == .canBeRomanized)
-                        ? (line.content.applyingTransform(.toLatin, reverse: false) ?? line.content)
+                        ? line.content.applyingTransform(.toLatin, reverse: false)!
                         : line.content
-                    $0.offsetMs = Int32(clamping: line.offsetMs ?? 0)
+                    $0.offsetMs = Int32(line.offsetMs ?? 0)
                 }
             }
         }

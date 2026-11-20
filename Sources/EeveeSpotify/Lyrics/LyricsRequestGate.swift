@@ -25,11 +25,7 @@ final class LyricsRequestGate {
     func wait(for request: URLRequest, isCancelled: () -> Bool) throws {
         try wait(key: host(request), isCancelled: isCancelled)
     }
-    func wait(for request: URLRequest) { wait(key: host(request)) }
     /// One slot per provider key (minimumInterval apart).
-    func wait(key: String) {
-        try? wait(key: key, isCancelled: { false })
-    }
     func wait(key: String, isCancelled: () -> Bool) throws {
         var slot = reserve(host: key, now: ProcessInfo.processInfo.systemUptime)
         while true {

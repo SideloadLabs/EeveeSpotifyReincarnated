@@ -81,11 +81,13 @@ func cachedOfflineLyrics(trackId: String, offline: Bool = false) -> Lyrics? {
     return lyrics
 }
 
-private func downloadRepository(_ source: LyricsSource) -> LyricsRepository? {
+private let petitDownloadRepository = PetitLyricsRepository()
+
+private func downloadRepository(_ source: LyricsSource, options: LyricsOptions) -> LyricsRepository? {
     switch source {
     case .genius: return GeniusLyricsRepository.shared
     case .lrclib: return LrclibLyricsRepository.shared
-    case .petit: return PetitLyricsRepository.shared
+    case .petit: return petitDownloadRepository
     case .spicylyrics: return SpicyLyricsRepository.shared
     case .notReplaced: return nil
     }
@@ -108,7 +110,7 @@ func downloadProviderLyrics(trackId: String, metadata: (title: String, artist: S
         !isCancelled() && store.isCurrent(revision, trackId: trackId) && UserDefaults.offlineLyricsEnabled
             && UserDefaults.lyricsSource == source && UserDefaults.lyricsOptions.downloadOptions == options
     }
-    guard let repository = downloadRepository(source), stillWanted() else { throw URLError(.cancelled) }
+    guard let repository = downloadRepository(source, options: options), stillWanted() else { throw URLError(.cancelled) }
     // URI-only requests (download queue, Spotify's plugin): local catalog first,
     // then Spotify's native track service, then the Web API with the captured token.
     var title = metadata?.title ?? "", artist = metadata?.artist ?? ""
@@ -129,7 +131,7 @@ func downloadProviderLyrics(trackId: String, metadata: (title: String, artist: S
         }
         guard stillWanted() else { throw URLError(.cancelled) }
         if !known(), let token = spotifyAccessToken,
-           let found = try fetchTrackDetails(trackId: trackId, token: token, startRequest: startWhenActive) {
+           let found = fetchTrackDetails(trackId: trackId, token: token) {
             title = found.title; artist = found.artist
         }
         guard stillWanted() else { throw URLError(.cancelled) }
@@ -140,7 +142,13 @@ func downloadProviderLyrics(trackId: String, metadata: (title: String, artist: S
     func fetch(_ repository: LyricsRepository) throws -> LyricsDto {
         let query = LyricsSearchQuery(title: title, primaryArtist: artist, spotifyTrackId: trackId)
         return try LyricsDownloadHTTP.perform(isCancelled: { !stillWanted() }, startRequest: startWhenActive) {
-            try repository.getLyrics(query, options: options)
+            let dto = try repository.getLyrics(query, options: options)
+            if dto.lines.isEmpty && repository is LrclibLyricsRepository { return dto }
+            guard dto.lines.contains(where: { !$0.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else {
+                if repository is GeniusLyricsRepository { throw LyricsError.noSuchSong }
+                throw LyricsError.decodingError
+            }
+            return dto
         }
     }
     var used = source
@@ -188,7 +196,14 @@ func downloadProviderLyrics(trackId: String, metadata: (title: String, artist: S
         }
     }
     guard stillWanted() else { throw URLError(.cancelled) }
-    let lyrics = Lyrics.with { $0.data = dto.toSpotifyLyricsData(source: used.description) }
+    var savedDTO = dto
+    let romanize = options.romanization && dto.romanization == .canBeRomanized
+    savedDTO.lines = dto.lines.map { line in
+        let content = romanize ? (line.content.applyingTransform(.toLatin, reverse: false) ?? line.content) : line.content
+        return LyricsLineDto(content: content, offsetMs: line.offsetMs.map { Int(Int32(clamping: $0)) })
+    }
+    if romanize { savedDTO.romanization = .romanized }
+    let lyrics = Lyrics.with { $0.data = savedDTO.toSpotifyLyricsData(source: used.description) }
     guard try store.save(trackId: trackId, source: source.rawValue, options: options,
                          data: lyrics.serializedData(), revision: revision) else { throw URLError(.cancelled) }
     LyricsNotFoundStore.shared.succeeded(trackId, source: source.rawValue)
@@ -196,20 +211,48 @@ func downloadProviderLyrics(trackId: String, metadata: (title: String, artist: S
     return lyrics
 }
 
+/// Saved lyrics for a lyrics request that failed in transport (offline).
+func savedLyrics(forFailed url: URL, error: Error?) -> Data? {
+    guard let error, (error as? URLError)?.code != .cancelled, url.isLyrics,
+          let trackId = extractTrackId(from: url.path),
+          let lyrics = cachedOfflineLyrics(trackId: trackId, offline: true) else { return nil }
+    if !url.path.contains("/download/") { KaraokePlaybackTracker.shared.updateTrackIdFromLyricsFetch(trackId) }
+    return try? lyrics.serializedData()
+}
+
 /// Lyrics hook entry point. Spotify's offline-lyrics plugin asks for
 /// /color-lyrics/v2/download/track/<id> for downloaded tracks that are usually
 /// not playing; those are served from the download path so playback state is
 /// untouched. Every other request goes to upstream's getLyricsDataForCurrentTrack.
-func eeveeLyricsData(_ path: String, originalLyrics: Lyrics? = nil) throws -> Data {
+/// Both of Spotify's delegates, and the response and completion callbacks, ask
+/// for the same task: one provider answer per task is shared between them.
+func eeveeLyricsData(_ path: String, originalLyrics: Lyrics? = nil, task: URLSessionTask) throws -> Data {
     guard path.contains("/download/track/") else {
         return try getLyricsDataForCurrentTrack(path, originalLyrics: originalLyrics)
     }
-    guard let trackId = extractTrackId(from: path), !trackId.isEmpty else { throw LyricsError.noCurrentTrack }
+    guard UserDefaults.lyricsSource.isReplacingLyrics, UserDefaults.offlineLyricsEnabled else {
+        throw LyricsError.invalidSource
+    }
+    guard let trackId = extractTrackId(from: path) else { throw LyricsError.noCurrentTrack }
+    return try LyricsTaskState.forTask(task).result {
+        do { return try pluginDownloadLyrics(trackId: trackId).serializedData() }
+        catch {
+            // Without lyrics from Spotify or the provider, an empty row keeps the
+            // audio download from waiting for lyrics. Not a provider "not found" entry.
+            if originalLyrics == nil, (error as? URLError)?.code != .cancelled {
+                NativeOfflineLyrics.shared.markNoLyrics(trackId: trackId,
+                    reason: "Spotify has no lyrics, external lyrics unavailable: \(error)")
+            }
+            throw error
+        }
+    }
+}
+
+private func pluginDownloadLyrics(trackId: String) throws -> Lyrics {
+    if let saved = cachedOfflineLyrics(trackId: trackId) { return saved }
     let execution = EeveeOfflineLyricsDownloader.shared.foreground
     if !execution.isActive || execution.networkUnavailable,
-       let cached = cachedOfflineLyrics(trackId: trackId, offline: true) { return try cached.serializedData() }
-    // LyricsTaskState makes this call off main. Spotify gets a bounded wait,
-    // and the shared fetch can still save a result after that deadline.
+       let cached = cachedOfflineLyrics(trackId: trackId, offline: true) { return cached }
     let semaphore = DispatchSemaphore(value: 0)
     var result: Result<Lyrics, Error>?
     EeveeOfflineLyricsDownloader.shared.lyricsForNativeDownload(trackId: trackId) { response in
@@ -227,5 +270,5 @@ func eeveeLyricsData(_ path: String, originalLyrics: Lyrics? = nil) throws -> Da
         lyrics = cached
     }
     lyrics.colors = offlineLyricsColors()
-    return try lyrics.serializedData()
+    return lyrics
 }
