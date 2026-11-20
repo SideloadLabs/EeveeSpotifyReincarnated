@@ -7,6 +7,7 @@ struct EqualizerSettingsView: View {
     @State private var userPresets = UserDefaults.equalizerUserPresets
     @State private var corrections = UserDefaults.headphoneCorrections
     @State private var output = Equalizer.output
+    @State private var confirmingClipping = false
     private let feedback = UISelectionFeedbackGenerator()
 
     private var gains: [Double] { Equalizer.normalized(options.gains) }
@@ -30,6 +31,13 @@ struct EqualizerSettingsView: View {
 
     private func gain(_ band: Int) -> Binding<Double> {
         Binding(get: { gains[band] }, set: { set(band, $0) })
+    }
+
+    // turning it off asks first, every time; the toggle stays on until it's confirmed.
+    private var clipping: Binding<Bool> {
+        Binding(get: { options.preventClipping }, set: { on in
+            if on { options.preventClipping = true } else { confirmingClipping = true }
+        })
     }
 
     private func set(_ band: Int, _ value: Double) {
@@ -57,7 +65,7 @@ struct EqualizerSettingsView: View {
                     .frame(height: 160)
                     .padding(.vertical, 8)
                 presetMenu
-                SettingsToggle(title: "equalizer_prevent_clipping".localized, icon: "waveform", color: .orange, isOn: $options.preventClipping)
+                SettingsToggle(title: "equalizer_prevent_clipping".localized, icon: "waveform", color: .orange, isOn: clipping)
             }
             .disabled(!options.enabled)
 
@@ -129,6 +137,14 @@ struct EqualizerSettingsView: View {
         .onChange(of: options) {
             UserDefaults.equalizerOptions = $0
             Equalizer.apply($0)
+        }
+        .alert(isPresented: $confirmingClipping) {
+            Alert(
+                title: Text("equalizer_clipping_warning_title".localized),
+                message: Text("equalizer_clipping_warning_message".localized),
+                primaryButton: .destructive(Text("equalizer_clipping_warning_confirm".localized)) { options.preventClipping = false },
+                secondaryButton: .cancel()
+            )
         }
     }
 

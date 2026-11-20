@@ -70,8 +70,9 @@ gets +2.9. Here a centre can be off by about 0.3 dB, in return for the whole cur
 The sound is turned down by the curve's highest point, so the boosts have room and no limiter is needed. That
 bounds steady tones, not peaks that line up in phase: very loud, bass-heavy material can still go over. The page
 says by how much it's turned down. With **Prevent clipping** off it isn't: the boosts play at full height and a
-loud song can clip, as in most equalizers, for those who'd rather keep the volume. Nothing limits it then; a
-float output clips in the hardware, a 16 or 32-bit integer one where the samples are written back.
+loud song can clip, as in most equalizers, for those who'd rather keep the volume. Turning it off asks first, every
+time. Nothing limits it then; a float output clips in the hardware, a 16 or 32-bit integer one where the samples
+are written back.
 
 ## Headphone corrections
 
