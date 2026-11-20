@@ -1,6 +1,9 @@
 #pragma once
 #import <Foundation/Foundation.h>
 
-// Pixie's interface is English-only, regardless of Spotify's preferred language.
-// Keep the paired-string API compatible with existing callers.
-NSString *SAPL(NSString *russian,NSString *english);
+NS_ASSUME_NONNULL_BEGIN
+
+// The English UI string is both the lookup key and the fallback.
+NSString *SAPLocalized(NSString *english);
+
+NS_ASSUME_NONNULL_END

@@ -37,7 +37,7 @@ def main():
     native.write_bytes(encrypt(media+table+head,bytes(range(1,17)),bytes(iv)))
     binary=out/'track-export'
     sources=[ROOT/'tests/track_export.m',*(resolve_source(n) for n in [
-        'WireProto.m','NativeCacheMap.m','CacheStorageKey.m','CacheEnvelope.c','OggExport.c','OggInspection.c','OggValidationTrace.m','OggArtwork.c','ExportArtworkMetadata.m','ExportLibrary.m','ExportKeyVault.m','ExportCacheIndex.m','M4AExport.m','M4AConversionQueue.m','MediaDecode.c','TemporaryOfflineExport.m','ExportShareFolder.m'])]
+        'Localization.m','WireProto.m','NativeCacheMap.m','CacheStorageKey.m','CacheEnvelope.c','OggExport.c','OggInspection.c','OggValidationTrace.m','OggArtwork.c','ExportArtworkMetadata.m','ExportLibrary.m','ExportKeyVault.m','ExportCacheIndex.m','M4AExport.m','M4AConversionQueue.m','MediaDecode.c','TemporaryOfflineExport.m','ExportShareFolder.m'])]
     with (out/'track-export.log').open('w') as log:
         run('xcrun','clang','-fobjc-arc','-std=gnu11','-DSAP_VAULT_TESTING=1','-DSAP_TESTING=1','-O1','-g','-fsanitize=address,undefined',
             *('-I'+str(p) for p in include_directories()),*sources,'-lm','-lsqlite3','-framework','AudioToolbox','-framework','AVFoundation','-framework','CoreMedia','-framework','Foundation','-o',binary,

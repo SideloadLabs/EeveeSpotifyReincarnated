@@ -1,3 +1,4 @@
+#import "Localization.h"
 #import "JournalPrivate.h"
 #include <float.h>
 
@@ -480,9 +481,7 @@ NSDictionary *SAPJournalReport(void) {
         @"unanswered_calls": [SAPJournalStateStorage.unanswered copy], @"outstanding_calls": [[SAPJournalStateStorage.outstanding allKeys] copy],
         @"log_file": @"SpotifyAudioProbeJournal.log",
         @"tracks": list,
-        @"note": SAPL(@"Error ядра офлайна не содержит URI (Error{code} — analysis/offline-esperanto-service.md), "
-                 @"поэтому ошибка привязывается к треку по времени и помечается как correlated.",
-                 @"Offline core errors contain no URI (Error{code}; see analysis/offline-esperanto-service.md), so errors are associated with tracks by timestamp and marked as correlated.")
+        @"note": SAPLocalized(@"Offline core errors contain no URI (Error{code}; see analysis/offline-esperanto-service.md), so errors are associated with tracks by timestamp and marked as correlated.")
     };
     os_unfair_lock_unlock(&SAPJournalStateStorage.lock);
     return report;

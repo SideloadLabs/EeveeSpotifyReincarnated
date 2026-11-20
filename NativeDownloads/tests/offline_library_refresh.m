@@ -1,6 +1,7 @@
 // Executes the production state/lifecycle methods with Foundation-only UI
 // boundaries. Native catalog membership/cache behavior has its own fixture.
 #import <Foundation/Foundation.h>
+#import "Localization.h"
 #import "OfflineLibraryProgress.h"
 #import "OfflineLibrarySelection.h"
 #define SAP_TRACE(...) ((void)0)

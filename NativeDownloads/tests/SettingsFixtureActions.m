@@ -3,6 +3,7 @@
 #import "AudioProbeUI.h"
 #import "OfflineDevices.h"
 #import "NativeDownloadQuality.h"
+#import "OfflineLibraryCatalog.h"
 static BOOL fixtureSourceMismatch;
 @implementation SAPSettingsActions
 + (NSDictionary *)snapshot {
@@ -56,6 +57,12 @@ void SAPEnableOfflineOnCurrentDevice(void (^completion)(NSDictionary *,NSString 
 
 // Navigation is exercised without loading the real Spotify offline library.
 void SAPShowOfflineLibrary(UIViewController *presenter) {}
+
+dispatch_block_t SAPFetchOfflineLibrary(void (^progress)(NSUInteger, NSUInteger),
+                                      void (^completion)(NSArray *, NSString *)) {
+    dispatch_async(dispatch_get_main_queue(), ^{ if (completion) completion(@[], nil); });
+    return ^{};
+}
 
 NSString *SAPAudioExportFormat(void){return @"m4a";}
 NSString *const SAPNativeDownloadQualityOfferDidChangeNotification=@"SAPFixtureNativeQualityOfferChanged";
