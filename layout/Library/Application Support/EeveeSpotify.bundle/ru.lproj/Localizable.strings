@@ -487,8 +487,6 @@ manage_downloads_subtitle = "Офлайн-загрузки Pixie";
 // Pixie background lyrics downloads
 
 // Offline custom text
-"lyrics_unsynchronized" = "Не синхронизирован";
-"lyrics_not_saved" = "Текст этой песни ещё не сохранён.";
 
 lyrics_downloads = "Скачивание текстов";
 lyrics_downloads_subtitle = "Скачивание вместе с музыкой и управление сохранёнными текстами";
