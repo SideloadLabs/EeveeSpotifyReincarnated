@@ -73,7 +73,7 @@ func loadCustomLyrics(_ request: PlaybackRequest) throws -> Lyrics {
     // 4. Read verified metadata for this ID, including tracks that aren't playing.
     if !hasMetadata,
        let info = EeveeOfflineLyricsDownloader.pixieCatalogMetadata(trackId: trackId)
-           ?? (needsMetadata ? nativeLyricsMetadata(trackId: trackId, timeout: 2) : nil) {
+           ?? (needsMetadata ? nativeLyricsMetadata(trackId: trackId, timeout: 2).metadata : nil) {
         currentTitle = info.title
         currentArtist = info.artist
         hasMetadata = true

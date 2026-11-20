@@ -8,12 +8,16 @@ import SwiftUI
 // own offline repository, which reads the native SQLite projection.
 
 enum OfflineLyricsFetchError: Error, CustomStringConvertible {
-    /// Title or artist unknown, so the provider cannot be searched. Not "no lyrics".
+    /// Spotify answered without a usable title/artist, so the provider cannot be
+    /// searched. A definite outcome for this track, though not "no lyrics".
     case noMetadata
+    /// Spotify's track service did not answer; the lookup may succeed later.
+    case metadataUnavailable
     case timedOut
     var description: String {
         switch self {
         case .noMetadata: return "no title/artist for this track, provider cannot be searched"
+        case .metadataUnavailable: return "track title/artist lookup did not answer; try again later"
         case .timedOut: return "lyrics fetch is still running; not a missing song"
         }
     }
@@ -28,6 +32,7 @@ private func shouldStopProviderFallback(_ error: Error) -> Bool {
 func geniusLyricsUnavailable(_ error: Error) -> Bool {
     if case LyricsError.noSuchSong = error { return true }
     if case OfflineLyricsFetchError.noMetadata = error { return true }
+    if case OfflineLyricsFetchError.metadataUnavailable = error { return true }
     return false
 }
 
@@ -116,9 +121,11 @@ func downloadProviderLyrics(trackId: String, metadata: (title: String, artist: S
         try foreground.whenNetworkAvailable(isCancelled: { !stillWanted() }, start)
     }
     func requireMetadata() throws {
-        if !known(), let found = nativeLyricsMetadata(trackId: trackId, timeout: metadataTimeout,
-                                                      startRequest: startWhenActive) {
-            title = found.title; artist = found.artist
+        var answered = true
+        if !known() {
+            let lookup = nativeLyricsMetadata(trackId: trackId, timeout: metadataTimeout, startRequest: startWhenActive)
+            if let found = lookup.metadata { title = found.title; artist = found.artist }
+            if case .unavailable = lookup { answered = false }
         }
         guard stillWanted() else { throw URLError(.cancelled) }
         if !known(), let token = spotifyAccessToken,
@@ -126,7 +133,9 @@ func downloadProviderLyrics(trackId: String, metadata: (title: String, artist: S
             title = found.title; artist = found.artist
         }
         guard stillWanted() else { throw URLError(.cancelled) }
-        guard known() else { throw OfflineLyricsFetchError.noMetadata }
+        // The Web API's nil mixes timeouts with misses; only Spotify's native
+        // answer makes a missing title definite.
+        guard known() else { throw answered ? OfflineLyricsFetchError.noMetadata : OfflineLyricsFetchError.metadataUnavailable }
     }
     func fetch(_ repository: LyricsRepository) throws -> LyricsDto {
         let query = LyricsSearchQuery(title: title, primaryArtist: artist, spotifyTrackId: trackId)
@@ -160,7 +169,7 @@ func downloadProviderLyrics(trackId: String, metadata: (title: String, artist: S
         // Spicy can search by ID alone. Genius needs verified track metadata,
         // including when the automatic catalog scan has only returned URIs.
         if !known() {
-            if case OfflineLyricsFetchError.noMetadata = primaryError { throw primaryError }
+            if primaryError is OfflineLyricsFetchError { throw primaryError }
             do { try requireMetadata() }
             catch OfflineLyricsFetchError.noMetadata {
                 if case LyricsError.noSuchSong = primaryError { throw OfflineLyricsFetchError.noMetadata }
