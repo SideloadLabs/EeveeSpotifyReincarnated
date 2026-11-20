@@ -32,12 +32,12 @@ for fmt in [plistlib.FMT_BINARY, plistlib.FMT_XML]:
     without_tasks = plistlib.dumps({'CFBundleIdentifier': 'com.spotify.client'}, fmt=fmt)
     assert plistlib.loads(patch_info(without_tasks))['BGTaskSchedulerPermittedIdentifiers'] == [identifier]
     assert plistlib.loads(patch_info(without_tasks))['UIBackgroundModes'] == ['processing']
-    ordinary = patch_info(patched, signing_bundle_identifier='com.spotify.client.QK2MKTAFK3')
+    ordinary = patch_info(patched, signing_bundle_identifier='com.spotify.client.EXAMPLE123')
     ordinary_config = plistlib.loads(ordinary)
     assert ordinary_config['CFBundleIdentifier'] == original['CFBundleIdentifier']
     assert ordinary_config['BGTaskSchedulerPermittedIdentifiers'] == [
-        'com.spotify.client.offline.downloads', 'com.spotify.client.QK2MKTAFK3.pixie.lyrics.processing']
-    assert patch_info(ordinary, signing_bundle_identifier='com.spotify.client.QK2MKTAFK3') == ordinary
+        'com.spotify.client.offline.downloads', 'com.spotify.client.EXAMPLE123.pixie.lyrics.processing']
+    assert patch_info(ordinary, signing_bundle_identifier='com.spotify.client.EXAMPLE123') == ordinary
     assert plistlib.loads(patch_info(ordinary, background_processing=False)) == original
 for invalid in [{}, {'CFBundleIdentifier': ''}, {'CFBundleIdentifier': 'com.example', 'BGTaskSchedulerPermittedIdentifiers': [123]}]:
     try:
