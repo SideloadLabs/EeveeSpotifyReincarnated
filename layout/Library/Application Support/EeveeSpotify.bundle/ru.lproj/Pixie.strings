@@ -284,7 +284,7 @@
 "OK" = "ОК";
 "Offline access disabled" = "Офлайн-доступ отключён";
 "Offline checks" = "Проверка офлайн-доступа";
-"Offline core errors contain no URI (Error{code}; see analysis/offline-esperanto-service.md), so errors are associated with tracks by timestamp and marked as correlated." = "Error ядра офлайна не содержит URI (Error{code} — analysis/offline-esperanto-service.md), поэтому ошибка привязывается к треку по времени и помечается как correlated.";
+"Offline core errors contain no URI (Error{code}; see analysis/offline-esperanto-service.md), so errors are associated with tracks by timestamp and marked as correlated." = "Ошибки ядра офлайна не содержат URI (Error{code} — analysis/offline-esperanto-service.md), поэтому ошибка привязывается к треку по времени и помечается как сопоставленная по времени.";
 "Offline devices" = "Офлайн-устройства";
 "Offline disabled" = "Офлайн-доступ выключен";
 "Offline enabled" = "Офлайн-доступ включён";
@@ -436,7 +436,7 @@
 "Spotify download preparation failed." = "Не удалось подготовить скачивание в Spotify.";
 "Spotify downloads: %lu / %lu complete" = "Загрузки Spotify: %lu / %lu готово";
 "Spotify downloads: %lu / %lu tracks ready for export" = "Загрузки Spotify: %lu / %lu готово к экспорту";
-"Spotify has no audio files for %@ even after the download." = "После скачивания аудиофайлы для «%@» недоступны.";
+"Spotify has no audio files for %@ even after the download." = "Spotify не вернул аудиофайлы для «%@» даже после скачивания.";
 "Spotify has not confirmed that the previous operation stopped." = "Spotify ещё не подтвердил остановку предыдущей операции.";
 "Spotify is downloading the album for export…" = "Spotify скачивает альбом для экспорта…";
 "Spotify is downloading the audio for export…" = "Spotify скачивает аудио для экспорта…";
@@ -462,7 +462,7 @@
 "Spotify stopped downloading the album tracks (%lu of %lu ready). No audio was exported." = "Spotify остановил скачивание альбома (%lu из %lu треков готово). Экспорт аудио не выполнен.";
 "Spotify twice reported “%@” as downloaded. Offline playback has not been tested. No separate audio file was created." = "Spotify дважды сообщил, что «%@» скачан. Офлайн-воспроизведение не проверено. Отдельный файл не создан.";
 "Spotify's existing authenticated headers are not available. Play one track online on this device, then refresh." = "Данные сеанса Spotify недоступны. Запустите трек онлайн на этом устройстве и обновите данные.";
-"Spotify's temporary download result is unknown. No automatic removal was attempted." = "Результат временного скачивания неизвестен. Автоматическое удаление не запускалось.";
+"Spotify's temporary download result is unknown. No automatic removal was attempted." = "Результат временного скачивания в Spotify неизвестен. Автоматическое удаление не запускалось.";
 "SpotifyAudioProbe — offline download status, %@\n" = "SpotifyAudioProbe — состояние офлайн-загрузки, %@\n";
 "Stalled without progress: %lu\n" = "Застряли без прогресса: %lu\n";
 "Start a music track on this iPhone first." = "Сначала запустите трек на этом iPhone.";
@@ -543,11 +543,11 @@
 "Verifying playlist order…" = "Проверяем порядок треков…";
 "Waiting" = "Ожидание";
 "Waiting for Spotify to finish the requested downloads…" = "Ожидаем завершения загрузок Spotify…";
-"Waiting for Spotify to start the album download…" = "Ожидаем начала скачивания альбома…";
+"Waiting for Spotify to start the album download…" = "Ждём, пока Spotify начнёт скачивание альбома…";
 "Waiting for Spotify…" = "Ожидаем ответа Spotify…";
 "Waiting for selected files…" = "Ожидаем выбранные файлы…";
-"Waiting for the existing Spotify album download…" = "Ожидаем завершения текущего скачивания альбома…";
-"Waiting for the existing Spotify download…" = "Ожидаем завершения текущего скачивания…";
+"Waiting for the existing Spotify album download…" = "Ожидаем завершения текущего скачивания альбома в Spotify…";
+"Waiting for the existing Spotify download…" = "Ожидаем завершения текущего скачивания в Spotify…";
 "Yes" = "Да";
 "Your music stays. Pending lyrics downloads will stop. You can download lyrics again." = "Музыка останется. Очередь текстов будет остановлена. Тексты можно скачать снова.";
 "ZIP archive" = "ZIP-архив";
@@ -570,7 +570,7 @@
 "unknown file error" = "неизвестная ошибка файла";
 "yes" = "да";
 "• %@ — %@ %@%%, in this state for %@%@\n" = "• %@ — %@ %@%%, в состоянии %@%@\n";
-"❌ error: %@ · 🚫 limit: %@ · ⚪️ not downloaded: %@ · ⏱ expired: %@\n" = "❌ error: %@ · 🚫 лимит: %@ · ⚪️ не скачан: %@ · ⏱ истёк: %@\n";
+"❌ error: %@ · 🚫 limit: %@ · ⚪️ not downloaded: %@ · ⏱ expired: %@\n" = "❌ ошибка: %@ · 🚫 лимит: %@ · ⚪️ не скачан: %@ · ⏱ истёк: %@\n";
 "Removed from the library: %lu / %lu\nRemoved offline: %lu / %lu" = "Удалено из медиатеки: %lu / %lu\nУдалено из загрузок: %lu / %lu";
 "Not removed: %@." = "Не удалено: %@.";
 "Not removed:" = "Не удалено:";

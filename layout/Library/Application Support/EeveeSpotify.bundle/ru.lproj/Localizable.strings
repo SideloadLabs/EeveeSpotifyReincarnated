@@ -484,9 +484,5 @@ restart_later = "Later";
 manage_downloads = "Управление загрузками";
 manage_downloads_subtitle = "Офлайн-загрузки Pixie";
 
-// Pixie background lyrics downloads
-
-// Offline custom text
-
 lyrics_downloads = "Скачивание текстов";
 lyrics_downloads_subtitle = "Скачивание вместе с музыкой и управление сохранёнными текстами";

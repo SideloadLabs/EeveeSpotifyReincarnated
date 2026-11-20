@@ -519,9 +519,5 @@ restart_later = "Later";
 manage_downloads = "Manage downloads";
 manage_downloads_subtitle = "Pixie offline downloads";
 
-// Pixie background lyrics downloads
-
-// Offline custom text
-
 lyrics_downloads = "Lyrics downloads";
 lyrics_downloads_subtitle = "Save lyrics with music, saved lyrics and cleanup";
