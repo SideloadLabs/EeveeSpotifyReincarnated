@@ -3,7 +3,8 @@
 The native LyricsRepository consults its in-memory cache *before* the offline
 data source; external SQLite commits do not invalidate that cache. In the
 already selected offline branch, skip only that cache lookup and fall through
-to the existing offline-enabled check and native SQLite fetch.
+to the native SQLite reader. Select this reader locally so audio synchronization
+continues to receive the original Spotify configuration.
 
 The branch is located by its instruction shape, not by address or UUID:
 
@@ -26,7 +27,7 @@ The branch is located by its instruction shape, not by address or UUID:
 Verified unique on Spotify 9.1.90, 9.1.92, 9.1.98 and 9.2.0 (9.2.0: 0x100813f30,
 the address previously patched by hand). Not present in 9.1.76/9.1.86, where
 the patch is skipped. Exactly one match is required; otherwise nothing changes
-and the report says why. Only one 4-byte instruction is replaced.
+and the report says why. Only the cache jump and the viewer's feature-flag load are changed.
 """
 import argparse
 import json
@@ -112,6 +113,10 @@ def branch(source, destination):
 JUMP = branch(0, (DESTINATION_INDEX - ENTRY_INDEX) * 4)
 
 
+VIEWER_ENABLED = 0x52800028  # mov w8, #1, followed by the original cmp/b.ne
+FLAG_INDEX = 12
+
+
 def _shape(words, patched=False):
     """Match the 15-instruction offline branch. `patched`: words[4] is our jump."""
     first = _ldrb(words[0])
@@ -131,11 +136,12 @@ def _shape(words, patched=False):
     if _cmp_one(words[9]) != 0 or not _b_ne(words[10]):
         return None
     slot, flag = _ldr_x(words[11]), _ldrb(words[12])
-    if slot is None or slot[2] != 8 or flag is None or flag[1] != 8 or flag[2] != 8:
+    viewer_patched = patched and words[FLAG_INDEX] == VIEWER_ENABLED
+    if slot is None or slot[2] != 8 or not (viewer_patched or (flag and flag[1:] == (8, 8))):
         return None
     if _cmp_one(words[13]) != 8 or not _b_ne(words[14]):
         return None
-    return {"network_state_offset": hex(first[0]), "offline_flag_offset": hex(flag[0])}
+    return {"network_state_offset": hex(first[0]), "offline_flag_offset": hex(flag[0]) if flag else None}
 
 
 def find(data):
@@ -155,8 +161,12 @@ def find(data):
         found = _shape(window)
         if found:
             matches.append((entry, fileoff + (index + ENTRY_INDEX) * 4, found))
-        elif window[ENTRY_INDEX] == JUMP and _shape(window, patched=True):
-            patched.append(entry)
+        elif window[ENTRY_INDEX] == JUMP:
+            fields = _shape(window, patched=True)
+            if fields and window[FLAG_INDEX] == VIEWER_ENABLED:
+                patched.append(entry)
+            elif fields:
+                matches.append((entry, fileoff + (index + ENTRY_INDEX) * 4, fields))
     return matches, patched
 
 
@@ -183,8 +193,10 @@ def patch(data, spotify_version=None):
     result = bytearray(data)
     old = bytes(result[offset:offset + 4])
     result[offset:offset + 4] = word
+    flag_offset = offset + (FLAG_INDEX - ENTRY_INDEX) * 4
+    struct.pack_into("<I", result, flag_offset, VIEWER_ENABLED)
     report.update({"applied": True, "entry": hex(entry), "destination": hex(destination),
-                   "file_offset": offset, "old_bytes": old.hex(), "new_bytes": word.hex(), **fields,
+                   "file_offset": offset, "viewer_flag_file_offset": flag_offset, "old_bytes": old.hex(), "new_bytes": word.hex(), **fields,
                    "scope": "offline native lyrics fetch skips memory cache and reads native SQLite"})
     return bytes(result), report
 

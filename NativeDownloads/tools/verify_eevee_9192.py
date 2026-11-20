@@ -13,7 +13,6 @@ import patch_native_restrictions as quota
 import patch_native_trace as trace
 import patch_export as export
 import patch_lyrics_offline_cache as lyrics_cache
-import patch_lyrics_plugin_registration as lyrics_registration
 from export_release_materials import notices
 from pixie_target import PROFILE
 from signing_metadata import embedded_entitlements
@@ -64,7 +63,6 @@ def main():
         patched, trace_report = trace.patch(prepared)
         patched, export_report = export.patch(patched)
         patched, lyrics_cache_report = lyrics_cache.patch(patched, PROFILE["spotify_version"])
-        patched, lyrics_registration_report = lyrics_registration.patch(patched)
         # Code outside the explicit observation entries/padding spans (the three diagnostic
         # boundaries and the Pixie 1.4 export boundaries) must remain byte-for-byte unchanged.
         spans = []
@@ -76,9 +74,9 @@ def main():
             _, address, cave, _, _ = point
             spans.extend([(address-quota.PREFERRED, address-quota.PREFERRED+4),
                           (cave-quota.PREFERRED, cave-quota.PREFERRED+len(export.trampoline(point)))])
-        for lyrics_report in (lyrics_cache_report, lyrics_registration_report):
-            if lyrics_report["applied"]:
-                offset = lyrics_report["file_offset"]
+        if lyrics_cache_report["applied"]:
+            for field in ("file_offset", "viewer_flag_file_offset"):
+                offset = lyrics_cache_report[field]
                 spans.append((offset, offset + 4))
         position = 0
         for start, end in sorted(spans):
@@ -109,7 +107,6 @@ def main():
                   'hook_target_names_present': required, 'rejected_invalid_patch_cases': rejected,
                   'quota': quota_report, 'diagnostic_boundaries': trace_report, 'export_boundaries': export_report,
                   'offline_lyrics_cache': lyrics_cache_report,
-                  'offline_lyrics_registration': lyrics_registration_report,
                   'phone_runtime_tested': False}
         if args.output:
             with ZipFile(args.output) as result:
@@ -123,7 +120,6 @@ def main():
                 info_name = APP + 'Info.plist'
                 expected_info = patch_info(source.read(info_name), signing_bundle_identifier=args.signing_bundle_identifier,
                                            background_processing=BACKGROUND_PROCESSING_MARKER in result.read(EEVEE))
-                expected_info = lyrics_registration.stamp_info(expected_info, lyrics_registration_report)
                 require(result.read(info_name) == expected_info, 'Unexpected app configuration changes')
                 if expected_info != source.read(info_name):
                     expected_changes.add(info_name)
