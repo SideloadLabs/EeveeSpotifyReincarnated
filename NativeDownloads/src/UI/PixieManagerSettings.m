@@ -393,6 +393,11 @@ static NSDictionary *SAPLyricsSnapshot(void) {
     Class cls=SAPLyricsBridge();SEL selector=NSSelectorFromString(@"settingsSnapshot");
     return [cls respondsToSelector:selector]?((id(*)(id,SEL))objc_msgSend)(cls,selector):@{};
 }
+// Counts wrap only after a "·" separator, so a label never splits from its number.
+static NSString *SAPLyricsCountsText(NSString *text) {
+    NSString *glued=[text stringByReplacingOccurrencesOfString:@" " withString:@" "];
+    return [glued stringByReplacingOccurrencesOfString:@" · " withString:@" · "];
+}
 // The native catalog read belongs to the download action, not to a page's lifetime.
 static dispatch_block_t SAPLyricsCatalogCancel;
 static id SAPLyricsCatalogObserver;
@@ -426,8 +431,7 @@ static id SAPLyricsCatalogObserver;
     [self updateProgressPanel];
 }
 - (BOOL)busy {return self.scanning || ([self.lyrics[@"batch"][@"active"]boolValue] && ![self.lyrics[@"batch"][@"kind"]isEqual:@"refresh"]);}
-// Match Downloaded tracks' active progress panel, including its fixed-height
-// one-line labels and Cancel capsule. Lyrics have no package to retain/share.
+// Match Downloaded tracks' active progress panel. Lyrics have only a Cancel action.
 - (void)updateProgressPanel {
     if(self.updatingProgressPanel || !self.isViewLoaded)return;
     self.updatingProgressPanel=YES;
@@ -445,8 +449,7 @@ static id SAPLyricsCatalogObserver;
         self.progressTitle=UILabel.new;self.progressTitle.font=[UIFont preferredFontForTextStyle:UIFontTextStyleFootnote];self.progressTitle.textColor=UIColor.labelColor;self.progressTitle.adjustsFontForContentSizeCategory=YES;
         self.progressTitle.numberOfLines=1;self.progressTitle.lineBreakMode=NSLineBreakByTruncatingTail;
         self.progressDetail=UILabel.new;self.progressDetail.font=[UIFont preferredFontForTextStyle:UIFontTextStyleCaption1];self.progressDetail.textColor=UIColor.secondaryLabelColor;self.progressDetail.adjustsFontForContentSizeCategory=YES;
-        self.progressDetail.numberOfLines=1;self.progressDetail.lineBreakMode=NSLineBreakByTruncatingTail;
-        self.progressDetail.adjustsFontSizeToFitWidth=YES;self.progressDetail.minimumScaleFactor=0.75;
+        self.progressDetail.numberOfLines=2;self.progressDetail.lineBreakMode=NSLineBreakByTruncatingTail;
         for(UILabel *label in @[self.progressTitle,self.progressDetail]) {
             label.translatesAutoresizingMaskIntoConstraints=NO;[label setContentCompressionResistancePriority:UILayoutPriorityDefaultLow forAxis:UILayoutConstraintAxisHorizontal];
         }
@@ -487,8 +490,8 @@ static id SAPLyricsCatalogObserver;
     if(self.scanning)title=SAPLocalized(@"Checking downloads · %lu / %lu");
     self.progressTitle.text=[NSString stringWithFormat:title,(unsigned long)done,(unsigned long)total];
     self.progressDetail.text=self.scanning?SAPLocalized(@"Preparing lyrics download…"):
-        [NSString stringWithFormat:SAPLocalized(@"Saved %@ · already saved %@ · failed %@ · not found %@"),
-            batch[@"saved"]?:@0,batch[@"skipped"]?:@0,batch[@"failed"]?:@0,batch[@"not_found"]?:@0];
+        SAPLyricsCountsText([NSString stringWithFormat:SAPLocalized(@"Saved %@ · already saved %@ · failed %@ · not found %@"),
+            batch[@"saved"]?:@0,batch[@"skipped"]?:@0,batch[@"failed"]?:@0,batch[@"not_found"]?:@0]);
     float fraction=total?MIN(1,(float)done/total):0;
     BOOL animate=continuing && self.progressBar.window!=nil && fraction>self.progressBar.progress && !UIAccessibilityIsReduceMotionEnabled();
     if(!continuing || fraction!=self.progressBar.progress || UIAccessibilityIsReduceMotionEnabled())[self.progressBar setProgress:fraction animated:animate];
@@ -498,12 +501,17 @@ static id SAPLyricsCatalogObserver;
 }
 - (void)layoutProgressPanel:(BOOL)insert {
     if(!self.progressHeader || (!insert && self.tableView.tableHeaderView!=self.progressHeader))return;
-    CGFloat width=self.tableView.bounds.size.width;UIEdgeInsets margins=self.tableView.layoutMargins;
+    CGFloat width=self.tableView.bounds.size.width;
+    if(width<=0)return;
+    UIEdgeInsets margins=self.tableView.layoutMargins;
     UIEdgeInsets headerMargins=UIEdgeInsetsMake(0,MAX(16,margins.left),0,MAX(16,margins.right));
     if(!UIEdgeInsetsEqualToEdgeInsets(headerMargins,self.progressHeader.layoutMargins))self.progressHeader.layoutMargins=headerMargins;
     CGFloat actionHeight=ceil(MAX(30,MAX(self.progressTitle.font.lineHeight,[UIFont preferredFontForTextStyle:UIFontTextStyleCaption1].lineHeight+10)));
     if(fabs(self.progressActionHeight.constant-actionHeight)>.5)self.progressActionHeight.constant=actionHeight;
-    CGFloat height=16+10+actionHeight+8+ceil(self.progressDetail.font.lineHeight)+10+4+14;
+    CGFloat detailWidth=MAX(1,width-headerMargins.left-headerMargins.right-32);
+    if(fabs(self.progressDetail.preferredMaxLayoutWidth-detailWidth)>.5)self.progressDetail.preferredMaxLayoutWidth=detailWidth;
+    CGFloat detailHeight=ceil([self.progressDetail sizeThatFits:CGSizeMake(detailWidth,CGFLOAT_MAX)].height);
+    CGFloat height=16+10+actionHeight+8+detailHeight+10+4+14;
     CGSize size=CGSizeMake(width,height);BOOL resized=!CGSizeEqualToSize(self.progressHeader.bounds.size,size);
     if(resized)self.progressHeader.frame=(CGRect){CGPointZero,size};
     if(self.tableView.tableHeaderView!=self.progressHeader || resized)self.tableView.tableHeaderView=self.progressHeader;
