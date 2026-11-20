@@ -15,5 +15,5 @@ NSString *SAPLocalized(NSString *english) {
         if (url) bundle = [NSBundle bundleWithURL:url];
     });
     if (!bundle || !english.length) return english;
-    return [bundle localizedStringForKey:english value:english table:@"Pixie"];
+    return [bundle localizedStringForKey:english value:english table:nil];
 }

@@ -167,7 +167,7 @@ def run_fixture(test: Fixture, build: Path, sanitize: bool):
         for language in ("en", "ru"):
             locale = f"{language}.lproj"
             (bundle / locale).mkdir()
-            shutil.copyfile(source_bundle / locale / "Pixie.strings", bundle / locale / "Pixie.strings")
+            shutil.copyfile(source_bundle / locale / "Localizable.strings", bundle / locale / "Localizable.strings")
         (contents / "Info.plist").write_bytes(plistlib.dumps({
             "CFBundleIdentifier": "test.pixie.localization",
             "CFBundleExecutable": test.name,
