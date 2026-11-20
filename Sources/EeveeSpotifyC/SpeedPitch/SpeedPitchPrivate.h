@@ -17,7 +17,7 @@ float SpeedPitchEngineSpeed(void);
 // it last did (INFINITY before). any thread.
 double SpeedPitchEnginePlayedSeconds(void);
 double SpeedPitchEngineSecondsSincePlayed(void);
-// drops the sound the unit holds, so a seek or skip starts clean.
+// drops the sound the unit holds, so a seek or skip starts clean. any thread: off the main one it hops there.
 void SpeedPitchEngineResetUnit(void);
 
 // main thread from here on.

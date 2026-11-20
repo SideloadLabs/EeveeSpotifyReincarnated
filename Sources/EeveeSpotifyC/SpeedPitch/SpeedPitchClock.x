@@ -149,7 +149,8 @@ static EeveeSpeedPitchObserver *sg_observer;
     BOOL counting = sg_clock.on || sg_clock.armed;
     NSString *track = counting ? trackOf(self) : nil;
     double played = SpeedPitchEnginePlayedSeconds();
-    double native = counting ? nativeSpeed(self) : 1;
+    // 0 when not asked: another thread may have started the clock since `counting` was read.
+    double native = counting ? nativeSpeed(self) : 0;
     BOOL here = playsHere();
     CFAbsoluteTime now = CFAbsoluteTimeGetCurrent(), stamp = self.timestamp.timeIntervalSinceReferenceDate;
     double speed = self.isPaused ? 0 : self.playbackSpeed, asOf = position - (now - stamp) * speed;

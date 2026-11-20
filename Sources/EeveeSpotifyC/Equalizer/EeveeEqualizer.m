@@ -21,14 +21,15 @@ void EeveeEqualizerSetLog(void (^log)(NSString *message)) {
     EeveeLogSinkSet(EeveeLogEqualizer, log);
 }
 
-void EeveeEqualizerLog(NSString *format, ...) {
+// the equalizer's log lines, through the sink Swift sets (EeveeEqualizerSetLog). never on the render thread.
+static void EQLog(NSString *format, ...) NS_FORMAT_FUNCTION(1, 2);
+
+static void EQLog(NSString *format, ...) {
     va_list args;
     va_start(args, format);
     EeveeLogSinkWrite(EeveeLogEqualizer, format, args);
     va_end(args);
 }
-
-#define EQLog EeveeEqualizerLog
 
 // what it's set to, and what the render thread did with it since the last report. "for another rate" climbing
 // means the design didn't follow the output; "refused" that the hardware's format isn't one the in-place path

@@ -107,6 +107,10 @@ UInt32 EeveeTimePitchChannels(const EeveeTimePitch *unit) {
     return unit->channels;
 }
 
+bool EeveeTimePitchCanResample(const EeveeTimePitch *unit) {
+    return unit->vari != NULL;
+}
+
 void EeveeTimePitchSetRate(EeveeTimePitch *unit, float rate) {
     AudioUnitSetParameter(unit->unit, kNewTimePitchParam_Rate, kAudioUnitScope_Global, 0, rate, 0);
     if (unit->vari) AudioUnitSetParameter(unit->vari, kVarispeedParam_PlaybackRate, kAudioUnitScope_Global, 0, rate, 0);

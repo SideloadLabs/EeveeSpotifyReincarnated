@@ -63,6 +63,11 @@ extension UserDefaults {
     static var headphoneCorrections
 }
 
+// the Swift side's debug log lines, prefixed like the C side's.
+func equalizerLog(_ format: String, _ args: CVarArg...) {
+    eeveeLog("[EeveeSpotify][Equalizer] %@", String(format: format, arguments: args))
+}
+
 enum Equalizer {
     static let bandCount = Int(EeveeEqualizerBandCount)
     static let flat = [Double](repeating: 0, count: bandCount)
@@ -142,8 +147,8 @@ enum Equalizer {
     // it's the device's address.
     static func applyCorrection() {
         let correction = correction
-        eeveeLog("[EeveeSpotify][Equalizer] output %@, correction %@", output?.name ?? "none", correction?.headphone ?? "none")
-        let filters = Array((correction?.filters ?? []).prefix(Int(EeveeEqualizerMaxCorrection)))
+        equalizerLog("output %@, correction %@", output?.name ?? "none", correction?.headphone ?? "none")
+        let filters = correction?.filters ?? []
         let kinds = filters.map { filter -> EeveeEqualizerFilter in
             switch filter.kind {
             case .peak: return .peak
@@ -182,7 +187,7 @@ enum Equalizer {
 
     static func activate() {
         EeveeEqualizerSetLog { message in
-            eeveeLog("[EeveeSpotify][Equalizer] %@", message)
+            equalizerLog("%@", message)
         }
         apply()
         applyCorrection()

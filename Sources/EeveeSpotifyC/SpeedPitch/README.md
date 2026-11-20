@@ -154,6 +154,7 @@ Turn on debug logging, restart, play a song, then export the debug log and look 
 
 - `audio: Spotify connects mixer … fed through the engine's callback`: speed is possible
 - `… its own connection kept: …`: speed is off for that output, and the line says why
+- `a unit in the chain for … Hz, … channels, without Varispeed: …`: *Pitch follows speed* can't work on that output
 - `mixer limit: follows 1.50x (Spotify's mixer seen)`: the core's limit follows the speed. Set the speed
   after a few seconds of playing, or the first change can say `not seen yet` before the mixer has run
 - `-[SPTEsperantoPlayer …] is missing` / `SPTPlayerState is missing`: a hook was skipped on this version

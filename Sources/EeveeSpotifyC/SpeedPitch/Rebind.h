@@ -2,6 +2,12 @@
 // only Spotify's calls reach the replacement. call from the tweak's init: slots are written without a lock.
 #import <Foundation/Foundation.h>
 
+// return addresses (EeveeCalledFromSpotify, bucketRead in MixerLimit.m) are read as they are. on arm64e they carry
+// a pointer authentication code and need ptrauth_strip first, so that build stops here instead of crashing.
+#if __has_feature(ptrauth_calls)
+#error "arm64e: strip the return addresses with ptrauth_strip before reading them"
+#endif
+
 // YES when a slot for `symbol` (no leading underscore) was repointed; `original` gets what the first held.
 BOOL EeveeRebindImport(const char *symbol, void *replacement, void **original);
 

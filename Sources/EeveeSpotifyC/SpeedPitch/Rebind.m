@@ -1,7 +1,4 @@
 #import <dlfcn.h>
-#if __has_feature(ptrauth_calls)
-#import <ptrauth.h>
-#endif
 #import <mach/mach.h>
 #import <mach-o/dyld.h>
 #import <mach-o/getsect.h>
@@ -12,6 +9,7 @@
 #import "Rebind.h"
 #import "SpeedPitchPrivate.h"
 
+// the slide from the image's own __TEXT, so it can't come from a different dyld index than the header.
 static BOOL imageSlide(const struct mach_header_64 *header, intptr_t *slide) {
     const struct load_command *command = (const struct load_command *)(header + 1);
     for (uint32_t i = 0; i < header->ncmds; i++, command = (const struct load_command *)((const char *)command + command->cmdsize)) {
@@ -183,9 +181,6 @@ BOOL EeveeCalledFromSpotify(void *returnAddress) {
         start = (uintptr_t)getsegmentdata(header, SEG_TEXT, &size);
         end = start + size;
     });
-#if __has_feature(ptrauth_calls)
-    returnAddress = ptrauth_strip(returnAddress, ptrauth_key_return_address);
-#endif
     uintptr_t address = (uintptr_t)returnAddress;
     return address >= start && address < end;
 }

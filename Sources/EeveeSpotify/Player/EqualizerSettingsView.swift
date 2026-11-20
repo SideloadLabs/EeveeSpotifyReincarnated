@@ -24,7 +24,7 @@ struct EqualizerSettingsView: View {
 
     private var presetName: String {
         if let preset = Equalizer.presets.first(where: { $0.gains == gains }) { return preset.name }
-        if let preset = userPresets.first(where: { Equalizer.normalized($0.gains) == gains }) { return preset.name }
+        if let preset = userPresets.first(where: { $0.gains == gains }) { return preset.name }
         return "equalizer_custom".localized
     }
 
@@ -93,11 +93,11 @@ struct EqualizerSettingsView: View {
 
                 Section(header: Text("equalizer_your_presets".localized)) {
                     ForEach(userPresets, id: \.name) { preset in
-                        Button { options.gains = Equalizer.normalized(preset.gains) } label: {
+                        Button { options.gains = preset.gains } label: {
                             HStack {
                                 Text(preset.name).foregroundColor(.primary)
                                 Spacer()
-                                if Equalizer.normalized(preset.gains) == gains {
+                                if preset.gains == gains {
                                     Image(systemName: "checkmark").foregroundColor(EeveeTheme.accent)
                                 }
                             }
@@ -141,9 +141,7 @@ struct EqualizerSettingsView: View {
             if !userPresets.isEmpty {
                 Divider()
                 ForEach(userPresets, id: \.name) { preset in
-                    Button { options.gains = Equalizer.normalized(preset.gains) } label: {
-                        checked(preset.name, Equalizer.normalized(preset.gains) == gains)
-                    }
+                    Button { options.gains = preset.gains } label: { checked(preset.name, preset.gains == gains) }
                 }
             }
         } label: {
@@ -235,6 +233,7 @@ private struct EqualizerCurveView: View {
     let set: (Int, Double) -> Void
 
     @State private var grabbed: Int?
+    @State private var dragging = false
     @State private var offset: CGFloat = 0
     @State private var lastTap: (band: Int, at: Date)?
     private let feedback = UISelectionFeedbackGenerator()
@@ -243,6 +242,8 @@ private struct EqualizerCurveView: View {
     private static let inset: CGFloat = 6
     // how far from a dot, up or down, a finger still takes it.
     private static let grab: CGFloat = 30
+    // a touch that stays this close to where it landed is a tap, which changes nothing.
+    private static let tapSlop: CGFloat = 6
     private static let marks: [(Double, String)] = [(100, "100"), (1000, "1k"), (10000, "10k")]
 
     private static func x(_ frequency: Double, _ width: CGFloat) -> CGFloat {
@@ -278,14 +279,17 @@ private struct EqualizerCurveView: View {
                     feedback.selectionChanged()
                 }
                 guard let band = grabbed else { return }
+                if !dragging && abs(value.translation.height) >= Self.tapSlop { dragging = true }
+                guard dragging else { return }
                 let next = Self.gain(value.location.y + offset, height)
                 guard next != gains[band] else { return }
                 if next == 0 || next == Equalizer.gainRange.lowerBound || next == Equalizer.gainRange.upperBound { feedback.selectionChanged() }
                 set(band, next)
             }
             .onEnded { value in
-                defer { grabbed = nil }
-                guard let band = grabbed, abs(value.translation.width) < 6, abs(value.translation.height) < 6 else { return }
+                defer { grabbed = nil; dragging = false }
+                guard let band = grabbed, abs(value.translation.width) < Self.tapSlop,
+                      abs(value.translation.height) < Self.tapSlop else { return }
                 if let last = lastTap, last.band == band, Date().timeIntervalSince(last.at) < 0.4 {
                     lastTap = nil
                     if gains[band] != 0 {

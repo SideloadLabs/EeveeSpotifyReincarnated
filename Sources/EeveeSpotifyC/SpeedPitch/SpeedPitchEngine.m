@@ -59,6 +59,7 @@ static pthread_mutex_t sg_buildLock = PTHREAD_MUTEX_INITIALIZER;
 static double sg_secondsPerTick;
 // hooked inline (the jailbreak's way in), every caller comes through, and only Spotify's are handled.
 static BOOL sg_inline;
+// a macro, not a function: __builtin_return_address(0) has to be the hook's own.
 #define NOT_SPOTIFY (sg_inline && !EeveeCalledFromSpotify(__builtin_return_address(0)))
 static OSStatus (*sg_setProperty)(AudioUnit, AudioUnitPropertyID, AudioUnitScope, AudioUnitElement, const void *, UInt32);
 
@@ -135,7 +136,8 @@ static OSStatus pullSource(Output *output, AudioUnit source, const AudioTimeStam
 // whether the time-pitch unit pulled the mixer during the render under way. the music's render thread only.
 static bool sg_unitPulled;
 
-// the time-pitch unit's input; it renders only on the music's output.
+// the time-pitch unit's input. it renders only on the music's output, and a change of music takes the unit out
+// first (disengage), so the music here is the output rendering it.
 static OSStatus pullForUnit(void *context, UInt32 frames, AudioBufferList *data) {
     sg_unitPulled = true;
     Output *output = music();
@@ -297,6 +299,8 @@ static OSStatus rendered(void *refCon, AudioUnitRenderActionFlags *flags, const 
         unit = atomic_load(&sg_inPlace);
         if (unit && EeveeTimePitchSampleRate(unit) != rateOf(&output->hardware)) unit = NULL;
     }
+    // checked again now that busy is set: reselect() only waits for outputs that are busy, so the music may have
+    // moved since the check above.
     if (output == music() && (unit || EqualizerWanted())) processInPlace(output, unit, flags, frames, data);
     atomic_store(&output->busy, false);
     return noErr;
@@ -342,7 +346,8 @@ static void waitFor(Output *output) {
     for (int i = 0; i < 400 && atomic_load(&output->busy); i++) usleep(250);
 }
 
-// stops the render threads using the unit, and returns once none is.
+// stops the render threads using the unit, and returns once none is. a render sets its busy flag before it reads
+// sg_engaged, and this clears sg_engaged before it reads busy, so one of the two always sees the other.
 static void disengage(void) {
     atomic_store(&sg_engaged, false);
     for (int i = 0; i < kMaxOutputs; i++) waitFor(&sg_outputs[i]);
@@ -439,7 +444,9 @@ static Output *choose(void) {
         if (!atomic_load(&output->unit)) continue;
         BOOL connected = atomic_load(&output->source) != NULL, running = atomic_load(&output->running);
         if (!running && !connected) continue;
-        BOOL sounds = seconds(now - MAX(atomic_load(&output->loudAt), output->eventAt)) < kSilentFor;
+        // loudAt can be stamped after `now` was read: that is sound just now, not a difference to wrap around.
+        uint64_t last = MAX(atomic_load(&output->loudAt), output->eventAt);
+        BOOL sounds = last >= now || seconds(now - last) < kSilentFor;
         int rank = running * 4 + connected * 2 + (running && connected && sounds);
         if (rank > bestRank || (rank == bestRank && output->order > best->order)) {
             best = output;
@@ -454,6 +461,7 @@ static void reselect(BOOL always, NSString *why) {
     Output *previous = music(), *next = choose();
     if (next != previous) {
         disengage();
+        // the newest now, so it keeps the unit through a tie with the one it took it from.
         if (next) markEvent(next);
         atomic_store(&sg_music, next);
         SPLog(@"audio: the unit moves from %@ to %@%@", describe(previous), describe(next), why ? [@", " stringByAppendingString:why] : @"");
@@ -684,7 +692,8 @@ static EeveeTimePitch *unitForFormat(void) {
             EeveeTimePitchReset(unit);
         }
         atomic_store(slot, unit);
-        SPLog(@"%@ %@ for %.0f Hz, %u channels", unit ? @"a unit" : @"no unit", pull ? @"in the chain" : @"in place", rate, (unsigned)channels);
+        SPLog(@"%@ %@ for %.0f Hz, %u channels%@", unit ? @"a unit" : @"no unit", pull ? @"in the chain" : @"in place", rate,
+              (unsigned)channels, unit && pull && !EeveeTimePitchCanResample(unit) ? @", without Varispeed: pitch can't follow speed" : @"");
         if (unit && wasEngaged) atomic_store(&sg_engaged, true);
     }
     pthread_mutex_unlock(&sg_buildLock);
@@ -824,6 +833,11 @@ double SpeedPitchEngineSecondsSincePlayed(void) {
 }
 
 void SpeedPitchEngineResetUnit(void) {
+    // Spotify's player calls this on whatever thread it likes; the unit and sg_speed belong to the main one.
+    if (!NSThread.isMainThread) {
+        dispatch_async(dispatch_get_main_queue(), ^{ SpeedPitchEngineResetUnit(); });
+        return;
+    }
     EeveeTimePitch *unit = atomic_load(tapped() ? &sg_pull : &sg_inPlace);
     if (!unit) return;
     disengage();

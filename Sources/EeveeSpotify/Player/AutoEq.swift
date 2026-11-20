@@ -8,7 +8,7 @@ import Foundation
 // and the folder holds "<folder's last part> ParametricEQ.txt": a "Preamp: -6.1 dB" line, then lines like
 //     Filter 1: ON LSC Fc 105 Hz Gain 6.4 dB Q 0.70
 enum AutoEq {
-    struct Headphone: Identifiable, Hashable {
+    struct Headphone: Identifiable {
         let name: String
         let source: String
         let path: String
@@ -85,7 +85,7 @@ enum AutoEq {
                 .map { -$0.timeIntervalSinceNow } ?? .infinity
             if !refresh, !cached.isEmpty, age < indexLife {
                 DispatchQueue.main.async {
-                    eeveeLog("[EeveeSpotify][Equalizer] AutoEq list: %d headphones from the cache, %.1f days old", cached.count, age / 86400)
+                    equalizerLog("AutoEq list: %d headphones from the cache, %.1f days old", cached.count, age / 86400)
                     done(cached, nil)
                 }
                 return
@@ -103,10 +103,10 @@ enum AutoEq {
                 let why = fetched.isEmpty ? (error?.localizedDescription ?? "autoeq_list_failed".localized) : nil
                 DispatchQueue.main.async {
                     if let why {
-                        eeveeLog("[EeveeSpotify][Equalizer] AutoEq list: GitHub failed (%@, HTTP %d), %d headphones from the cache",
-                                 why, status, cached.count)
+                        equalizerLog("AutoEq list: GitHub failed (%@, HTTP %d), %d headphones from the cache",
+                                     why, status, cached.count)
                     } else {
-                        eeveeLog("[EeveeSpotify][Equalizer] AutoEq list: %d headphones from GitHub", fetched.count)
+                        equalizerLog("AutoEq list: %d headphones from GitHub", fetched.count)
                     }
                     done(fetched.isEmpty ? cached : fetched, why)
                 }
@@ -126,7 +126,8 @@ enum AutoEq {
         return file.addingPercentEncoding(withAllowedCharacters: unescaped).flatMap { URL(string: results + $0) }
     }
 
-    // a parametric file's filters, nil when a filter that's on is of a kind this doesn't know, or there are none.
+    // a parametric file's filters, nil when a filter that's on is of a kind this doesn't know or can't be read, or
+    // there are none: a correction missing some of its filters would play wrong without saying so.
     static func parseParametric(_ text: String) -> [ParametricFilter]? {
         let pattern = #"^Filter\s+\d+:\s+ON\s+([A-Z]+)\s+Fc\s+([0-9.]+)\s*Hz\s+Gain\s+(-?[0-9.]+)\s*dB\s+Q\s+([0-9.]+)"#
         guard let expression = try? NSRegularExpression(pattern: pattern, options: [.anchorsMatchLines]) else { return nil }
@@ -138,9 +139,9 @@ enum AutoEq {
             let field = { (index: Int) in Range(match.range(at: index), in: text).map { String(text[$0]) } ?? "" }
             let kind: ParametricFilter.Kind
             switch field(1) {
-            case "PK", "PEQ": kind = .peak
-            case "LSC", "LS": kind = .lowShelf
-            case "HSC", "HS": kind = .highShelf
+            case "PK": kind = .peak
+            case "LSC": kind = .lowShelf
+            case "HSC": kind = .highShelf
             default:
                 unknown = true
                 return
@@ -151,7 +152,9 @@ enum AutoEq {
             }
             filters.append(ParametricFilter(kind: kind, frequency: frequency, gain: gain, q: q))
         }
-        return unknown || filters.isEmpty ? nil : filters
+        let enabled = text.split(whereSeparator: \.isNewline)
+            .filter { $0.range(of: #"^Filter\s+\d+:\s+ON\b"#, options: .regularExpression) != nil }.count
+        return unknown || filters.isEmpty || filters.count != enabled ? nil : filters
     }
 
     // downloaded since launch, so trying corrections back and forth fetches each once. main queue only.
@@ -160,7 +163,7 @@ enum AutoEq {
     // the headphone's filters, or why not, on the main queue.
     static func download(_ headphone: Headphone, done: @escaping (Result<[ParametricFilter], DownloadError>) -> Void) {
         if let filters = downloaded[headphone.path] {
-            eeveeLog("[EeveeSpotify][Equalizer] AutoEq %@ (%@): %d filters, downloaded before", headphone.name, headphone.source, filters.count)
+            equalizerLog("AutoEq %@ (%@): %d filters, downloaded before", headphone.name, headphone.source, filters.count)
             done(.success(filters))
             return
         }
@@ -174,12 +177,12 @@ enum AutoEq {
             DispatchQueue.main.async {
                 if let filters {
                     downloaded[headphone.path] = filters
-                    eeveeLog("[EeveeSpotify][Equalizer] AutoEq %@ (%@): %d filters", headphone.name, headphone.source, filters.count)
+                    equalizerLog("AutoEq %@ (%@): %d filters", headphone.name, headphone.source, filters.count)
                     done(.success(filters))
                 } else {
                     // a 200 without filters is a file this can't read: a new filter kind, or another layout.
-                    eeveeLog("[EeveeSpotify][Equalizer] AutoEq %@ (%@) failed: HTTP %d, %@", headphone.name, headphone.source, status,
-                             error?.localizedDescription ?? (status == 200 ? "no filters it can read" : "no file"))
+                    equalizerLog("AutoEq %@ (%@) failed: HTTP %d, %@", headphone.name, headphone.source, status,
+                                 error?.localizedDescription ?? (status == 200 ? "no filters it can read" : "no file"))
                     done(.failure(DownloadError(message: error?.localizedDescription
                         ?? (status == 404 ? "autoeq_no_parametric".localized : "autoeq_unreadable".localized))))
                 }

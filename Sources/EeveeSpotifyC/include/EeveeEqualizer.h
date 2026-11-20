@@ -24,8 +24,8 @@ double EeveeEqualizerFrequency(NSInteger band);
 // without it the boosts can clip. applies at once, or as soon as Spotify's output starts.
 void EeveeEqualizerSet(BOOL on, const double *gains, BOOL preventClipping);
 
-// the headphone correction under the bands, `count` filters (at most EeveeEqualizerMaxCorrection, 0 for none),
-// each a kind, a frequency in Hz, a gain in dB and a Q. it only plays while the equalizer is on.
+// the headphone correction under the bands, `count` filters (0 for none; past EeveeEqualizerMaxCorrection the rest
+// are left out), each a kind, a frequency in Hz, a gain in dB and a Q. it only plays while the equalizer is on.
 void EeveeEqualizerSetCorrection(const EeveeEqualizerFilter *kinds, const double *frequencies, const double *gains, const double *qs,
                                  NSInteger count);
 

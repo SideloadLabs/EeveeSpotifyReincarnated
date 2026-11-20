@@ -29,7 +29,7 @@ typedef struct {
     EqualizerBiquad sections[kEqualizerSections];  // the bands, then the correction's filters, then pass-throughs
     int count;      // sections in use
     double rate;
-    double gain;    // linear, at most 1: the turn-down that keeps the boosts from clipping
+    double gain;    // linear, at most 1: the turn-down that leaves room for the boosts
     bool flat;      // every slider at 0 and no correction: the sections pass the sound as it is
 } EqualizerDesign;
 
@@ -71,8 +71,3 @@ EqualizerStats EqualizerReadStats(void);
 
 // the music's output now plays at `rate` (SpeedPitchEngine.m). main thread.
 void EeveeEqualizerFollowOutput(double rate);
-#ifdef __OBJC__
-#import <Foundation/Foundation.h>
-// the equalizer's log lines, through the sink Swift sets (EeveeEqualizerSetLog). never on the render thread.
-void EeveeEqualizerLog(NSString *format, ...) NS_FORMAT_FUNCTION(1, 2);
-#endif

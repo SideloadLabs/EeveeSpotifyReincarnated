@@ -18,6 +18,8 @@ typedef OSStatus (*EeveeTimePitchSource)(void *context, UInt32 frames, AudioBuff
 EeveeTimePitch *EeveeTimePitchCreate(double sampleRate, UInt32 channels, EeveeTimePitchSource source, void *context);
 double EeveeTimePitchSampleRate(const EeveeTimePitch *unit);
 UInt32 EeveeTimePitchChannels(const EeveeTimePitch *unit);
+// whether pitch can follow speed: pull mode, with Varispeed made.
+bool EeveeTimePitchCanResample(const EeveeTimePitch *unit);
 
 // any thread, from the next buffer. rate 1 is normal speed.
 void EeveeTimePitchSetRate(EeveeTimePitch *unit, float rate);

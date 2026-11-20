@@ -2,9 +2,6 @@
 // limit"): the token bucket's two reads of steady_clock::now() get a clock running max(1, speed) times as fast.
 #import <dlfcn.h>
 #import <stdatomic.h>
-#if __has_feature(ptrauth_calls)
-#import <ptrauth.h>
-#endif
 #import "Rebind.h"
 #import "SpeedPitchPrivate.h"
 
@@ -36,13 +33,11 @@ static int64_t warped(int64_t now) {
     }
 }
 
-// which of the bucket's two reads this is, by the code it returns to, 0 for neither:
+// which of the bucket's two reads this is, by the code it returns to (both reach the clock through tail calls),
+// 0 for neither:
 // - elapsed time: ldp of the tokens and the last read from [bucket + 0x30], then a divide by 1,000,000
 // - the last read: str x0 to [bucket + 0x38], after add x0, bucket, #0x10 (its clock) and the bl
 static unsigned bucketRead(void *returnAddress) {
-#if __has_feature(ptrauth_calls)
-    returnAddress = ptrauth_strip(returnAddress, ptrauth_key_return_address);
-#endif
     const uint32_t *ret = returnAddress;
     uint32_t next = ret[0];
     if ((next & 0xFFC00000) == 0xA9400000 && ((next >> 15) & 0x7F) == 0x30 / 8) {
@@ -101,6 +96,8 @@ void SpeedPitchMixerLimitSetSpeed(float speed) {
     // rebased at the old rate, so the timeline never jumps.
     int64_t at = warped(real);
     atomic_fetch_add_explicit(&sg_seq, 1, memory_order_acq_rel);
+    // keeps the stores below behind that bump, so a reader never takes them under the old count.
+    atomic_thread_fence(memory_order_release);
     atomic_store_explicit(&sg_base, real, memory_order_relaxed);
     atomic_store_explicit(&sg_warpedBase, at, memory_order_relaxed);
     atomic_store_explicit(&sg_rate, rate, memory_order_relaxed);
