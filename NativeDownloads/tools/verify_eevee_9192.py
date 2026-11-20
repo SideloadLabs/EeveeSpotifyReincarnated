@@ -123,6 +123,7 @@ def main():
                 info_name = APP + 'Info.plist'
                 expected_info = patch_info(source.read(info_name), signing_bundle_identifier=args.signing_bundle_identifier,
                                            background_processing=BACKGROUND_PROCESSING_MARKER in result.read(EEVEE))
+                expected_info = lyrics_registration.stamp_info(expected_info, lyrics_registration_report)
                 require(result.read(info_name) == expected_info, 'Unexpected app configuration changes')
                 if expected_info != source.read(info_name):
                     expected_changes.add(info_name)

@@ -161,6 +161,9 @@ jobs:
             9.2.0|9.2.2) ;;
             *)
               echo "::warning::Pixie download manager supports Spotify 9.2.0 and 9.2.2 only (this IPA is $SPOT_VERSION); skipping."
+              LYRICS_IPA="$RUNNER_TEMP/$(basename "$OUT_IPA")"
+              python3 NativeDownloads/tools/patch_lyrics_plugin_registration.py "$OUT_IPA" --output "$LYRICS_IPA"
+              mv -f "$LYRICS_IPA" "$OUT_IPA"
               exit 0 ;;
           esac
           # One target profile per Spotify build. The committed generated headers belong to the

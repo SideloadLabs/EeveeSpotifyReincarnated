@@ -92,8 +92,3 @@ void EeveePixieObserveDownloadCompletion(BOOL enabled) {
     void (*observe)(BOOL) = dlsym(RTLD_DEFAULT, "SAPNativeDownloadCompletionSetActive");
     if (observe) observe(enabled);
 }
-
-BOOL EeveeNativeLyricsIsolatedFromAudio(void) {
-    BOOL (*verified)(void) = dlsym(RTLD_DEFAULT, "SAPNativeLyricsIsolatedFromAudio");
-    return verified && verified();
-}
