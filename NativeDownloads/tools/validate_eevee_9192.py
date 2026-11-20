@@ -26,12 +26,10 @@ def main():
     from patch_native_restrictions import guard_header, limits_header
     from patch_key_request_mode import key_header
     from patch_native_trace import header
-    from patch_lyrics_plugin_registration import guard_header as lyrics_registration_header
     for name, expected in [("NativeRestrictionsPatch.h", guard_header()),
                            ("OfflineLimits.h", limits_header()),
                            ("NativeKeyModePatch.h", key_header()),
-                           ("NativeTracePatch.h", header()),
-                           ("NativeLyricsRegistrationPatch.h", lyrics_registration_header())]:
+                           ("NativeTracePatch.h", header())]:
         assert resolve_source(name).read_text() == expected, name
     from export_headers import headers as export_headers
     for name, expected in export_headers().items():

@@ -1,4 +1,5 @@
 """Exercise the shape-based offline lyrics cache patch on a synthetic Mach-O."""
+import plistlib
 import struct
 import sys
 from pathlib import Path
@@ -67,24 +68,43 @@ result, report = patcher.patch(b"not a binary" * 4)
 assert not report["applied"] and "Mach-O" in report["reason"]
 print("Native offline lyrics cache patch: shape match, single-instruction change, refusals and skips passed")
 
-skip = registration.SKIP_ADDRESS - registration.WINDOW_ADDRESS
-code = registration.ORIGINAL.ljust(skip, b"\0") + registration.SKIP_HEAD
-native, offset = macho(code, registration.UUID, base=registration.WINDOW_ADDRESS-text_offset)
-isolated, report = registration.patch(native)
-gate = offset + registration.BRANCH_INDEX
-assert report["applied"] and report["file_offset"] == gate
-assert native[:gate] == isolated[:gate] and native[gate+4:] == isolated[gate+4:]
-old, = struct.unpack_from("<I", native, gate)
-new, = struct.unpack_from("<I", isolated, gate)
-assert old & 0xFF00001F == 0x54000001 and new >> 26 == 5
-assert (old >> 5) & 0x7FFFF == new & 0x3FFFFFF == (registration.SKIP_ADDRESS-registration.BRANCH_ADDRESS)//4
-unknown, _ = macho(code, base=registration.WINDOW_ADDRESS-text_offset)
-assert registration.patch(unknown) == (unknown, {"applied": False, "reason": "unverified Spotify executable"})
-for modified in (isolated, native[:offset+skip] + b"\x00" + native[offset+skip+1:]):
-    try:
-        registration.patch(modified)
-    except ValueError:
-        pass
-    else:
-        raise AssertionError("The registration patch accepted an already patched branch or changed skip block")
-print("Offline lyrics plugin: only the registration gate follows its stock disabled branch")
+def registration_code(plugin=registration.PLUGIN, displacement=0xA0):
+    gate = 8
+    target = gate+displacement
+    name = target + registration.CONTINUATION_LENGTH
+    code = bytearray(name + len(plugin))
+    code[:gate] = registration.GATE_PREFIX
+    # Compute the plugin name in x21 before applying Swift's large-string tag.
+    distance = name-(gate+4)
+    adr = 0x10000015 | (distance&3)<<29 | (distance>>2)<<5
+    struct.pack_into("<III", code, gate, 0x54000001 | (displacement//4)<<5, adr, 0xB24102B5)
+    struct.pack_into("<7I", code, target, 0xAA1903E0, 0x94000000, 0xF9400709,
+                     0xD10403A8, 0xAA1903F4, 0xAA1803E1, 0xD63F0120)
+    code[name:] = plugin
+    return bytes(code)
+
+
+info = plistlib.dumps({"CFBundleIdentifier": "com.spotify.client"}, fmt=plistlib.FMT_BINARY)
+for base, identity, displacement in [(0x100000000, b"\x03"*16, 0xA0), (0x104100000, b"\xE8"*16, 0x180)]:
+    native, offset = macho(filler + registration_code(displacement=displacement), identity, base=base)
+    isolated, report = registration.patch(native)
+    gate = offset + len(filler) + 8
+    assert report["applied"] and report["file_offset"] == gate
+    assert native[:gate] == isolated[:gate] and native[gate+4:] == isolated[gate+4:]
+    assert struct.unpack_from("<I", isolated, gate)[0] == 0x14000000 | (displacement//4)
+    stamped = registration.stamp_info(info, report)
+    proof = plistlib.loads(stamped)[registration.PROOF_KEY]
+    assert proof["UUID"] == identity and proof["GateOffset"] == gate-8
+    assert proof["GateBytes"] == isolated[gate-8:gate+4] and proof["SkipOffset"] == gate+displacement
+    assert proof["SkipBytes"] == isolated[gate+displacement:gate+displacement+28]
+    same, repeated = registration.patch(isolated)
+    assert same == isolated and repeated["already_patched"] and not repeated["applied"]
+    assert registration.stamp_info(stamped, repeated) == stamped
+
+unknown_code = registration_code(plugin=b"reference_plugin\0")
+for code, count in [(unknown_code, 0), (registration_code() + b"\0" * ((-len(registration_code())) % 4) + registration_code(), 2)]:
+    unknown, _ = macho(code)
+    result, report = registration.patch(unknown)
+    assert result == unknown and report == {"applied": False, "reason": f"expected one offline lyrics registration, found {count}"}
+    assert plistlib.loads(registration.stamp_info(stamped, report)) == plistlib.loads(info)
+print("Offline lyrics registration matches the plugin and continuation across relocated images, and skips ambiguity")

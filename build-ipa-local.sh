@@ -72,6 +72,9 @@ cyan -i "$VANILLA_IPA" -o "$OUT_IPA" -f "${INJECT[@]}" -c 9 -m 15.0 -du
 
 color "6/8  ipapatch LC-inject zxPluginsInject"
 ipapatch --input "$OUT_IPA" --inplace --noconfirm --dylib packages/zxPluginsInject.dylib
+LYRICS_IPA="${OUT_IPA%.ipa}.offline-lyrics.ipa"
+python3 NativeDownloads/tools/patch_lyrics_plugin_registration.py "$OUT_IPA" --output "$LYRICS_IPA"
+mv -f "$LYRICS_IPA" "$OUT_IPA"
 
 # Belt-and-suspenders: cyan -du strips appex/Watch but verify.
 zip -d "$OUT_IPA" "Payload/Spotify.app/Watch*" "Watch*" 2>/dev/null || true
