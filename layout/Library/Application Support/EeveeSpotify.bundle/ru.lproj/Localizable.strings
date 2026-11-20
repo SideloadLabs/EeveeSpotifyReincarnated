@@ -484,8 +484,6 @@ restart_later = "Later";
 manage_downloads = "Управление загрузками";
 manage_downloads_subtitle = "Офлайн-загрузки Pixie";
 
-lyrics_downloads = "Скачивание текстов";
-lyrics_downloads_subtitle = "Скачивание вместе с музыкой и управление сохранёнными текстами";
 
 // Pixie interface
 
@@ -716,6 +714,8 @@ lyrics_downloads_subtitle = "Скачивание вместе с музыкой
 "Local track quota" = "Лимит треков на устройстве";
 "Log reset was not fully completed: %@" = "Не удалось полностью очистить журнал: %@";
 "Lyrics" = "Тексты песен";
+"Lyrics downloads" = "Скачивание текстов";
+"Download lyrics for downloaded songs and manage the saved lyrics." = "Скачивание текстов для скачанных песен и управление сохранёнными текстами.";
 "Lyrics for %lu song" = "Текст для %lu песни";
 "Lyrics for %lu songs" = "Тексты сохранены: %lu";
 "M4A conversion failed (code %u)." = "Сбой конвертации в M4A (код %u).";

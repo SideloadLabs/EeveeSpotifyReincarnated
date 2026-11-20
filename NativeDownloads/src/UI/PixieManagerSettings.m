@@ -642,21 +642,25 @@ static id SAPLyricsCatalogObserver;
     // Persist suppression before native navigation starts; the notification then removes the row.
     SAPDismissNativeDownloadQualityOfferAndOpenSettings();
 }
-- (NSInteger)numberOfSectionsInTableView:(UITableView *)table {return 4+(self.qualityOffer?1:0);}
+// Lyrics downloads are EeveeSpotify's: the section exists only when it is installed.
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)table {return 4+(self.qualityOffer?1:0)+(SAPLyricsBridge()?1:0);}
+- (NSInteger)topic:(NSInteger)section {return !SAPLyricsBridge()&&section>=3?section+1:section;}
 - (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section {
     if(self.qualityOffer){if(section==0)return 1;section--;}
+    section=[self topic:section];
     if(section==0)return [self.snapshot[@"download_active"]boolValue]?3:2;
-    if(section==1)return 2;
-    if(section==3)return SAPDiagnosticsEnabled()?4:3;
-    if(section==2)return 2;
+    if(section==3)return 1;
+    if(section==4)return SAPDiagnosticsEnabled()?4:3;
+    if(section==1||section==2)return 2;
     return 2;
 }
 - (NSString *)tableView:(UITableView *)table titleForHeaderInSection:(NSInteger)section {
     if(self.qualityOffer){if(section==0)return nil;section--;}
-    return @[SAPLocalized(@"Download"),SAPLocalized(@"Download compatibility"),SAPLocalized(@"Export"),SAPLocalized(@"Diagnostics")][section];
+    return @[SAPLocalized(@"Download"),SAPLocalized(@"Download compatibility"),SAPLocalized(@"Export"),SAPLocalized(@"Lyrics"),SAPLocalized(@"Diagnostics")][[self topic:section]];
 }
 - (NSString *)tableView:(UITableView *)table titleForFooterInSection:(NSInteger)section {
     if(self.qualityOffer){if(section==0)return nil;section--;}
+    section=[self topic:section];
     if(section==0) {
         NSDictionary *startup=self.snapshot[@"jailbreak_bootstrap"];
         if(startup&&![startup[@"native_patches_ready"]boolValue])return [NSString stringWithFormat:SAPLocalized(@"Pixie could not initialize downloads (%@). Supported Spotify: %@. Detected: %@. Menu and logs remain available."),startup[@"reason"],@SAP_SPOTIFY_VERSION,startup[@"detected_spotify_version"]];
@@ -668,7 +672,8 @@ static id SAPLyricsCatalogObserver;
         return [NSString stringWithFormat:SAPLocalized(@"%@\n\nOnly change settings in this menu if downloads are not working."),SAPLocalized(mode[@"detail"]?:@"")];
     }
     if(section==2)return SAPLocalized(@"Export downloaded Spotify audio to external apps or Files from Pixie or Spotify’s Share as file option. Choose a destination in the share sheet. The selected format applies to future exports.");
-    if(section==3)return SAPLocalized(@"Enable Diagnostics for detailed passive events.");
+    if(section==3)return SAPLocalized(@"Download lyrics for downloaded songs and manage the saved lyrics.");
+    if(section==4)return SAPLocalized(@"Enable Diagnostics for detailed passive events.");
     return nil;
 }
 - (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)index {
@@ -676,7 +681,8 @@ static id SAPLyricsCatalogObserver;
         if(index.section==0)return SAPSettingsCell(table,SAPLocalized(@"Download quality is Normal"),SAPLocalized(@"Tap to switch to High in Spotify settings"),@"arrow.up.circle.fill",UIColor.systemGreenColor,YES);
         index=[NSIndexPath indexPathForRow:index.row inSection:index.section-1];
     }
-    if(index.section==3 && !SAPDiagnosticsEnabled() && index.row>0)index=[NSIndexPath indexPathForRow:index.row+1 inSection:index.section];
+    index=[NSIndexPath indexPathForRow:index.row inSection:[self topic:index.section]];
+    if(index.section==4 && !SAPDiagnosticsEnabled() && index.row>0)index=[NSIndexPath indexPathForRow:index.row+1 inSection:index.section];
     NSString *title,*subtitle=nil,*symbol;UIColor *color;BOOL chevron=NO;
     if(index.section==0) {
         NSArray *titles=@[[self.snapshot[@"download_active"]boolValue]?SAPLocalized(@"Track download status"):SAPLocalized(@"Download current track"),SAPLocalized(@"Download current track's album"),SAPLocalized(@"Cancel download")];
@@ -706,13 +712,15 @@ static id SAPLyricsCatalogObserver;
         UISwitch *toggle=[UISwitch new];toggle.on=[SAPAudioExportFormat()isEqual:@"ogg"];toggle.accessibilityLabel=SAPLocalized(@"Use Ogg format");
         [toggle addTarget:self action:@selector(oggFormatChanged:) forControlEvents:UIControlEventValueChanged];cell.accessoryView=toggle;
         cell.selectionStyle=UITableViewCellSelectionStyleNone;return cell;
+    }else if(index.section==3) {
+        return SAPSettingsCell(table,SAPLocalized(@"Lyrics downloads"),nil,@"arrow.down.circle.fill",UIColor.systemPurpleColor,YES);
     }else {
         title=@[SAPLocalized(@"Diagnostics"),SAPLocalized(@"Download status"),SAPLocalized(@"Send log"),SAPLocalized(@"Reset log")][index.row];
         symbol=@[@"slider.horizontal.3",@"waveform.path.ecg",@"square.and.arrow.up",@"trash.fill"][index.row];color=index.row==3?UIColor.systemGrayColor:UIColor.systemTealColor;chevron=index.row==1;
         if(index.row==3)subtitle=SAPLocalized(@"Clear previous logs and start a fresh history");
     }
     UITableViewCell *cell=SAPSettingsCell(table,title,subtitle,symbol,color,chevron);
-    if(index.section==3 && index.row==0) {
+    if(index.section==4 && index.row==0) {
         UISwitch *toggle=[UISwitch new];toggle.on=SAPDiagnosticsEnabled();
         toggle.accessibilityLabel=SAPLocalized(@"Diagnostics");toggle.accessibilityIdentifier=@"SpotifyDiagnosticsSwitch";
         [toggle addTarget:self action:@selector(diagnosticsChanged:) forControlEvents:UIControlEventValueChanged];cell.accessoryView=toggle;
@@ -749,15 +757,17 @@ static id SAPLyricsCatalogObserver;
         if(index.section==0){SAP_TRACE("ui","pixie_menu_selection",0,@{@"title":self.title?:@"",@"item":@"download_quality_offer"});[self qualityOfferTapped];return;}
         index=[NSIndexPath indexPathForRow:index.row inSection:index.section-1];
     }
-    if(index.section==3 && !SAPDiagnosticsEnabled() && index.row>0)index=[NSIndexPath indexPathForRow:index.row+1 inSection:index.section];
+    index=[NSIndexPath indexPathForRow:index.row inSection:[self topic:index.section]];
+    if(index.section==4 && !SAPDiagnosticsEnabled() && index.row>0)index=[NSIndexPath indexPathForRow:index.row+1 inSection:index.section];
     SAP_TRACE("ui","pixie_menu_selection",0,@{@"title":self.title?:@"",@"section":@(index.section),@"row":@(index.row)});
     if(index.section==2) {
         if(index.row==1){SAPShowOfflineLibrary(self);return;}
         return;
     }
-    if(index.section==3 && index.row==0){[self requestDiagnostics:!SAPDiagnosticsEnabled()];return;}
-    if(index.section==3 && index.row==2){[SAPSettingsActions perform:SAPSettingsSendLog];return;}
-    if(index.section==3 && index.row==3){[SAPSettingsActions perform:SAPSettingsResetJournal];return;}
+    if(index.section==3){[self.navigationController pushViewController:[SAPLyricsSettings new] animated:YES];return;}
+    if(index.section==4 && index.row==0){[self requestDiagnostics:!SAPDiagnosticsEnabled()];return;}
+    if(index.section==4 && index.row==2){[SAPSettingsActions perform:SAPSettingsSendLog];return;}
+    if(index.section==4 && index.row==3){[SAPSettingsActions perform:SAPSettingsResetJournal];return;}
     if(index.section==1) {
         if(self.checkingCompatibility)return;
         if(index.row==1){[self.navigationController pushViewController:[SAPOfflineDevicesSettings new] animated:YES];return;}
@@ -774,7 +784,7 @@ static id SAPLyricsCatalogObserver;
         [choice addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"Cancel") style:UIAlertActionStyleCancel handler:nil]];
         [self presentViewController:choice animated:YES completion:nil];return;
     }
-    if(index.section==3 && index.row==1) {
+    if(index.section==4 && index.row==1) {
         SAPDetailsSettings *page=[SAPDetailsSettings new];
         [self.navigationController pushViewController:page animated:YES];return;
     }
@@ -919,7 +929,7 @@ static void SAPAttachSettings(UIViewController *host) {
 static void SAPSettingsLoaded(id self,SEL selector) {originalSettingsLoad(self,selector);SAPAttachSettings(self);}
 static void SAPSettingsLayout(id self,SEL selector) {originalSettingsLayout(self,selector);SAPAttachSettings(self);}
 __attribute__((visibility("default"))) UIViewController *SAPCreateDownloadsSettings(void) {return [SAPDownloadsSettings new];}
-// Lyrics downloads live in EeveeSpotify's Lyrics settings, opened through this entry point.
+// The lyrics page, also created directly by the UI fixtures.
 __attribute__((visibility("default"))) UIViewController *SAPCreateLyricsSettings(void) {return [SAPLyricsSettings new];}
 void SAPInstallDownloadSettings(void) {
     if(!NSThread.isMainThread){dispatch_async(dispatch_get_main_queue(),^{SAPInstallDownloadSettings();});return;}
