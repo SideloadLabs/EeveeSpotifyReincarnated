@@ -1,5 +1,10 @@
 // Pixie interface
 
+"Mode 0 is verified in the executable. This status does not confirm download authorization." = "Режим 0 подтверждён в исполняемом файле. Это не подтверждает разрешение на загрузку.";
+"Mode 1 is verified in the executable. This status does not confirm download authorization." = "Режим 1 подтверждён в исполняемом файле. Это не подтверждает разрешение на загрузку.";
+"Only restoring a confirmed mode 1 to mode 0 is allowed. A saved preference alone is not confirmation." = "Можно только вернуть подтверждённый режим 1 на режим 0. Сохранённая настройка сама по себе не подтверждение.";
+"The installed request mode cannot be verified. Changes are disabled." = "Установленный режим запросов не удаётся проверить. Изменения отключены.";
+"The verified selector returned 1. Restoring mode 0 is available. Download authorization is separate." = "Проверенный селектор вернул 1. Можно вернуть режим 0. Разрешение на загрузку проверяется отдельно.";
 "\nCore errors:\n" = "\nОшибки ядра:\n";
 "\nRecent transitions:\n" = "\nПереходы (последние):\n";
 "\nThe core transport is not available yet: start playback so the log can query the status.\n" = "\nКанал к ядру ещё не получен: запустите воспроизведение, чтобы журнал мог опрашивать состояние сам.\n";

@@ -1,5 +1,10 @@
 // Pixie interface
 
+"Mode 0 is verified in the executable. This status does not confirm download authorization." = "Mode 0 is verified in the executable. This status does not confirm download authorization.";
+"Mode 1 is verified in the executable. This status does not confirm download authorization." = "Mode 1 is verified in the executable. This status does not confirm download authorization.";
+"Only restoring a confirmed mode 1 to mode 0 is allowed. A saved preference alone is not confirmation." = "Only restoring a confirmed mode 1 to mode 0 is allowed. A saved preference alone is not confirmation.";
+"The installed request mode cannot be verified. Changes are disabled." = "The installed request mode cannot be verified. Changes are disabled.";
+"The verified selector returned 1. Restoring mode 0 is available. Download authorization is separate." = "The verified selector returned 1. Restoring mode 0 is available. Download authorization is separate.";
 "\nCore errors:\n" = "\nCore errors:\n";
 "\nRecent transitions:\n" = "\nRecent transitions:\n";
 "\nThe core transport is not available yet: start playback so the log can query the status.\n" = "\nThe core transport is not available yet: start playback so the log can query the status.\n";
