@@ -59,20 +59,6 @@ UIViewController *EeveePixieMakeDownloadsController(void) {
     return make ? make() : nil;
 }
 
-static UIViewController *(*PixieLyricsFactory(void))(void) {
-    static UIViewController *(*make)(void);
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{ make = dlsym(RTLD_DEFAULT, "SAPCreateLyricsSettings"); });
-    return make;
-}
-
-BOOL EeveePixieLyricsAvailable(void) { return PixieLyricsFactory() != NULL; }
-
-UIViewController *EeveePixieMakeLyricsController(void) {
-    UIViewController *(*make)(void) = PixieLyricsFactory();
-    return make ? make() : nil;
-}
-
 void EeveePixieFetchLyricsMetadata(NSString *trackURI, void (^completion)(NSDictionary *)) {
     // Resolve per call: Eevee may have initialized before the optional companion.
     void (*fetch)(NSString *,void (^)(NSDictionary *))=dlsym(RTLD_DEFAULT,"SAPFetchOfflineLyricsMetadata");

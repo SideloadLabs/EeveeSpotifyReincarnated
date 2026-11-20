@@ -22,9 +22,6 @@ void EeveePixieInstallArtistFollow(void);
 BOOL EeveePixieDownloadsAvailable(void);
 NSString *EeveePixieStartupSummary(void);
 UIViewController *_Nullable EeveePixieMakeDownloadsController(void);
-// Lyrics downloads page (Pixie), shown at the bottom of Eevee's Lyrics settings.
-BOOL EeveePixieLyricsAvailable(void);
-UIViewController *_Nullable EeveePixieMakeLyricsController(void);
 void EeveePixieFetchLyricsMetadata(NSString *trackURI, void (^completion)(NSDictionary *_Nullable metadata));
 dispatch_block_t _Nullable EeveePixieReadDownloadedTrackURIs(void (^completion)(NSArray<NSString *> *_Nullable tracks));
 void EeveePixieObserveDownloadCompletion(BOOL enabled);

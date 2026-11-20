@@ -519,8 +519,6 @@ restart_later = "Later";
 manage_downloads = "Manage downloads";
 manage_downloads_subtitle = "Pixie offline downloads";
 
-lyrics_downloads = "Lyrics downloads";
-lyrics_downloads_subtitle = "Save lyrics with music, saved lyrics and cleanup";
 
 // Pixie interface
 
@@ -751,6 +749,8 @@ lyrics_downloads_subtitle = "Save lyrics with music, saved lyrics and cleanup";
 "Local track quota" = "Local track quota";
 "Log reset was not fully completed: %@" = "Log reset was not fully completed: %@";
 "Lyrics" = "Lyrics";
+"Lyrics downloads" = "Lyrics downloads";
+"Download lyrics for downloaded songs and manage the saved lyrics." = "Download lyrics for downloaded songs and manage the saved lyrics.";
 "Lyrics for %lu song" = "Lyrics for %lu song";
 "Lyrics for %lu songs" = "Lyrics for %lu songs";
 "M4A conversion failed (code %u)." = "M4A conversion failed (code %u).";
