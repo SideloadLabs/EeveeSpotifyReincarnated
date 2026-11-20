@@ -1,7 +1,6 @@
 import Foundation
 import UIKit
 import SwiftUI
-import EeveeSpotifyC
 
 /// Spotify's native offline lyrics repository bypasses URLSession. Project saved lyrics
 /// into its own Codable model, validating with Spotify's decoder before writing.
@@ -97,10 +96,7 @@ final class NativeOfflineLyrics {
         // 1. Spotify's own Codable model, sync types and colors must round-trip.
         do { codec = try Codec() }
         catch { publish(active: false, reason: "native lyrics model is different: \(error)"); return }
-        // 2. The database must have the layout we write, checked BEFORE the flag is
-        // forced: with the flag on, Spotify's plugin holds downloads Waiting until
-        // each has a row, so a database we cannot write must never get that far.
-        // At this point (tweak init) Spotify has not opened the database yet.
+        // Validate storage before publishing locally saved lyrics to the viewer.
         var failure: Error?
         queue.sync {
             do { _ = try openDatabase() } catch { failure = error }
@@ -111,16 +107,12 @@ final class NativeOfflineLyrics {
             return
         }
         enabled = true
-        let isolated = EeveeNativeLyricsIsolatedFromAudio()
-        if isolated {
-            RemoteFlags.shared.force(["ios-feature-lyrics.lyrics_offline_enabled": true], by: "Saved external lyrics")
-        }
         observer = NotificationCenter.default.addObserver(forName: .eeveeOfflineLyricsFilesChanged,
             object: nil, queue: nil) { [weak self] note in
             let ids = note.userInfo?["tracks"] as? [String]
             self?.queue.async { self?.reconcile(ids) }
         }
-        publish(active: true, reason: isolated ? "native lyrics separate from audio downloads" : "native projection verified; Spotify controls the offline lyrics flag")
+        publish(active: true, reason: "native projection verified; Spotify controls its download configuration")
         reconcileAll()
     }
     /// Opens (once) and verifies the native database. Runs on `queue`.

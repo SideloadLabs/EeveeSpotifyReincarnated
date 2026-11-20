@@ -23,7 +23,6 @@ from export_release_materials import notices, retain_relink_sources
 from companion_build import build_companion
 from patch_offline import patch_reminder
 from patch_lyrics_offline_cache import patch as patch_lyrics_offline_cache
-from patch_lyrics_plugin_registration import patch as isolate_lyrics_plugin, stamp_info
 from signing_metadata import sign_preserving_entitlements
 from lyrics_background_config import BACKGROUND_PROCESSING_MARKER, patch_info
 
@@ -89,8 +88,6 @@ def main():
     patched, native_trace = patch_native_trace(patched)
     patched, export = patch_export(patched)
     patched, lyrics_cache = patch_lyrics_offline_cache(patched, PROFILE["spotify_version"])
-    patched, lyrics_registration = isolate_lyrics_plugin(patched)
-    packaged_info = stamp_info(packaged_info, lyrics_registration)
     patched, stale_bytes = strip_stale_signature(patched)
     key['implementation']='verified static observation boundary restores fixed w2=0 before the original indirect call'
     key['configuration_source']='verified_static_trace_argument'
@@ -149,7 +146,6 @@ def main():
                       "spotify_uuid": UUID.hex(), "audio_imports": audio,
                       "native_limits": limits, "key_request_mode": key, "native_observation": native_trace,
                       "export_observation": export, "offline_lyrics_cache": lyrics_cache,
-                      "offline_lyrics_registration": lyrics_registration,
                       "stale_signature_bytes_removed": stale_bytes, "relink_sources": retain_relink_sources(output),
                       "signing_metadata": signing_metadata,
                       "eevee_native_download_reminder": reminder}
