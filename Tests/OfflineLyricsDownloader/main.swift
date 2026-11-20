@@ -64,20 +64,24 @@ final class OfflineLyricsStore {
     var blockSaved = false
     let savedEntered = DispatchSemaphore(value: 0), savedRelease = DispatchSemaphore(value: 0)
     var suppressed = Set<String>()
+    var removedDownloads = Set<String>()
     func savedTrackIds() -> [String] {
         if blockSaved { blockSaved = false; savedEntered.signal(); savedRelease.wait() }
         return saved
     }
-    func automaticallyRetryableTrackIds(_ ids: [String]) -> [String] { ids.filter { !suppressed.contains($0) } }
+    func automaticallyRetryableTrackIds(_ ids: [String]) -> [String] {
+        ids.filter { !suppressed.contains($0) && !removedDownloads.contains($0) }
+    }
+    func downloadsSeen(trackIds: [String]) throws { removedDownloads.subtract(trackIds) }
     func revision(trackId: String) -> Revision { Revision(epoch: 0) }
     func isCurrent(_ revision: Revision, trackId: String) -> Bool { true }
     func entry(trackId: String, source: Int, options: LyricsOptions) -> Entry? { nil }
     func remember(context: String, trackIds: [String]) throws {}
     func remember(contexts: [String: [String]]) throws {}
     func tracks(in context: String) -> [String] { [] }
-    func allowDownloads(trackIds: [String]) throws { suppressed.subtract(trackIds) }
+    func allowDownloads(trackIds: [String]) throws { suppressed.subtract(trackIds); removedDownloads.subtract(trackIds) }
     func invalidatePendingWrites() {}
-    func remove(trackIds: [String]) throws { suppressed.formUnion(trackIds) }
+    func remove(trackIds: [String]) throws { removedDownloads.formUnion(trackIds) }
     func removeAll(additionallySuppressing: [String]) throws { suppressed.formUnion(additionallySuppressing) }
 }
 final class KaraokeLyricsStore {
@@ -581,9 +585,18 @@ coldDownloader.start()
 RunLoop.current.run(until: Date().addingTimeInterval(0.2))
 check(attempts(checkpointTrack) == 0 && UserDefaults.container.data(forKey: checkpointKey) != nil,
       "A cold background launch started or lost the saved queue")
+let readsBeforeColdLaunch = libraryReads
 coldDownloader.foreground.didBecomeActive()
+// The launch waits for Pixie and Spotify's offline service, then checks once.
+let launchDeadline = Date().addingTimeInterval(8)
+while libraryReads == readsBeforeColdLaunch && Date() < launchDeadline { RunLoop.current.run(until: Date().addingTimeInterval(0.05)) }
+check(libraryReads == readsBeforeColdLaunch + 1 && attempts(checkpointTrack) == 0,
+      "The launch did not run exactly one library check before resuming the queue")
+check(UserDefaults.container.data(forKey: checkpointKey) != nil, "The interrupted queue was dropped before the launch check")
+libraryCallback?([])
 pump(until: { attempts(checkpointTrack) == 1 && UserDefaults.container.data(forKey: checkpointKey) == nil },
      "Opening the app did not automatically resume and finish its checkpoint")
+check(libraryReads == readsBeforeColdLaunch + 1, "The launch scanned the library more than once")
 check(attempts(checkpointTrack) == 1 && attempts(deletedBeforeRelaunch) == 0 && attempts(savedBeforeRelaunch) == 0
       && attempts(restoredRateLimitRetry) == 1, "Checkpoint recovery restored an ineligible job or reset its 429 retry count")
 check(UserDefaults.container.data(forKey: checkpointKey) == nil, "A completed cold task still had a checkpoint")

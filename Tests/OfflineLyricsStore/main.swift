@@ -87,6 +87,14 @@ check(persistedDeletion.automaticallyRetryableTrackIds([track, "absent"]) == ["a
 try store.allowDownloads(trackIds: [track])
 check(store.automaticallyRetryableTrackIds([track]) == [track], "explicit redownload did not re-enable automatic recovery")
 check(try store.save(trackId: track, source: 5, options: options, data: payload, revision: fresh), "explicit redownload was blocked")
+// A removed download that Spotify later reports downloaded (even after a relaunch) gets lyrics again.
+let secondTrack = "second"
+try store.remove(trackIds: [secondTrack])
+check(OfflineLyricsStore(directory: folder).automaticallyRetryableTrackIds([secondTrack]).isEmpty, "a removed download was retried")
+try OfflineLyricsStore(directory: folder).downloadsSeen(trackIds: [secondTrack])
+let afterRelaunch = OfflineLyricsStore(directory: folder)
+check(afterRelaunch.automaticallyRetryableTrackIds([secondTrack]) == [secondTrack], "a re-downloaded track stayed blocked after relaunch")
+check(try afterRelaunch.save(trackId: secondTrack, source: 5, options: options, data: payload), "a re-downloaded track could not save lyrics")
 let pendingClear = store.revision(trackId: "later")
 try store.removeAll(additionallySuppressing: ["missingMarker"])
 check(store.summary().files == 0 && store.summary().bytes == 0, "clear left lyric files or incorrect statistics")
@@ -95,4 +103,7 @@ check(store.missingTrackIds([track, "track0"], source: 5, options: options).coun
 check(!(try store.save(trackId: "later", source: 5, options: options, data: payload, revision: pendingClear)), "clear allowed an old queued job to recreate files")
 check(OfflineLyricsStore(directory: folder).automaticallyRetryableTrackIds([track, "missingMarker"]).isEmpty,
       "clear failed to suppress placeholder recovery without a saved file")
+try store.downloadsSeen(trackIds: [track])
+check(OfflineLyricsStore(directory: folder).automaticallyRetryableTrackIds([track]).isEmpty,
+      "seeing a still-downloaded track undid Delete saved lyrics")
 print("OfflineLyricsStore tests passed")
