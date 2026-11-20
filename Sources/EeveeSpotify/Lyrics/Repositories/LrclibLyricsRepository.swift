@@ -31,13 +31,6 @@ private class LrclibTLSDelegate: NSObject, URLSessionTaskDelegate {
         // iOS 26; the Swift conditional cast `as? [SecCertificate]` can silently
         // return nil on some OS builds when the bridging isn't automatic.
         // Use CFArrayGetCount / CFArrayGetValueAtIndex to extract the chain safely.
-        guard let request = task.currentRequest,
-              request.value(forHTTPHeaderField: "Host") == expectedHost,
-              request.url?.host == challenge.protectionSpace.host,
-              request.url?.host != expectedHost else {
-            completionHandler(.performDefaultHandling, nil)
-            return
-        }
         let certChain: [SecCertificate]
         if #available(iOS 15.0, *) {
             guard let chainRef = SecTrustCopyCertificateChain(serverTrust) else {
@@ -109,12 +102,13 @@ private func resolveIPv4(_ host: String) -> String? {
 }
 
 class LrclibLyricsRepository: LyricsRepository {
-    private let apiUrl: String
+    var apiUrl: String
     private let session: URLSession
 
-    init(apiUrl: String, configuration: URLSessionConfiguration = .ephemeral) {
+    private init(apiUrl: String) {
         self.apiUrl = apiUrl
         
+        let configuration = URLSessionConfiguration.ephemeral
         configuration.httpAdditionalHeaders = [
             "User-Agent": "EeveeSpotify v\(EeveeSpotify.version) https://github.com/whoeevee/EeveeSpotify"
         ]
@@ -140,18 +134,9 @@ class LrclibLyricsRepository: LyricsRepository {
     
     static let originalApiUrl = "https://lrclib.net/api"
     
-    private static let lock = NSLock()
-    private static var current: LrclibLyricsRepository?
-    static var shared: LrclibLyricsRepository {
-        let url = UserDefaults.lyricsOptions.lrclibUrl
-        lock.lock(); defer { lock.unlock() }
-        if let current, current.apiUrl == url { return current }
-        let repository = LrclibLyricsRepository(apiUrl: url)
-        current = repository
-        return repository
-    }
-
-    deinit { session.finishTasksAndInvalidate() }
+    static let shared = LrclibLyricsRepository(
+        apiUrl: UserDefaults.lyricsOptions.lrclibUrl
+    )
     
     private func perform(
         _ path: String, 
@@ -192,23 +177,18 @@ class LrclibLyricsRepository: LyricsRepository {
         var data: Data?
         var error: Error?
 
-        var httpResponse: URLResponse?
-        var responseRequest = request
-        try LyricsDownloadHTTP.prepare(request)
-        let task = session.dataTask(with: request) { responseData, response, err in
+        let task = session.dataTask(with: request) { responseData, _, err in
             error = err
             data = responseData
-            httpResponse = response
             semaphore.signal()
         }
 
         try LyricsDownloadHTTP.start(task)
-        try LyricsDownloadHTTP.waitForResponse(semaphore, task: task)
+        try LyricsDownloadHTTP.wait(semaphore, task: task, accepting: [404])
 
-        if let firstError = error, (firstError as? URLError)?.code != .notConnectedToInternet,
-           (firstError as? URLError)?.code != .cancelled, request.url != url {
+        if error != nil, request.url != url {
             // IPv4-direct attempt failed; retry with the original hostname URL.
-            writeDebugLog("[LRCLIB] IPv4-direct attempt failed (\(firstError)), retrying via hostname")
+            writeDebugLog("[LRCLIB] IPv4-direct attempt failed (\(error!)), retrying via hostname")
 
             let fallbackSemaphore = DispatchSemaphore(value: 0)
             var fallbackRequest = URLRequest(url: url)
@@ -217,29 +197,21 @@ class LrclibLyricsRepository: LyricsRepository {
                 forHTTPHeaderField: "User-Agent"
             )
 
-            try LyricsDownloadHTTP.prepare(fallbackRequest)
-            responseRequest = fallbackRequest
-            let fallbackTask = session.dataTask(with: fallbackRequest) { response, urlResponse, err in
+            let fallbackTask = session.dataTask(with: fallbackRequest) { response, _, err in
                 error = err
                 data = response
-                httpResponse = urlResponse
                 fallbackSemaphore.signal()
             }
 
             try LyricsDownloadHTTP.start(fallbackTask)
-            try LyricsDownloadHTTP.waitForResponse(fallbackSemaphore, task: fallbackTask)
+            try LyricsDownloadHTTP.wait(fallbackSemaphore, task: fallbackTask, accepting: [404])
         }
 
         if let error = error {
             writeDebugLog("[LRCLIB] Request error for \(stringUrl): \(error)")
             throw error
         }
-        try LyricsDownloadHTTP.validate(httpResponse, request: responseRequest)
 
-        if let http = httpResponse as? HTTPURLResponse {
-            if http.statusCode == 404 { throw LyricsError.noSuchSong }
-            guard (200..<300).contains(http.statusCode) else { throw LyricsProviderHTTPError(status: http.statusCode) }
-        }
         guard let data else {
             writeDebugLog("[LRCLIB] No data returned for \(stringUrl)")
             throw LyricsError.decodingError
@@ -262,10 +234,10 @@ class LrclibLyricsRepository: LyricsRepository {
         }
     }
     
-    private static func mapSyncedLyricsLines(_ lines: [String]) -> [LyricsLineDto] {
+    private func mapSyncedLyricsLines(_ lines: [String]) -> [LyricsLineDto] {
         return lines.compactMap { line in
             guard let match = line.firstMatch(
-                "\\[(?<minute>\\d+):(?<seconds>\\d+\\.\\d+|\\d+)\\] ?(?<content>.*)"
+                "\\[(?<minute>\\d*):(?<seconds>\\d+\\.\\d+|\\d+)\\] ?(?<content>.*)"
             ) else {
                 return nil
             }
@@ -280,12 +252,14 @@ class LrclibLyricsRepository: LyricsRepository {
                 }
             }
             
-            guard let minute = captures["minute"].flatMap(Double.init),
-                  let seconds = captures["seconds"].flatMap(Double.init),
-                  let content = captures["content"] else { return nil }
-            let milliseconds = ((minute * 60 + seconds) * 1000).rounded()
-            guard milliseconds <= Double(Int32.max) else { return nil }
-            return LyricsLineDto(content: content.lyricsNoteIfEmpty, offsetMs: Int(milliseconds))
+            let minute = Int(captures["minute"]!)!
+            let seconds = Float(captures["seconds"]!)!
+            let content = captures["content"]!
+            
+            return LyricsLineDto(
+                content: content.lyricsNoteIfEmpty,
+                offsetMs: Int(minute * 60 * 1000 + Int(seconds * 1000))
+            )
         }
     }
 
@@ -294,15 +268,17 @@ class LrclibLyricsRepository: LyricsRepository {
 
         do {
             song = try getSong(trackName: query.title, artistName: query.primaryArtist)
-        } catch LyricsError.noSuchSong {
-            let stripped = query.title.strippedTrackTitle
-            guard !stripped.isEmpty, stripped != query.title else { throw LyricsError.noSuchSong }
-            song = try getSong(trackName: stripped, artistName: query.primaryArtist)
+        } catch {
+            let strippedTitle = query.title.strippedTrackTitle
+            do {
+                song = try getSong(trackName: strippedTitle, artistName: query.primaryArtist)
+            } catch {
+                // A failed download request is not a missing song.
+                if LyricsDownloadHTTP.isDownloading, !(error is DecodingError) { throw error }
+                throw LyricsError.noSuchSong
+            }
         }
-        return try Self.lyrics(from: song)
-    }
 
-    static func lyrics(from song: LrclibSong) throws -> LyricsDto {
         if song.instrumental {
             return LyricsDto(
                 lines: [],
@@ -311,18 +287,29 @@ class LrclibLyricsRepository: LyricsRepository {
             )
         }
 
-        if let synced = song.syncedLyrics {
-            let parsed = mapSyncedLyricsLines(synced.components(separatedBy: "\n"))
-            if !parsed.isEmpty {
-                return LyricsDto(lines: parsed, timeSynced: true,
-                                 romanization: parsed.map(\.content).canBeRomanized ? .canBeRomanized : .original)
-            }
+        if let syncedLyrics = song.syncedLyrics, !syncedLyrics.isEmpty {
+            let lines = Array(syncedLyrics.components(separatedBy: "\n").dropLast())
+            return LyricsDto(
+                lines: mapSyncedLyricsLines(lines),
+                timeSynced: true,
+                romanization: lines.canBeRomanized ? .canBeRomanized : .original
+            )
         }
-
-        guard let plain = song.plainLyrics?.trimmingCharacters(in: .newlines),
-              !plain.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw LyricsError.decodingError }
-        let lines = plain.components(separatedBy: "\n")
-        return LyricsDto(lines: lines.map { LyricsLineDto(content: $0) }, timeSynced: false,
-                         romanization: lines.canBeRomanized ? .canBeRomanized : .original)
+        
+        guard let plainLyrics = song.plainLyrics, !plainLyrics.isEmpty else {
+            return LyricsDto(
+                lines: [],
+                timeSynced: false,
+                romanization: .original
+            )
+        }
+        
+        let lines = Array(plainLyrics.components(separatedBy: "\n").dropLast())
+        
+        return LyricsDto(
+            lines: lines.map { content in LyricsLineDto(content: content) },
+            timeSynced: false,
+            romanization: lines.canBeRomanized ? .canBeRomanized : .original
+        )
     }
 }

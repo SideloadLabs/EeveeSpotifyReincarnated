@@ -35,11 +35,6 @@ enum SpicyLyricsJSON {
         return nil
     }
 
-    var milliseconds: Int? {
-        guard let seconds = doubleValue, seconds >= 0, seconds <= Double(Int32.max) / 1000 else { return nil }
-        return Int(seconds * 1000)
-    }
-
     var boolValue: Bool? {
         if case .bool(let b) = self { return b }
         return nil

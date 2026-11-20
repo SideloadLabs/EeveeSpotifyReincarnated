@@ -11,8 +11,8 @@ struct LyricsDownloadTransportError: Error, CustomStringConvertible {
 }
 
 /// A synchronous repository call carries its download policy on its worker
-/// thread. Shared online repository instances remain unthrottled. Responses are
-/// checked on that same worker after the URLSession callback signals its result.
+/// thread. Providers call `start` and `wait` in place of `resume()` and
+/// `semaphore.wait()`; outside a download both do exactly what they replace.
 enum LyricsDownloadHTTP {
     typealias RequestStart = (() -> Void) throws -> Void
     private final class Context {
@@ -60,55 +60,50 @@ enum LyricsDownloadHTTP {
     }
     static var isDownloading: Bool { Thread.current.threadDictionary[key] is Context }
 
-    static func waitForRetry(_ delay: TimeInterval) throws {
-        guard let context = Thread.current.threadDictionary[key] as? Context else {
-            Thread.sleep(forTimeInterval: delay)
-            return
-        }
-        let deadline = ProcessInfo.processInfo.systemUptime + delay
-        while true {
-            if context.isCancelled() { throw URLError(.cancelled) }
-            let remaining = deadline - ProcessInfo.processInfo.systemUptime
-            if remaining <= 0 { return }
-            Thread.sleep(forTimeInterval: min(remaining, 0.1))
-        }
-    }
-
-    static func prepare(_ request: URLRequest) throws {
-        guard let context = Thread.current.threadDictionary[key] as? Context else { return }
-        try context.startRequest {}
-        try LyricsRequestGate.shared.wait(for: request, isCancelled: context.isCancelled)
-    }
+    /// A provider's `task.resume()`. Outside a download it is exactly that. In a
+    /// download it first waits for the host's pacing, the foreground and the network.
     static func start(_ task: URLSessionTask) throws {
         guard let context = Thread.current.threadDictionary[key] as? Context else {
             task.resume()
             return
         }
-        do { try context.startRequest { task.resume() } }
-        catch {
+        do {
+            if let request = task.originalRequest {
+                try LyricsRequestGate.shared.wait(for: request, isCancelled: context.isCancelled)
+            }
+            try context.startRequest { task.resume() }
+        } catch {
             task.cancel()
             throw error
         }
     }
-    static func waitForResponse(_ completion: DispatchSemaphore, task: URLSessionTask) throws {
+
+    /// A provider's `semaphore.wait()`. Outside a download it is exactly that. In a
+    /// download it stops when the download is no longer wanted, and statuses the
+    /// provider does not read itself (429, 5xx, ...) become typed errors, so they
+    /// are retried later instead of being taken for a missing song.
+    static func wait(_ completion: DispatchSemaphore, task: URLSessionTask, accepting statuses: Set<Int> = []) throws {
         guard let context = Thread.current.threadDictionary[key] as? Context else {
             completion.wait()
             return
         }
-        while !context.isCancelled() {
-            if completion.wait(timeout: .now() + .milliseconds(100)) == .success { return }
+        while completion.wait(timeout: .now() + .milliseconds(100)) != .success {
+            if context.isCancelled() {
+                task.cancel()
+                throw URLError(.cancelled)
+            }
         }
-        task.cancel()
-        throw URLError(.cancelled)
+        guard task.error == nil, let request = task.originalRequest else { return }
+        try validate(task.response, request: request, accepting: statuses)
     }
-    static func validate(_ response: URLResponse?, request: URLRequest, handlesQueuedResponse: Bool = false) throws {
+
+    static func validate(_ response: URLResponse?, request: URLRequest,
+                         accepting statuses: Set<Int> = []) throws {
         guard let context = Thread.current.threadDictionary[key] as? Context else { return }
         if context.isCancelled() { throw URLError(.cancelled) }
         guard let http = response as? HTTPURLResponse else { return }
         try LyricsRequestGate.shared.check(http, request: request)
-        // A server/transport failure must not become a permanent "no lyrics".
-        if handlesQueuedResponse && http.statusCode == 503 { return }
-        if http.statusCode == 408 || http.statusCode >= 500 {
+        guard (200..<300).contains(http.statusCode) || statuses.contains(http.statusCode) else {
             throw LyricsProviderHTTPError(status: http.statusCode)
         }
     }

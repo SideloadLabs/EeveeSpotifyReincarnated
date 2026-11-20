@@ -43,13 +43,8 @@ for main_swift in Tests/*/main.swift; do
             extra_sources+=("Sources/EeveeSpotify/Lyrics/LyricsRequestGate.swift"
                 "Sources/EeveeSpotify/Lyrics/LyricsDownloadHTTP.swift")
             ;;
-        PlaybackLyricsRequests)
-            extra_sources+=("Sources/EeveeSpotify/Lyrics/PlaybackLyricsRequests.swift"
-                "Sources/EeveeSpotify/Lyrics/LyricsTaskState.swift")
-            ;;
         LyricsTaskState)
-            extra_sources+=("Sources/EeveeSpotify/Lyrics/LyricsTaskState.swift"
-                "Sources/EeveeSpotify/Lyrics/LyricsHTTPHooks.swift")
+            extra_sources+=("Sources/EeveeSpotify/Lyrics/LyricsTaskState.swift")
             ;;
         LyricsNotFoundStore)
             extra_sources+=("Sources/EeveeSpotify/Lyrics/LyricsNotFoundStore.swift")
