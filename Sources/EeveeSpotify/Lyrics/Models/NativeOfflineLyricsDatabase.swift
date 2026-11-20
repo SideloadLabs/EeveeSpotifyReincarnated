@@ -51,7 +51,20 @@ final class NativeOfflineLyricsDatabase {
                 throw Failure(message: "lyrics_entities has another layout: \(error)")
             }
             try execute("CREATE TABLE IF NOT EXISTS eevee_lyrics_projection_v1 (track_uri TEXT NOT NULL PRIMARY KEY, original BLOB, injected BLOB NOT NULL)")
+            // Digest of the saved text and format an injected row was built from. Lets a
+            // launch skip re-encoding rows whose input did not change.
+            if !(try hasColumn("eevee_lyrics_projection_v1", "source_digest")) {
+                try execute("ALTER TABLE eevee_lyrics_projection_v1 ADD COLUMN source_digest TEXT")
+            }
         } catch { sqlite3_close(db); throw error }
+    }
+    private func hasColumn(_ table: String, _ column: String) throws -> Bool {
+        let statement = try prepare("PRAGMA table_info(\(table))")
+        defer { sqlite3_finalize(statement) }
+        while sqlite3_step(statement) == SQLITE_ROW {
+            if let name = sqlite3_column_text(statement, 1), String(cString: name) == column { return true }
+        }
+        return false
     }
     deinit { sqlite3_close(db) }
     private func prepare(_ sql: String) throws -> OpaquePointer {
@@ -100,15 +113,22 @@ final class NativeOfflineLyricsDatabase {
         default: throw Failure(message: String(cString: sqlite3_errmsg(db)))
         }
     }
-    private func ownership(_ uri: String) throws -> (original: Data?, injected: Data)? {
-        let statement = try prepare("SELECT original, injected FROM eevee_lyrics_projection_v1 WHERE track_uri = ?")
+    private func ownership(_ uri: String) throws -> (original: Data?, injected: Data, digest: String?)? {
+        let statement = try prepare("SELECT original, injected, source_digest FROM eevee_lyrics_projection_v1 WHERE track_uri = ?")
         defer { sqlite3_finalize(statement) }
         bind(uri, to: statement, at: 1)
         switch sqlite3_step(statement) {
-        case SQLITE_ROW: return (blob(statement, 0), blob(statement, 1) ?? Data())
+        case SQLITE_ROW:
+            let digest = sqlite3_column_text(statement, 2).map { String(cString: $0) }
+            return (blob(statement, 0), blob(statement, 1) ?? Data(), digest)
         case SQLITE_DONE: return nil
         default: throw Failure(message: String(cString: sqlite3_errmsg(db)))
         }
+    }
+    /// Read-only: is our row for `uri` still in place and built from `digest`?
+    func isProjected(_ uri: String, digest: String) throws -> Bool {
+        guard let owned = try ownership(uri), owned.digest == digest else { return false }
+        return try row(uri) == owned.injected
     }
     private func write(_ uri: String, _ data: Data?) throws {
         let statement = try prepare(data == nil
@@ -120,23 +140,26 @@ final class NativeOfflineLyricsDatabase {
         try finish(statement)
     }
     /// Read-only check: would `apply` change anything? Takes no write lock.
-    private func needsChange(_ uri: String, _ data: Data?) throws -> Bool {
+    /// A nil `digest` leaves the stored digest out of the comparison.
+    private func needsChange(_ uri: String, _ data: Data?, _ digest: String?) throws -> Bool {
         let owned = try ownership(uri)
         guard let data else { return owned != nil }
         guard owned?.injected == data else { return true }
+        if let digest, owned?.digest != digest { return true }
         return try row(uri) != data
     }
-    private func apply(_ uri: String, _ data: Data?) throws {
+    private func apply(_ uri: String, _ data: Data?, _ digest: String?) throws {
         let current = try row(uri)
         let owned = try ownership(uri)
         if let data {
-            if owned?.injected == data && current == data { return }
+            if owned?.injected == data && current == data && (digest == nil || owned?.digest == digest) { return }
             let original = owned != nil && current == owned?.injected ? owned?.original : current
-            let statement = try prepare("INSERT OR REPLACE INTO eevee_lyrics_projection_v1 (track_uri, original, injected) VALUES (?, ?, ?)")
+            let statement = try prepare("INSERT OR REPLACE INTO eevee_lyrics_projection_v1 (track_uri, original, injected, source_digest) VALUES (?, ?, ?, ?)")
             defer { sqlite3_finalize(statement) }
             bind(uri, to: statement, at: 1)
             bind(original, to: statement, at: 2)
             bind(data, to: statement, at: 3)
+            if let digest = digest ?? owned?.digest { bind(digest, to: statement, at: 4) } else { sqlite3_bind_null(statement, 4) }
             try finish(statement)
             if current != data { try write(uri, data) }
         } else if let owned {
@@ -157,9 +180,14 @@ final class NativeOfflineLyricsDatabase {
     /// launch-time reconcile with nothing new never locks the database.
     @discardableResult
     func update(_ changes: [(uri: String, data: Data?)]) throws -> Int {
-        let pending = try changes.filter { try needsChange($0.uri, $0.data) }
+        try update(changes.map { (uri: $0.uri, data: $0.data, digest: String?.none) })
+    }
+    /// `digest` records which saved text and format a row was built from.
+    @discardableResult
+    func update(_ changes: [(uri: String, data: Data?, digest: String?)]) throws -> Int {
+        let pending = try changes.filter { try needsChange($0.uri, $0.data, $0.digest) }
         guard !pending.isEmpty else { return 0 }
-        try transaction { for change in pending { try apply(change.uri, change.data) } }
+        try transaction { for change in pending { try apply(change.uri, change.data, change.digest) } }
         return pending.count
     }
     /// Empty rows for tracks with no lyrics anywhere. Never replaces a row we do not
@@ -173,7 +201,7 @@ final class NativeOfflineLyricsDatabase {
     }
     private func applyPlaceholder(_ uri: String, _ data: Data) throws {
         guard try placeholderNeeded(uri, data) else { return }
-        if let owned = try ownership(uri), owned.original != nil { try apply(uri, nil); return }
+        if let owned = try ownership(uri), owned.original != nil { try apply(uri, nil, nil); return }
         let statement = try prepare("INSERT OR REPLACE INTO eevee_lyrics_projection_v1 (track_uri, original, injected) VALUES (?, NULL, ?)")
         defer { sqlite3_finalize(statement) }
         bind(uri, to: statement, at: 1)

@@ -51,7 +51,11 @@ final class OfflineLyricsStore {
     private var epoch: UInt64 = 0
     private var revisions: [String: UInt64] = [:]
     private var contexts: [String: Set<String>]?
+    /// Lyrics the user deleted while the music stayed downloaded ("Delete saved lyrics").
     private var suppressed: Set<String>?
+    /// Removed downloads. Nothing may recreate their lyrics until the track is seen
+    /// downloaded again (library read, audio completion, explicit download).
+    private var removedDownloads: Set<String>?
     private var fileIndex: FileIndex?
     private var optionIndex: [String: LyricsOptions] = [:]
     private var missingFiles = Set<String>()
@@ -163,7 +167,7 @@ final class OfflineLyricsStore {
               revision: Revision? = nil) throws -> Bool {
         lock.lock(); defer { lock.unlock() }
         loadSuppressed()
-        guard let url = url(trackId: trackId, source: source), !suppressed!.contains(trackId),
+        guard let url = url(trackId: trackId, source: source), !suppressed!.contains(trackId), !removedDownloads!.contains(trackId),
               revision == nil || currentRevision(trackId) == revision else { return false }
         try prepareDirectory()
         let entry = Entry(version: 1, options: options, data: data)
@@ -183,30 +187,48 @@ final class OfflineLyricsStore {
         values.isExcludedFromBackup = true
         try? folder.setResourceValues(values)
     }
+    private func readIds(_ name: String) -> Set<String> {
+        let data = try? Data(contentsOf: directory.appendingPathComponent(name))
+        return Set((data.flatMap { try? JSONDecoder().decode([String].self, from: $0) } ?? []).filter(valid))
+    }
+    private func writeIds(_ ids: Set<String>?, _ name: String) throws {
+        try prepareDirectory()
+        try JSONEncoder().encode((ids ?? []).sorted()).write(to: directory.appendingPathComponent(name), options: .atomic)
+    }
     private func loadSuppressed() {
-        guard suppressed == nil else { return }
-        let data = try? Data(contentsOf: directory.appendingPathComponent("deleted.json"))
-        suppressed = Set((data.flatMap { try? JSONDecoder().decode([String].self, from: $0) } ?? []).filter(valid))
+        if suppressed == nil { suppressed = readIds("deleted.json") }
+        if removedDownloads == nil { removedDownloads = readIds("removed.json") }
     }
     private func saveSuppressed() throws {
-        try prepareDirectory()
-        try JSONEncoder().encode((suppressed ?? []).sorted()).write(to: directory.appendingPathComponent("deleted.json"), options: .atomic)
+        try writeIds(suppressed, "deleted.json")
+        try writeIds(removedDownloads, "removed.json")
     }
-    /// Automatic recovery must not undo Delete saved lyrics, even after relaunch.
-    /// Read on the statistics worker alongside missingTrackIds, never on main.
+    /// Automatic recovery must not undo Delete saved lyrics, even after relaunch, nor
+    /// recreate a removed download. Read on the statistics worker, never on main.
     func automaticallyRetryableTrackIds(_ ids: [String]) -> [String] {
         lock.lock(); defer { lock.unlock() }
         loadSuppressed()
-        return ids.filter { valid($0) && !suppressed!.contains($0) }
+        return ids.filter { valid($0) && !suppressed!.contains($0) && !removedDownloads!.contains($0) }
     }
     /// A real new music download or explicit backfill may save the text again.
     /// Merely reopening a deleted song's online lyrics may not recreate its file.
     func allowDownloads(trackIds: [String]) throws {
         lock.lock(); defer { lock.unlock() }
         loadSuppressed()
-        let before = suppressed!
-        suppressed!.subtract(trackIds.filter(valid))
-        if before != suppressed! { try saveSuppressed() }
+        let ids = trackIds.filter(valid)
+        let before = (suppressed!, removedDownloads!)
+        suppressed!.subtract(ids)
+        removedDownloads!.subtract(ids)
+        if before != (suppressed!, removedDownloads!) { try saveSuppressed() }
+    }
+    /// Spotify reports these tracks downloaded, so a removed download came back.
+    /// Lyrics the user deleted while the music stayed downloaded remain deleted.
+    func downloadsSeen(trackIds: [String]) throws {
+        lock.lock(); defer { lock.unlock() }
+        loadSuppressed()
+        let before = removedDownloads!
+        removedDownloads!.subtract(trackIds.filter(valid))
+        if before != removedDownloads! { try saveSuppressed() }
     }
 
     private func loadContexts() {
@@ -278,7 +300,7 @@ final class OfflineLyricsStore {
         // Revisions change even if no file exists: queued/in-flight work must not recreate it.
         for id in ids { revisions[id, default: 0] &+= 1 }
         loadSuppressed()
-        suppressed!.formUnion(ids)
+        removedDownloads!.formUnion(ids)
         var failure: Error?
         for file in lyricFiles() where ids.contains(file.id) {
             do {

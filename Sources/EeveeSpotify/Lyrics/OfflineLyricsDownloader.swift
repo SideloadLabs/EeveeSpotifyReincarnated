@@ -118,7 +118,7 @@ final class EeveeOfflineLyricsDownloader: NSObject {
     private var restoringCheckpoint = false
     private var checkpointWriteScheduled = false
     private var didRestoreAtLaunch = false
-    private var refreshOnNextForeground = false
+    private var launchCheckpoint: QueueCheckpoint?
     private var readLibraryOnNextForeground = false
     private var cancelledAt = Date.distantPast
     private var scheduledLibraryRead: DispatchWorkItem?
@@ -196,7 +196,7 @@ final class EeveeOfflineLyricsDownloader: NSObject {
             self.removalTokens[context] = nil
             let ids = current.compactMap(Self.trackId)
             for id in ids { self.requestedAt[id] = max(issued, self.requestedAt[id] ?? .distantPast) }
-            if let known = self.knownDownloadedIds, ids.contains(where: { !known.contains($0) }) { self.knownDownloadedIds = nil; self.persistKnownLibrary() }
+            // Requested is not downloaded yet: the library count grows on each audio completion.
             do { try OfflineLyricsStore.shared.remember(context: context, trackIds: ids) }
             catch { writeDebugLog("[Lyrics] could not save download membership: \(error)") }
             self.enqueue(current.map { ["uri": $0] })
@@ -230,20 +230,12 @@ final class EeveeOfflineLyricsDownloader: NSObject {
     private func resumeForegroundWork() {
         if !didRestoreAtLaunch {
             didRestoreAtLaunch = true
-            restoreCheckpoint()
-            // Pixie can load after the lyrics downloader. Recheck once on launch.
-            let generation = refreshGeneration
-            DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
-                guard let self, self.refreshGeneration == generation else { return }
-                self.refreshOnNextForeground = true
-                if self.foreground.isActive { self.resumeForegroundWork() }
-            }
+            launchCheckpoint = loadCheckpoint()
+            restoringCheckpoint = launchCheckpoint != nil
+            // One launch check, once Pixie and Spotify's offline service are up. It
+            // covers the downloaded library, saved texts, markers and the interrupted
+            // queue, so nothing else rescans at launch.
             scheduleInitialLibraryRead(delay: 5)
-        }
-        if refreshOnNextForeground {
-            refreshOnNextForeground = false
-            EeveePixieObserveDownloadCompletion(UserDefaults.offlineLyricsEnabled)
-            refreshForCurrentSource()
         }
         if readLibraryOnNextForeground {
             readLibraryOnNextForeground = false
@@ -251,25 +243,25 @@ final class EeveeOfflineLyricsDownloader: NSObject {
         }
     }
 
-    private func restoreCheckpoint() {
+    /// The queue interrupted by the last exit, if it still matches the settings.
+    private func loadCheckpoint() -> QueueCheckpoint? {
         let defaults = UserDefaults.container
-        guard let data = defaults.data(forKey: Self.checkpointKey) else { return }
+        guard let data = defaults.data(forKey: Self.checkpointKey) else { return nil }
         guard let checkpoint = try? PropertyListDecoder().decode(QueueCheckpoint.self, from: data),
               UserDefaults.offlineLyricsEnabled, checkpoint.source == UserDefaults.lyricsSource.rawValue,
               checkpoint.options.downloadOptions == UserDefaults.lyricsOptions.downloadOptions else {
             defaults.removeObject(forKey: Self.checkpointKey)
-            return
+            return nil
         }
         lastCheckpoint = checkpoint
-        restoringCheckpoint = true
-        let ids = Set(checkpoint.ids).union(checkpoint.recheckCatalog ? knownDownloadedIds ?? [] : [])
-        refreshForCurrentSource(downloadedIds: ids, reason: "restoring pending lyrics",
-                                includeStored: checkpoint.recheckCatalog,
-                                rateLimitRetryIds: Set(checkpoint.rateLimitRetryIds ?? [])) { [weak self] in
-            guard let self else { return }
-            self.restoringCheckpoint = false
-            self.changed()
-        }
+        return checkpoint
+    }
+
+    private func finishRestore() {
+        launchCheckpoint = nil
+        guard restoringCheckpoint else { return }
+        restoringCheckpoint = false
+        changed()
     }
 
     private func flushCheckpoint() {
@@ -300,11 +292,6 @@ final class EeveeOfflineLyricsDownloader: NSObject {
     private func audioTrackDownloaded(_ id: String, at time: Date) {
         guard UserDefaults.offlineLyricsEnabled, time >= cancelledAt,
               time >= (removedAt[id] ?? .distantPast) else { return }
-        if let removed = removedAt[id], removed > clearedAt, (requestedAt[id] ?? .distantPast) <= removed {
-            // A newer audio completion can arrive before the album membership callback.
-            do { try OfflineLyricsStore.shared.allowDownloads(trackIds: [id]) }
-            catch { writeDebugLog("[Lyrics] could not prepare completed download: \(error)") }
-        }
         requestedAt[id] = max(time, requestedAt[id] ?? .distantPast)
         if cancelLibraryRead != nil { completedDuringLibraryRead.insert(id) }
         if scanningLibrary { completedDuringManualScan.insert(id) }
@@ -318,13 +305,15 @@ final class EeveeOfflineLyricsDownloader: NSObject {
             changed()
         }
         refreshForCurrentSource(downloadedIds: [id], observedAt: time, reason: "audio track completed",
-                                priority: .high, showsProgress: false)
+                                priority: .high, showsProgress: false, seenDownloaded: [id])
     }
 
-    /// A launch or re-enable covers tracks already on disk, including interrupted
-    /// jobs. Audio completion events take the single-ID path instead.
+    /// A launch or re-enable covers tracks already on disk, saved texts, markers and
+    /// interrupted jobs in one pass. Audio completion events take the single-ID path.
     private func scheduleInitialLibraryRead(delay: TimeInterval = 0.8) {
-        guard UserDefaults.offlineLyricsEnabled, UserDefaults.lyricsSource.isReplacingLyrics, !scanningLibrary else { return }
+        guard UserDefaults.offlineLyricsEnabled, UserDefaults.lyricsSource.isReplacingLyrics, !scanningLibrary else {
+            finishRestore(); return
+        }
         guard cancelLibraryRead == nil, scheduledLibraryRead == nil else { return }
         let generation = refreshGeneration
         let work = DispatchWorkItem { [weak self] in
@@ -334,22 +323,34 @@ final class EeveeOfflineLyricsDownloader: NSObject {
                 self.readLibraryOnNextForeground = true
                 return
             }
-            guard UserDefaults.offlineLyricsEnabled, UserDefaults.lyricsSource.isReplacingLyrics, !self.scanningLibrary else { return }
+            guard UserDefaults.offlineLyricsEnabled, UserDefaults.lyricsSource.isReplacingLyrics, !self.scanningLibrary else {
+                self.finishRestore(); return
+            }
+            // Pixie can load after the lyrics downloader.
+            EeveePixieObserveDownloadCompletion(true)
             let started = Date()
             self.cancelLibraryRead = EeveePixieReadDownloadedTrackURIs { [weak self] tracks in
                 guard let self, self.refreshGeneration == generation else { return }
                 self.cancelLibraryRead = nil
                 let completed = self.completedDuringLibraryRead
                 self.completedDuringLibraryRead.removeAll()
-                guard let tracks, !self.scanningLibrary else { return }
-                let ids = Set(tracks.compactMap(Self.trackId))
-                    .filter { (self.removedAt[$0] ?? .distantPast) <= started }.union(completed)
-                if ids != self.knownDownloadedIds {
-                    self.knownDownloadedIds = ids
-                    self.persistKnownLibrary()
-                    self.changed()
+                let checkpoint = self.launchCheckpoint
+                guard !self.scanningLibrary else { self.finishRestore(); return }
+                var downloaded = completed
+                if let tracks {
+                    downloaded.formUnion(Set(tracks.compactMap(Self.trackId))
+                        .filter { (self.removedAt[$0] ?? .distantPast) <= started })
+                    if downloaded != self.knownDownloadedIds {
+                        self.knownDownloadedIds = downloaded
+                        self.persistKnownLibrary()
+                        self.changed()
+                    }
                 }
-                self.refreshForCurrentSource(downloadedIds: ids, observedAt: started, reason: "downloaded library refresh")
+                self.refreshForCurrentSource(downloadedIds: downloaded.union(checkpoint?.ids ?? []), observedAt: started,
+                                             reason: "launch check", includeStored: true, seenDownloaded: downloaded,
+                                             rateLimitRetryIds: Set(checkpoint?.rateLimitRetryIds ?? [])) { [weak self] in
+                    self?.finishRestore()
+                }
             }
         }
         scheduledLibraryRead = work
@@ -384,7 +385,8 @@ final class EeveeOfflineLyricsDownloader: NSObject {
     func refreshForCurrentSource(downloadedIds: Set<String>? = nil, observedAt: Date = Date(),
                                  reason: String = "provider refresh", priority: Operation.QueuePriority = .normal,
                                  userInitiated: Bool = false, showsProgress: Bool = true,
-                                 includeStored: Bool = false, rateLimitRetryIds: Set<String> = [], completion: (() -> Void)? = nil) {
+                                 includeStored: Bool = false, seenDownloaded: Set<String> = [],
+                                 rateLimitRetryIds: Set<String> = [], completion: (() -> Void)? = nil) {
         let source = UserDefaults.lyricsSource
         let options = UserDefaults.lyricsOptions.downloadOptions
         if userInitiated { cancelPending() }
@@ -414,6 +416,11 @@ final class EeveeOfflineLyricsDownloader: NSObject {
         let placeholders = checkStored ? NativeOfflineLyrics.placeholderTrackIdsForRetry() : []
         statisticsQueue.async {
             let store = OfflineLyricsStore.shared
+            // Spotify reports these downloaded: a removed download that came back may get lyrics again.
+            if !seenDownloaded.isEmpty {
+                do { try store.downloadsSeen(trackIds: Array(seenDownloaded)) }
+                catch { writeDebugLog("[Lyrics] could not record downloaded tracks: \(error)") }
+            }
             let candidates = candidatesFromLibrary.union(checkStored ? Set(store.savedTrackIds()).union(placeholders) : [])
             let retryable = store.automaticallyRetryableTrackIds(Array(candidates))
             let lacking = store.missingTrackIds(retryable, source: source.rawValue, options: options)
@@ -755,7 +762,7 @@ final class EeveeOfflineLyricsDownloader: NSObject {
         explicitRefresh = nil
         restoringCheckpoint = false
         cancelledAt = Date()
-        refreshOnNextForeground = false
+        launchCheckpoint = nil
         readLibraryOnNextForeground = false
         scheduledLibraryRead?.cancel()
         scheduledLibraryRead = nil
@@ -845,10 +852,7 @@ final class EeveeOfflineLyricsDownloader: NSObject {
         if enabled && !wasEnabled { shared.knownDownloadedIds = nil; shared.persistKnownLibrary() }
         if !enabled { shared.cancelPending() }
         shared.changed()
-        if enabled && !wasEnabled {
-            shared.refreshForCurrentSource()
-            shared.scheduleInitialLibraryRead()
-        }
+        if enabled && !wasEnabled { shared.scheduleInitialLibraryRead() }
     }
     @objc(deleteSavedLyricsWithCompletion:)
     static func deleteSavedLyrics(completion: @escaping (NSString?) -> Void) {

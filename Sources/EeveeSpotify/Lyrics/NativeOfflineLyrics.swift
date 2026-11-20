@@ -1,6 +1,7 @@
 import Foundation
 import UIKit
 import SwiftUI
+import CryptoKit
 
 /// Spotify's native offline lyrics repository bypasses URLSession. Project saved lyrics
 /// into its own Codable model, validating with Spotify's decoder before writing.
@@ -141,36 +142,41 @@ final class NativeOfflineLyrics {
                 }
                 ids = Set(OfflineLyricsStore.shared.savedTrackIds()).union(owned).union(noLyrics)
             }
-            var changes: [(uri: String, data: Data?)] = []
+            var changes: [(uri: String, data: Data?, digest: String?)] = []
             var placeholders: [(uri: String, data: Data)] = []
+            var have = Set<String>()
             let oldMarkerCount = noLyrics.count
+            let settings = codec.settingsKey()
             for id in ids {
+                let uri = "spotify:track:\(id)"
                 // Read the CURRENT selection/files on this queue. Never project a
                 // captured result from a download deleted or switched meanwhile.
                 // Spotify reads this table only offline (online it fetches, and our
                 // hook answers with the selected provider). Until the selected
                 // provider's text is downloaded, keep the previous provider's text.
-                let data: Data?
                 if let entry = savedOfflineLyricsEntry(trackId: id, allowOtherProvider: true),
                    let lyrics = try? Lyrics(serializedBytes: entry.data), !lyrics.data.lines.isEmpty {
-                    data = try codec.encode(trackId: id, lyrics: lyrics)
-                } else { data = nil }
-                let uri = "spotify:track:\(id)"
+                    have.insert(id)
+                    let digest = codec.digest(of: entry.data, settings: settings)
+                    // Our row is intact and built from this very text: nothing to encode.
+                    if try database.isProjected(uri, digest: digest) { continue }
+                    changes.append((uri: uri, data: try codec.encode(trackId: id, lyrics: lyrics), digest: digest))
+                    continue
+                }
                 let removed = allDownloadsRemoved || removedDownloads.contains(id)
-                if data == nil, !removed, !noLyrics.contains(id), (try? database.ownsWithoutOriginal(uri)) == true {
+                if !removed, !noLyrics.contains(id), (try? database.ownsWithoutOriginal(uri)) == true {
                     // Lyrics removed but the track is still downloaded: keep a marker row.
                     noLyrics.insert(id)
                 }
-                if data == nil, !removed, noLyrics.contains(id) {
+                if !removed, noLyrics.contains(id) {
                     // Zero-length marker: Spotify's offline plugin only checks that a row
                     // exists (track stays downloaded), while the lyrics view cannot decode
                     // it and shows nothing. A decodable empty entity showed an empty block.
-                    placeholders.append((uri: "spotify:track:\(id)", data: Data()))
+                    placeholders.append((uri: uri, data: Data()))
                 } else {
-                    changes.append((uri: "spotify:track:\(id)", data: data))
+                    changes.append((uri: uri, data: nil, digest: nil))
                 }
             }
-            let have = Set(changes.compactMap { $0.data == nil ? nil : String($0.uri.dropFirst("spotify:track:".count)) })
             if noLyrics.count != oldMarkerCount { saveNoLyrics() }
             let written = try database.update(changes)
             let empties = try database.ensurePlaceholders(placeholders)
@@ -181,7 +187,8 @@ final class NativeOfflineLyrics {
             withLyricsLock.unlock()
             removedDownloads.subtract(ids)
             if requested == nil { allDownloadsRemoved = false }
-            writeDebugLog("[Lyrics][NativeOffline] reconciled \(ids.count) tracks, wrote \(written), empty rows \(empties)/\(placeholders.count), journal=\(database.currentJournalMode())")
+            let encoded = changes.filter { $0.data != nil }.count
+            writeDebugLog("[Lyrics][NativeOffline] reconciled \(ids.count) tracks, encoded \(encoded), wrote \(written), empty rows \(empties)/\(placeholders.count), journal=\(database.currentJournalMode())")
         } catch { writeDebugLog("[Lyrics][NativeOffline] cache projection failed: \(error)") }
     }
 
@@ -196,6 +203,22 @@ final class NativeOfflineLyrics {
         private final class ColorCache {
             let lock = NSLock()
             var values: [UInt32: Any] = [:]
+        }
+        /// Digest of the validation encodings: changes whenever Spotify's model or
+        /// our projection changes, so rows built by an older format are re-encoded.
+        private var formatDigest = ""
+
+        private static func sha256(_ data: Data) -> String {
+            SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        }
+        /// Settings that enter `encode` without being part of the saved text.
+        func settingsKey() -> String {
+            let settings = UserDefaults.lyricsColors
+            return "\(settings.useStaticColor):\(settings.staticColor)"
+        }
+        /// What a row is built from: format, color settings and the saved text itself.
+        func digest(of saved: Data, settings: String) -> String {
+            "\(formatDigest):\(settings):\(Self.sha256(saved))"
         }
 
         init() throws {
@@ -214,13 +237,14 @@ final class NativeOfflineLyrics {
             writeDebugLog("[Lyrics][NativeOffline] native color archive validated")
 
             let probe = Lyrics.with { $0.data.lines = [LyricsLine.with { $0.content = "Eevee offline validation" }] }
-            _ = try encode(trackId: "validation", lyrics: probe)
+            let plain = try encode(trackId: "validation", lyrics: probe)
             let timedProbe = Lyrics.with {
                 $0.data.timeSynchronized = true
                 $0.data.lines = [LyricsLine.with { $0.content = "First"; $0.offsetMs = 1234 },
                     LyricsLine.with { $0.content = "Second"; $0.offsetMs = 5678 }]
             }
-            _ = try encode(trackId: "timedvalidation", lyrics: timedProbe)
+            let timed = try encode(trackId: "timedvalidation", lyrics: timedProbe)
+            formatDigest = Self.sha256(plain + timed)
         }
 
         /// Native CodableColor encodes a single Data value containing a secure
