@@ -26,7 +26,7 @@ func captureAccessToken(from request: URLRequest?, session: URLSession? = nil) {
 // Spotify's primary URLSession delegate; patching is shared with HttpClientURLSessionHook via SpotifyResponsePatcher.
 
 class SPTDataLoaderServiceHook: ClassHook<NSObject>, SpotifySessionDelegate {
-    typealias Group = PremiumBootstrapGroup
+    typealias Group = SpotifySessionResponsesGroup
     static let targetName = "SPTDataLoaderService"
 
     func URLSession(
@@ -34,6 +34,10 @@ class SPTDataLoaderServiceHook: ClassHook<NSObject>, SpotifySessionDelegate {
         task: URLSessionDataTask,
         didCompleteWithError error: Error?
     ) {
+        guard SpotifyResponsePatcher.shouldInterceptSession(task.currentRequest?.url) else {
+            orig.URLSession(session, task: task, didCompleteWithError: error)
+            return
+        }
         captureAccessToken(from: task.currentRequest, session: session)
 
         guard let url = task.currentRequest?.url else {
@@ -126,6 +130,10 @@ class SPTDataLoaderServiceHook: ClassHook<NSObject>, SpotifySessionDelegate {
         didReceiveResponse response: HTTPURLResponse,
         completionHandler handler: @escaping (URLSession.ResponseDisposition) -> Void
     ) {
+        guard SpotifyResponsePatcher.shouldInterceptSession(task.currentRequest?.url) else {
+            orig.URLSession(session, dataTask: task, didReceiveResponse: response, completionHandler: handler)
+            return
+        }
         if let url = task.currentRequest?.url, url.isCustomize, response.statusCode == 304 {
             // A 304 would make Spotify use its unpatched disk-cached config, so replay ours as a 200.
             if let cached = SpotifyResponsePatcher.cachedCustomizeData
@@ -169,6 +177,10 @@ class SPTDataLoaderServiceHook: ClassHook<NSObject>, SpotifySessionDelegate {
         dataTask task: URLSessionDataTask,
         didReceiveData data: Data
     ) {
+        guard SpotifyResponsePatcher.shouldInterceptSession(task.currentRequest?.url) else {
+            orig.URLSession(session, dataTask: task, didReceiveData: data)
+            return
+        }
         guard let url = task.currentRequest?.url else { return }
 
         // Replaced in didCompleteWithError; passing it through would deliver both.

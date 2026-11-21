@@ -44,11 +44,15 @@ enum BrowsitaSectionStripper {
 
     static var verboseLog: Bool = false
 
-    static func keepHomeShortcuts(_ data: Data, url: URL) -> Data? {
+    static func shouldHandleHome(_ url: URL) -> Bool {
         let path = url.path.lowercased()
         let host = url.host?.lowercased() ?? ""
-        guard host.hasSuffix(".spotify.com"), path.contains("/casita/"), shouldHandle(url) else { return nil }
-        let result = stripContainerLayout(data, path: path, policy: .shortcutsOnly)
+        return host.hasSuffix(".spotify.com") && path.contains("/casita/") && shouldHandle(url)
+    }
+
+    static func keepHomeShortcuts(_ data: Data, url: URL) -> Data? {
+        guard shouldHandleHome(url) else { return nil }
+        let result = stripContainerLayout(data, path: url.path, policy: .shortcutsOnly)
         if result == nil {
             writeDebugLog("[HomeFeed] Kept original response: no verified shortcut reduction, bytes=\(data.count)")
         }

@@ -130,6 +130,10 @@ let homeURL = URL(string: "https://spclient.wg.spotify.com/casita/v1/home")!
 let browseURL = URL(string: "https://spclient.wg.spotify.com/browsita/v1/browse")!
 let shortcutSection = "type.googleapis.com/spotify.casita.v1.resolved.Shortcuts playlist:recent"
 let homeWithShelves = message(["Fresh new music", shortcutSection, "Today's biggest hits", "Popular radios"])
+require(BrowsitaSectionStripper.shouldHandleHome(homeURL), "Home-only interception must recognize Spotify Home")
+for unrelated in [feedsURL, browseURL, scrollURL, URL(string: "https://accounts.spotify.com/api/token")!] {
+    require(!BrowsitaSectionStripper.shouldHandleHome(unrelated), "Home-only interception must leave unrelated requests alone")
+}
 require(BrowsitaSectionStripper.keepHomeShortcuts(homeWithShelves, url: homeURL) == message([shortcutSection]),
         "Home response must retain the entire shortcuts section and remove recommendation siblings")
 let metadata = lenDelimited(4, text("preserve opaque response metadata"))
