@@ -297,10 +297,6 @@ struct EeveeSpotify: Tweak {
 
         if EeveeSpotify.hookTarget == .v91 {
 
-            if SpotifyResponsePatcher.interceptsAllResponses || HomeDeclutter.launchHidden.contains(.shortcutsOnly) {
-                SpotifySessionResponsesGroup().activate()
-            }
-
             if UserDefaults.patchType.isPatching {
                 PremiumBootstrapGroup().activate()
                 writeDebugLog("[INIT] Activated PremiumBootstrapGroup")
@@ -313,6 +309,10 @@ struct EeveeSpotify: Tweak {
                 }
 
                 activateV91ServerSidedReminderIfAvailable()
+            }
+
+            if SpotifyResponsePatcher.interceptsAllResponses || HomeDeclutter.launchHidden.contains(.shortcutsOnly) {
+                SpotifySessionResponsesGroup().activate()
             }
 
             let lyricsEnabled = UserDefaults.lyricsSource.isReplacingLyrics
