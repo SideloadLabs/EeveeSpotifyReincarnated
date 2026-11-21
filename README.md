@@ -116,9 +116,9 @@ Thanks for all of the community's support, also, thanks to all the devs who work
 
 - This project is a fork of [Meeep1/EeveeSpotifyRevivedPublic](https://github.com/Meeep1/EeveeSpotifyRevivedPublic).
 
-## Vibecoded Pull Requests & Commit Comments
+## Vibecoded Pull Requests & AI generated Commit Comments
 
-Please note that there are some vibecoded pull requests and vibecoded commit comments in this repository.
+Please note that there are some vibecoded pull requests and ai generated commit comments in this repository.
 
 ## Disclaimer
 
