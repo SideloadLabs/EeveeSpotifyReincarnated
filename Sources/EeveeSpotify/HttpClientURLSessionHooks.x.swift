@@ -5,7 +5,7 @@ import Orion
 // bootstrap / customize / PAM responses through this delegate instead — without
 // hooking both, server-rendered free-tier strings slip through.
 class HttpClientURLSessionHook: ClassHook<NSObject>, SpotifySessionDelegate {
-    typealias Group = PremiumBootstrapGroup
+    typealias Group = SpotifySessionResponsesGroup
     static let targetName = "Connectivity_HttpClientKit.HttpClientURLSession"
 
     func URLSession(
@@ -13,6 +13,10 @@ class HttpClientURLSessionHook: ClassHook<NSObject>, SpotifySessionDelegate {
         task: URLSessionDataTask,
         didCompleteWithError error: Error?
     ) {
+        guard SpotifyResponsePatcher.shouldInterceptSession(task.currentRequest?.url) else {
+            orig.URLSession(session, task: task, didCompleteWithError: error)
+            return
+        }
         captureAccessToken(from: task.currentRequest, session: session)
 
         guard let url = task.currentRequest?.url else {
@@ -105,6 +109,10 @@ class HttpClientURLSessionHook: ClassHook<NSObject>, SpotifySessionDelegate {
         didReceiveResponse response: HTTPURLResponse,
         completionHandler handler: @escaping (URLSession.ResponseDisposition) -> Void
     ) {
+        guard SpotifyResponsePatcher.shouldInterceptSession(task.currentRequest?.url) else {
+            orig.URLSession(session, dataTask: task, didReceiveResponse: response, completionHandler: handler)
+            return
+        }
         if let url = task.currentRequest?.url, url.isCustomize, response.statusCode == 304 {
             // Warm relaunch: customize revalidates via ETag and returns 304 with no
             // body. The in-memory cache is empty in a fresh process, so fall back to
@@ -154,6 +162,10 @@ class HttpClientURLSessionHook: ClassHook<NSObject>, SpotifySessionDelegate {
         dataTask task: URLSessionDataTask,
         didReceiveData data: Data
     ) {
+        guard SpotifyResponsePatcher.shouldInterceptSession(task.currentRequest?.url) else {
+            orig.URLSession(session, dataTask: task, didReceiveData: data)
+            return
+        }
         guard let url = task.currentRequest?.url else { return }
         if SpotifyResponsePatcher.shouldBlock(url) { return }
         if CasitaResponseProbe.shouldProbe(url) {

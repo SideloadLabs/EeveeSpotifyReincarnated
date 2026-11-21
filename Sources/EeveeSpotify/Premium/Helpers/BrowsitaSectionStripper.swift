@@ -4,6 +4,15 @@ import Foundation
 
 enum BrowsitaSectionStripper {
 
+    private enum SectionPolicy {
+        case ads, shortcutsOnly
+    }
+
+    // Resolved message type and section identifiers present in Spotify 9.2.0.
+    private static let shortcutMarkers = [
+        "spotify.casita.v1.resolved.Shortcuts", "mobile-shortcuts-section", "shortcuts_section",
+    ].map { Array($0.utf8) }
+
     private static let hardAdMarkers: [[UInt8]] = [
         "spotify:ad:", "open.spotify.com/ad/", "ad-formats", "advertisement", "brand-ad",
         "sponsored", "marquee", "promoted", "home-ads", "adsproduct",
@@ -35,6 +44,21 @@ enum BrowsitaSectionStripper {
 
     static var verboseLog: Bool = false
 
+    static func shouldHandleHome(_ url: URL) -> Bool {
+        let path = url.path.lowercased()
+        let host = url.host?.lowercased() ?? ""
+        return host.hasSuffix(".spotify.com") && path.contains("/casita/") && shouldHandle(url)
+    }
+
+    static func keepHomeShortcuts(_ data: Data, url: URL) -> Data? {
+        guard shouldHandleHome(url) else { return nil }
+        let result = stripContainerLayout(data, path: url.path, policy: .shortcutsOnly)
+        if result == nil {
+            writeDebugLog("[HomeFeed] Kept original response: no verified shortcut reduction, bytes=\(data.count)")
+        }
+        return result
+    }
+
     static func shouldHandle(_ url: URL) -> Bool {
         let p = url.path.lowercased()
         // /casita/v1/feeds is flat tab-chip list, parser would mis-walk it.
@@ -59,12 +83,13 @@ enum BrowsitaSectionStripper {
     }
 
     // browsita/casita layout: outer 0x0a container of repeated 0x0a sections.
-    private static func stripContainerLayout(_ data: Data, path: String) -> Data? {
+    private static func stripContainerLayout(_ data: Data, path: String, policy: SectionPolicy = .ads) -> Data? {
         var cursor = 0
         guard data.count >= 2, data[cursor] == 0x0a else { return bail(path, "no-outer-tag") }
         cursor += 1
         guard let (outerLen, outerLenBytes) = readVarint(data, at: cursor) else { return bail(path, "bad-outer-varint") }
         cursor += outerLenBytes
+        guard outerLen <= UInt64(data.count - cursor) else { return bail(path, "outer-len-overflow") }
         let containerStart = cursor
         let containerEnd = cursor + Int(outerLen)
         guard containerEnd <= data.count else { return bail(path, "outer-len-overflow") }
@@ -77,14 +102,22 @@ enum BrowsitaSectionStripper {
             guard c < data.count, data[c] == 0x0a else { return bail(path, "section-tag-mismatch idx=\(idx)") }
             let sectionTagStart = c
             c += 1
-            guard let (secLen, secLenBytes) = readVarint(data, at: c) else { return bail(path, "bad-section-varint idx=\(idx)") }
+            guard let (secLen, secLenBytes) = readVarint(data, at: c, end: containerEnd) else { return bail(path, "bad-section-varint idx=\(idx)") }
             c += secLenBytes
+            guard secLen <= UInt64(containerEnd - c) else { return bail(path, "section-len-overflow idx=\(idx)") }
             let contentStart = c
             let contentEnd = c + Int(secLen)
             guard contentEnd <= containerEnd else { return bail(path, "section-len-overflow idx=\(idx)") }
 
-            if let markers = adHits(data, start: contentStart, end: contentEnd) {
-                if verboseLog { writeDebugLog("[STRIP] DROP \(path) idx=\(idx) size=\(secLen) hits=\(markers.joined(separator: ","))") }
+            let markers = policy == .ads ? adHits(data, start: contentStart, end: contentEnd) : nil
+            let shortcut = policy == .shortcutsOnly && shortcutMarkers.contains {
+                containsASCIIInsensitive(data[contentStart..<contentEnd], needle: $0)
+            }
+            let remove = policy == .shortcutsOnly ? !shortcut : markers != nil
+            if remove {
+                if verboseLog {
+                    writeDebugLog("[STRIP] DROP \(path) idx=\(idx) size=\(secLen) hits=\((markers ?? []).joined(separator: ","))")
+                }
                 dropped += 1
             } else {
                 if verboseLog { writeDebugLog("[STRIP] KEEP \(path) idx=\(idx) size=\(secLen)") }
@@ -95,6 +128,8 @@ enum BrowsitaSectionStripper {
             idx += 1
         }
 
+        // Only reduce a positively identified Home response. An unknown layout stays intact.
+        guard policy != .shortcutsOnly || kept > 0 else { return nil }
         guard dropped > 0 else { return nil }
 
         var result = Data()
@@ -104,7 +139,8 @@ enum BrowsitaSectionStripper {
         if containerEnd < data.count {
             result.append(data.subdata(in: containerEnd..<data.count))
         }
-        writeDebugLog("[STRIP] \(path) dropped=\(dropped) kept=\(kept) \(data.count)->\(result.count)")
+        let prefix = policy == .shortcutsOnly ? "HomeFeed" : "STRIP"
+        writeDebugLog("[\(prefix)] \(path) dropped=\(dropped) kept=\(kept) \(data.count)->\(result.count)")
         return result
     }
 
@@ -308,6 +344,7 @@ enum BrowsitaSectionStripper {
         var idx = at
         while idx < bound && bytesRead < 10 {
             let b = data[idx]
+            guard bytesRead < 9 || b <= 1 else { return nil }
             value |= UInt64(b & 0x7f) << shift
             shift += 7
             bytesRead += 1

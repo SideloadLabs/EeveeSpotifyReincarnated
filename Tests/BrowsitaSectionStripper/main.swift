@@ -123,3 +123,49 @@ require(realResult == trackRefReal + aboutSectionReal,
         "ad section with deeply nested aet tracking must be dropped whole")
 
 print("BrowsitaSectionStripper regression tests passed")
+
+// Home-only filtering uses synthetic section containers with type/section identifiers
+// found in Spotify 9.2.0. It must never resize collection-view cells to hide a section.
+let homeURL = URL(string: "https://spclient.wg.spotify.com/casita/v1/home")!
+let browseURL = URL(string: "https://spclient.wg.spotify.com/browsita/v1/browse")!
+let shortcutSection = "type.googleapis.com/spotify.casita.v1.resolved.Shortcuts playlist:recent"
+let homeWithShelves = message(["Fresh new music", shortcutSection, "Today's biggest hits", "Popular radios"])
+require(BrowsitaSectionStripper.shouldHandleHome(homeURL), "Home-only interception must recognize Spotify Home")
+for unrelated in [feedsURL, browseURL, scrollURL, URL(string: "https://accounts.spotify.com/api/token")!] {
+    require(!BrowsitaSectionStripper.shouldHandleHome(unrelated), "Home-only interception must leave unrelated requests alone")
+}
+require(BrowsitaSectionStripper.keepHomeShortcuts(homeWithShelves, url: homeURL) == message([shortcutSection]),
+        "Home response must retain the entire shortcuts section and remove recommendation siblings")
+let metadata = lenDelimited(4, text("preserve opaque response metadata"))
+require(BrowsitaSectionStripper.keepHomeShortcuts(homeWithShelves + metadata, url: homeURL) == message([shortcutSection]) + metadata,
+        "Response metadata outside the sections container must remain byte-identical")
+require(BrowsitaSectionStripper.keepHomeShortcuts(message([shortcutSection]), url: homeURL) == nil,
+        "An already filtered response needs no rewrite")
+require(BrowsitaSectionStripper.keepHomeShortcuts(message(["Shortcuts by an artist", "Fresh new music"]), url: homeURL) == nil,
+        "A song title containing Shortcuts must not identify a shortcut grid")
+require(BrowsitaSectionStripper.keepHomeShortcuts(homeWithShelves, url: feedsURL) == nil,
+        "Keep the All/Music/Podcasts/Audiobooks feed-chip response intact")
+require(BrowsitaSectionStripper.keepHomeShortcuts(homeWithShelves, url: browseURL) == nil,
+        "Keep Search/Browse responses intact")
+require(BrowsitaSectionStripper.keepHomeShortcuts(homeWithShelves, url: scrollURL) == nil,
+        "Keep Now Playing response structures intact")
+let unrelatedURL = URL(string: "https://example.com/casita/v1/home")!
+require(BrowsitaSectionStripper.keepHomeShortcuts(homeWithShelves, url: unrelatedURL) == nil,
+        "Only Spotify Home responses may be filtered")
+for identifier in ["mobile-shortcuts-section", "shortcuts_section", "SPOTIFY.CASITA.V1.RESOLVED.SHORTCUTS"] {
+    require(BrowsitaSectionStripper.keepHomeShortcuts(message([identifier, "editorial shelf"]), url: homeURL) == message([identifier]),
+            "Recognize the supported shortcut identifiers independently of capitalization")
+}
+let excessiveLength = Data([0x0a] + Array(repeating: UInt8(0xff), count: 9) + [0x01])
+let overflowingVarint = Data([0x0a] + Array(repeating: UInt8(0xff), count: 10))
+let invalidSection = Data([0x0a, 0x02, 0x0a, 0x7f])
+for malformed in [garbage, excessiveLength, overflowingVarint, invalidSection] {
+    require(BrowsitaSectionStripper.keepHomeShortcuts(malformed, url: homeURL) == nil,
+            "Malformed section lengths must pass through without a trap or partial rewrite")
+}
+let aNestedMessage = lenDelimited(3, text("metadata"))
+    + lenDelimited(7, lenDelimited(2, text("spotify.casita.v1.resolved.Shortcuts")))
+let unfamiliarLayout = lenDelimited(8, aNestedMessage)
+require(BrowsitaSectionStripper.keepHomeShortcuts(unfamiliarLayout, url: homeURL) == nil,
+        "Unfamiliar container layouts must pass through intact")
+print("Home response filtering regression tests passed")
