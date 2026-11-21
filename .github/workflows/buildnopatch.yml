@@ -45,6 +45,9 @@ jobs:
       - name: Run regression tests
         run: bash Scripts/run-tests.sh
 
+      - name: Run Home layout regression tests
+        run: bash Tests/HomeFeedLayout/run.sh
+
       - name: Setup Theos
         uses: actions/checkout@v4
         with:

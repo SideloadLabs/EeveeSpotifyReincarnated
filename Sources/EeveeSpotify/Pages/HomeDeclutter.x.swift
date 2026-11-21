@@ -65,6 +65,16 @@ enum HomeDeclutter {
 
     static func hiddenSection(for cell: UICollectionViewCell) -> HomePart? {
         let content = cell.contentView.subviews.first
+        if hidden.contains(.shortcutsOnly) {
+            guard let content else { return nil }
+            let name = NSStringFromClass(type(of: content))
+            guard name.contains("Home_EvoPageImpl"), name.contains("HomeStructure") else { return nil }
+            switch HomeFeedLayout.sectionKind(in: content) {
+            case .recommendations: return .shortcutsOnly
+            case .shortcuts: return hidden.contains(.shortcuts) ? .shortcuts : nil
+            case .pending: return nil
+            }
+        }
         if checksFeedContent, let part = classifyFeedContent(content) { return part }
         guard hidesMarkedSections else { return nil }
         if let verdict = objc_getAssociatedObject(cell, &verdictKey) as? Verdict, verdict.content === content, content != nil,
@@ -91,7 +101,6 @@ enum HomeDeclutter {
             }
         }
 
-        if hidden.contains(.shortcutsOnly) { return .shortcutsOnly }
         guard hidden.contains(.episodeCarousels), !(root is UICollectionView) else { return nil }
 
         // A standalone episode preview can be rendered as a card or as a stack with its heading.
@@ -143,6 +152,18 @@ class HomeSectionCellHook: ClassHook<UICollectionViewCell> {
     static let targetName = "_TtC12Element_List18CollectionViewCell"
 
     func preferredLayoutAttributesFittingAttributes(_ attributes: UICollectionViewLayoutAttributes) -> UICollectionViewLayoutAttributes {
+        if HomeDeclutter.hidden.contains(.shortcutsOnly) {
+            if HomeDeclutter.hiddenSection(for: target) != nil {
+                // A hidden section only needs measuring once. Its inner content retains its natural height.
+                let result = HomeFeedLayout.isCollapsed(target)
+                    ? attributes.copy() as! UICollectionViewLayoutAttributes
+                    : orig.preferredLayoutAttributesFittingAttributes(attributes)
+                HomeFeedLayout.collapse(target, attributes: result)
+                return result
+            }
+            HomeFeedLayout.restore(target)
+            return orig.preferredLayoutAttributesFittingAttributes(attributes)
+        }
         let result = orig.preferredLayoutAttributesFittingAttributes(attributes)
         let part = HomeDeclutter.meter.measure { HomeDeclutter.hiddenSection(for: target) }
         let hidden = part != nil
@@ -150,6 +171,16 @@ class HomeSectionCellHook: ClassHook<UICollectionViewCell> {
         if hidden { result.size.height = 0 }
         if part == .shortcutsOnly || part == .episodeCarousels { result.isHidden = true }
         return result
+    }
+
+    func layoutSubviews() {
+        orig.layoutSubviews()
+        HomeFeedLayout.maintain(target)
+    }
+
+    func prepareForReuse() {
+        HomeFeedLayout.restore(target)
+        orig.prepareForReuse()
     }
 }
 
@@ -160,7 +191,8 @@ class HomeSectionHeadingHook: ClassHook<UICollectionReusableView> {
     func preferredLayoutAttributesFittingAttributes(_ attributes: UICollectionViewLayoutAttributes) -> UICollectionViewLayoutAttributes {
         let result = orig.preferredLayoutAttributesFittingAttributes(attributes)
         if HomeDeclutter.hidesHeading(in: target) {
-            result.size.height = 0
+            // Retain the header's measured height so its internal constraints stay satisfiable.
+            if !HomeDeclutter.hidden.contains(.shortcutsOnly) { result.size.height = 0 }
             result.isHidden = true
         }
         return result
