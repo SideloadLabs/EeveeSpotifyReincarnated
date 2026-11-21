@@ -20,7 +20,7 @@ struct HomeSettingsView: View {
             }
 
             Section(footer: Text("home_shortcuts_only_footer".localized)) {
-                toggle(.episodeCarousels, icon: "mic.fill", color: .teal)
+                toggle(.episodeCarousels, icon: "mic.fill", color: Color(hex: "#30B0C7"))
                 toggle(.shortcutsOnly, icon: "rectangle.grid.1x2.fill", color: .blue)
             }
 
