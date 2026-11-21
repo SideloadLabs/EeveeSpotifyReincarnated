@@ -28,7 +28,7 @@ struct HomeSettingsView: View {
                 hidden = []
             }
 
-            RestartSection(visible: hidden != HomeDeclutter.hidden)
+            RestartSection(visible: hidden != HomeDeclutter.launchHidden)
 
             SpacerView()
         }

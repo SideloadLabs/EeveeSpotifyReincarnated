@@ -177,6 +177,10 @@ enum SpotifyResponsePatcher {
             return PatchResult(data: Data(), tag: .dacEmpty)
         }
         if BrowsitaSectionStripper.shouldHandle(url) {
+            if HomeDeclutter.launchHidden.contains(.shortcutsOnly),
+               let filtered = BrowsitaSectionStripper.keepHomeShortcuts(buffer, url: url) {
+                return PatchResult(data: filtered, tag: .casitaStrip)
+            }
             if let stripped = BrowsitaSectionStripper.strip(buffer, url: url) {
                 return PatchResult(data: stripped, tag: .casitaStrip)
             }
