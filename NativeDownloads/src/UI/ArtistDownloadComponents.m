@@ -1,3 +1,4 @@
+#import "Localization.h"
 #import "ArtistDownloadComponents.h"
 #import "ArtistArtworkLoader.h"
 #import <objc/runtime.h>
@@ -35,7 +36,7 @@ UIImage *SAPArtistArtworkPlaceholder(void) {
 }
 - (void)updateDownloaded:(NSUInteger)downloaded total:(NSUInteger)total progress:(double)progress {
     SAPSetProgressRing(_progressRing,progress,self.window!=nil && !UIAccessibilityIsReduceMotionEnabled());
-    self.accessibilityLabel=[NSString stringWithFormat:@"Partially downloaded, %lu of %lu tracks",(unsigned long)downloaded,(unsigned long)total];
+    self.accessibilityLabel=[NSString stringWithFormat:SAPLocalized(@"Partially downloaded, %lu of %lu tracks"),(unsigned long)downloaded,(unsigned long)total];
 }
 - (void)didMoveToWindow {
     [super didMoveToWindow];
@@ -45,16 +46,16 @@ UIImage *SAPArtistArtworkPlaceholder(void) {
 
 NSString *SAPArtistReleaseCategoryTitle(NSDictionary *release) {
     NSString *category=release[@"category"];
-    if(![category isEqualToString:@"Appears on"])return category;
+    if(![category isEqualToString:@"Appears on"])return category ? SAPLocalized(category) : nil;
     NSString *type;
     switch([release[@"type"]unsignedIntegerValue]) {
-        case 1:type=@"Album";break;
-        case 2:type=@"Single";break;
-        case 3:type=@"Compilation";break;
+        case 1:type=SAPLocalized(@"Album");break;
+        case 2:type=SAPLocalized(@"Single");break;
+        case 3:type=SAPLocalized(@"Compilation");break;
         case 4:type=@"EP";break;
-        default:type=@"Unknown type";break;
+        default:type=SAPLocalized(@"Unknown type");break;
     }
-    return [NSString stringWithFormat:@"Appears on (%@)",type];
+    return [NSString stringWithFormat:SAPLocalized(@"Appears on (%@)"),type];
 }
 
 NSString *SAPArtistTrackCounter(NSUInteger downloaded,NSUInteger total) {
@@ -64,7 +65,7 @@ NSString *SAPArtistTrackCounter(NSUInteger downloaded,NSUInteger total) {
         NSString *padding=[@"" stringByPaddingToLength:totalDigits-downloadedText.length withString:@" " startingAtIndex:0];
         downloadedText=[padding stringByAppendingString:downloadedText];
     }
-    return [NSString stringWithFormat:@"%@ / %lu tracks",downloadedText,(unsigned long)total];
+    return [NSString stringWithFormat:SAPLocalized(@"%@ / %lu tracks"),downloadedText,(unsigned long)total];
 }
 
 UIImageView *SAPArtistStateIcon(NSString *symbol,UIColor *color,NSString *label) {
@@ -90,15 +91,15 @@ UIImageView *SAPArtistStateIcon(NSString *symbol,UIColor *color,NSString *label)
         NSUInteger done=[display[@"downloaded_tracks"]unsignedIntegerValue],total=[display[@"total_tracks"]unsignedIntegerValue];double value=[display[@"progress"]doubleValue];
         if(!self.progressIndicator)self.progressIndicator=[[SAPArtistProgressAccessory alloc]initWithDownloaded:done total:total progress:value];
         else [self.progressIndicator updateDownloaded:done total:total progress:value];
-        if(frozen)self.progressIndicator.accessibilityLabel=[NSString stringWithFormat:@"Stopped. Last download progress: %.0f percent",MIN(1,MAX(0,value))*100];
+        if(frozen)self.progressIndicator.accessibilityLabel=[NSString stringWithFormat:SAPLocalized(@"Stopped. Last download progress: %.0f percent"),MIN(1,MAX(0,value))*100];
         self.indicatorKind=frozen?@"stopped":kind;return self.progressIndicator;
     }
-    if(!self.staticIndicator)self.staticIndicator=SAPArtistStateIcon(@"arrow.down.circle",UIColor.secondaryLabelColor,@"Not downloaded");
+    if(!self.staticIndicator)self.staticIndicator=SAPArtistStateIcon(@"arrow.down.circle",UIColor.secondaryLabelColor,SAPLocalized(@"Not downloaded"));
     if(![self.indicatorKind isEqual:kind]) {
         BOOL full=[kind isEqual:@"downloaded"],unknown=[kind isEqual:@"unknown"];
         self.staticIndicator.image=[UIImage systemImageNamed:full?@"checkmark.circle":unknown?@"questionmark.circle":@"arrow.down.circle"];
         self.staticIndicator.tintColor=full?UIColor.systemGreenColor:UIColor.secondaryLabelColor;
-        self.staticIndicator.accessibilityLabel=full?@"Downloaded":unknown?@"Download state unavailable":@"Not downloaded";
+        self.staticIndicator.accessibilityLabel=full?SAPLocalized(@"Downloaded"):unknown?SAPLocalized(@"Download state unavailable"):SAPLocalized(@"Not downloaded");
         self.indicatorKind=kind;
     }
     return self.staticIndicator;

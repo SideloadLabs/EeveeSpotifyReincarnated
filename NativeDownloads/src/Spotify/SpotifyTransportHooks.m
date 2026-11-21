@@ -1,3 +1,4 @@
+#import "OfflineLyrics.h"
 #import "SpotifyTransport.h"
 #import "TrackJournal.h"
 #import "WireProto.h"
@@ -79,6 +80,31 @@ NSArray *SAPInstallSpotifyTransportHooks(void) {
                     SAPRememberNativeCall(self, serviceName, methodName);
 #endif
                     BOOL offline=[serviceName isKindOfClass:NSString.class] && [serviceName isEqual:SAPOfflineService];
+                    // Observe requests independently of diagnostic logging. The lyrics
+                    // queue deduplicates the native UI and transport paths.
+                    if(offline && !offlineHookDepth && [methodName isEqual:@"AddDownload"] && [payload isKindOfClass:NSData.class])
+                        SAPRequestOfflineLyrics(SAPProtoString(SAPProtoFields(payload),2),nil);
+                    if(!offlineHookDepth && [serviceName isEqual:@"spotify.playlist_esperanto.proto.PlaylistService"] &&
+                       [methodName isEqual:@"SetOfflineState"] && [payload isKindOfClass:NSData.class]) {
+                        NSArray *fields=SAPProtoFields(payload);
+                        if(SAPProtoNumber(fields,3,0)==1)SAPRequestOfflineLyrics(SAPProtoString(fields,1),nil);
+                    }
+                    if(!offlineHookDepth && callback && [commandName hasPrefix:@"callSingle:"] && [payload isKindOfClass:NSData.class]) {
+                        BOOL remove=offline && ([methodName isEqual:@"RemoveDownload"] || [methodName isEqual:@"RemoveAllDownloads"]);
+                        NSArray *fields=SAPProtoFields(payload);
+                        BOOL playlist=[serviceName isEqual:@"spotify.playlist_esperanto.proto.PlaylistService"] &&
+                            [methodName isEqual:@"SetOfflineState"] && SAPProtoNumber(fields,3,0)==2;
+                        if(remove || playlist) {
+                            NSString *uri=[methodName isEqual:@"RemoveAllDownloads"]?@"spotify:all":SAPProtoString(fields,remove?2:1);
+                            void (^next)(NSData *)=callback;
+                            callback=^(NSData *data){
+                                NSArray *reply=[data isKindOfClass:NSData.class]?SAPProtoFields(data):nil;
+                                uint64_t code=remove?SAPProtoNumber(reply,1,0):SAPProtoNumber(SAPProtoFields(SAPProtoData(reply,1)),1,0);
+                                if(reply && (remove?code==0:(code>=200 && code<300)))SAPRemoveOfflineLyrics(uri,nil);
+                                next(data);
+                            };
+                        }
+                    }
                     BOOL read=[methodName isKindOfClass:NSString.class] && ([methodName hasPrefix:@"Get"] || [methodName hasPrefix:@"Subscribe"]);
                     // Stock Offline responses prove this service's route even
                     // when logging is off. Pixie reads learn only after their

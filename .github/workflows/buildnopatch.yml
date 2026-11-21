@@ -163,6 +163,9 @@ jobs:
               | plutil -extract CFBundleShortVersionString raw - 2>/dev/null || echo "unknown")
           if [ "$SPOT_VERSION" != "9.2.0" ]; then
             echo "::warning::Pixie download manager supports Spotify 9.2.0 only (this IPA is $SPOT_VERSION); skipping."
+            LYRICS_IPA="$RUNNER_TEMP/$(basename "$OUT_IPA")"
+            python3 NativeDownloads/tools/package_lyrics_viewer.py "$OUT_IPA" --output "$LYRICS_IPA"
+            mv -f "$LYRICS_IPA" "$OUT_IPA"
             exit 0
           fi
           python3 NativeDownloads/tools/validate_eevee_9192.py

@@ -111,3 +111,5 @@ int main(void){@autoreleasepool{
  }return 0;}
 
 void SAPCallReadOnlyService(NSString *s,NSString *m,NSData *p,void(^c)(NSData *,NSString *)){SAPCallReadOnlyServiceCancellable(s,m,p,c);}
+
+void SAPRemoveOfflineLyrics(NSString *uri, NSArray *tracks) {}

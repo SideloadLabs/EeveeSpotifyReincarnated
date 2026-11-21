@@ -59,8 +59,8 @@ static void SAPPresent(UIViewController *modal) {
 }
 
 static void SAPMessage(NSString *message) {
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:SAPL(@"Менеджер загрузок Pixie",@"Pixie Download Manager") message:message preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleCancel handler:^(UIAlertAction *action){[NSNotificationCenter.defaultCenter postNotificationName:@"SAPDownloadSettingsChanged" object:nil];}]];
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:SAPLocalized(@"Pixie Download Manager") message:message ? SAPLocalized(message) : nil preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"OK") style:UIAlertActionStyleCancel handler:^(UIAlertAction *action){[NSNotificationCenter.defaultCenter postNotificationName:@"SAPDownloadSettingsChanged" object:nil];}]];
     SAPPresent(alert);
 }
 
@@ -69,8 +69,8 @@ static void SAPDownloadMessage(NSString *message) {
     if (UIApplication.sharedApplication.applicationState != UIApplicationStateActive) return;
     UIAlertController *current = SAPDownloadAlert;
     if (current && !current.isBeingDismissed) { current.message = message; return; }
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:SAPL(@"Скачать текущий трек",@"Download current track") message:message preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleCancel handler:^(UIAlertAction *action){[NSNotificationCenter.defaultCenter postNotificationName:@"SAPDownloadSettingsChanged" object:nil];}]];
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:SAPLocalized(@"Download current track") message:message ? SAPLocalized(message) : nil preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"OK") style:UIAlertActionStyleCancel handler:^(UIAlertAction *action){[NSNotificationCenter.defaultCenter postNotificationName:@"SAPDownloadSettingsChanged" object:nil];}]];
     SAPDownloadAlert = alert;
     SAPPresent(alert);
 }
@@ -96,8 +96,8 @@ static void SAPShare(NSURL *url) {
 @implementation SAPSettingsActions
 + (NSDictionary *)snapshot {
     NSMutableDictionary *value=[@{@"diagnostics_enabled":@(SAPDiagnosticsEnabled()),
-        @"diagnostics":SAPL(@"Диагностика выключена. Включи переключатель «Диагностика» для сбора данных.",@"Diagnostics are off. Enable Diagnostics to collect data."),
-        @"journal_summary":SAPL(@"Диагностика выключена. Журнал не обновляется. Проверка текущего трека доступна отдельно.",@"Diagnostics are off. The log is not updated. You can still check the current track separately."),
+        @"diagnostics":SAPLocalized(@"Diagnostics are off. Enable Diagnostics to collect data."),
+        @"journal_summary":SAPLocalized(@"Diagnostics are off. The log is not updated. You can still check the current track separately."),
         @"download_active":@(SAPTrackDownloadActive()),@"key_request_mode":SAPKeyRequestModeReport()}mutableCopy];
 #if SAP_JAILBREAK
     value[@"jailbreak_bootstrap"]=SAPJailbreakSupportReport();
@@ -132,7 +132,7 @@ static void SAPShare(NSURL *url) {
 #if SAP_JAILBREAK
     NSMutableDictionary *withBootstrap=[report mutableCopy];withBootstrap[@"jailbreak_bootstrap"]=SAPJailbreakSupportReport();report=withBootstrap;
 #endif
-    NSString *message=SAPDiagnosticsEnabled()?SAPL(@"Диагностика загрузок включена.",@"Download diagnostics are enabled."):SAPL(@"Диагностика выключена. Сохранённые данные могут быть устаревшими.",@"Diagnostics are off. Retained observations may be stale.");
+    NSString *message=SAPDiagnosticsEnabled()?SAPLocalized(@"Download diagnostics are enabled."):SAPLocalized(@"Diagnostics are off. Retained observations may be stale.");
     return @{ @"report":report, @"diagnostics":message, @"journal_summary":@"",
         @"download_active":@(SAPTrackDownloadActive()), @"key_request_mode":SAPKeyRequestModeReport() };
 }
@@ -155,36 +155,36 @@ static void SAPShare(NSURL *url) {
 #if SAP_JAILBREAK
     NSDictionary *startup=SAPJailbreakSupportReport();
     if((action==SAPSettingsDownload||action==SAPSettingsDownloadAlbum)&&![startup[@"native_patches_ready"]boolValue]) {
-        SAPMessage([NSString stringWithFormat:@"Pixie downloads could not initialize (%@). This DEB requires the verified Spotify 9.1.92 executable. Detected version: %@.",startup[@"reason"],startup[@"detected_spotify_version"]]);return;
+        SAPMessage([NSString stringWithFormat:SAPLocalized(@"Pixie downloads could not initialize (%@). This DEB requires the verified Spotify 9.1.92 executable. Detected version: %@."),startup[@"reason"],startup[@"detected_spotify_version"]]);return;
     }
 #endif
     switch(action) {
         case SAPSettingsExportTrackAudio:
         case SAPSettingsExportAlbumAudio: {
-            UIAlertController *progress=[UIAlertController alertControllerWithTitle:@"Audio export" message:@"Preparing audio export… Large albums may take a moment." preferredStyle:UIAlertControllerStyleAlert];
-            [progress addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:^(UIAlertAction *action){SAPCancelAudioExport();}]];
+            UIAlertController *progress=[UIAlertController alertControllerWithTitle:SAPLocalized(@"Audio export") message:SAPLocalized(@"Preparing audio export… Large albums may take a moment.") preferredStyle:UIAlertControllerStyleAlert];
+            [progress addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"Cancel") style:UIAlertActionStyleCancel handler:^(UIAlertAction *action){SAPCancelAudioExport();}]];
             SAPDownloadAlert=progress;SAPPresent(progress);
             __weak UIAlertController *exportProgress=progress;
             SAPExportCurrentAudioWithKeyRefresh(action==SAPSettingsExportAlbumAudio,^(NSString *text){
                 UIAlertController *progress=exportProgress;
-                if(progress.presentingViewController && !progress.isBeingDismissed)progress.message=text;
+                if(progress.presentingViewController && !progress.isBeingDismissed)progress.message=SAPLocalized(text);
             },^(NSUInteger count,void (^decide)(BOOL)){
                 UIAlertController *progress=exportProgress;
                 void (^ask)(void)=^{
-                    NSString *body=[NSString stringWithFormat:SAPL(@"Полный аудиофайл для %lu трек(ов) не прочитан. Скачать трек заново? Потребуется интернет.",@"Complete audio could not be read for %lu track(s). Download the track again? Internet is required."),(unsigned long)count];
-                    UIAlertController *confirm=[UIAlertController alertControllerWithTitle:SAPL(@"Скачать заново трек?",@"Download track again?") message:body preferredStyle:UIAlertControllerStyleAlert];
-                    [confirm addAction:[UIAlertAction actionWithTitle:SAPL(@"Да",@"Yes") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action){
+                    NSString *body=[NSString stringWithFormat:SAPLocalized(@"Complete audio could not be read for %lu track(s). Download the track again? Internet is required."),(unsigned long)count];
+                    UIAlertController *confirm=[UIAlertController alertControllerWithTitle:SAPLocalized(@"Download track again?") message:body preferredStyle:UIAlertControllerStyleAlert];
+                    [confirm addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"Yes") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action){
                         SAPDownloadAlert=progress;SAPPresent(progress);
                         decide(YES);
                     }]];
-                    [confirm addAction:[UIAlertAction actionWithTitle:SAPL(@"Нет",@"No") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action){decide(NO);}]];
-                    [confirm addAction:[UIAlertAction actionWithTitle:SAPL(@"Отмена",@"Cancel") style:UIAlertActionStyleCancel handler:^(UIAlertAction *action){decide(NO);}]];
+                    [confirm addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"No") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action){decide(NO);}]];
+                    [confirm addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"Cancel") style:UIAlertActionStyleCancel handler:^(UIAlertAction *action){decide(NO);}]];
                     SAPPresent(confirm);
                 };
                 if(progress.presentingViewController){[progress dismissViewControllerAnimated:YES completion:ask];}else ask();
             },^(NSArray<NSURL *> *files,NSString *error){
                 BOOL cancelled=[error isEqualToString:@"Audio export cancelled."];
-                void (^show)(void)=^{if(cancelled)return;if(files.count){SAPPrepareAudioExportShareItems(files,action==SAPSettingsExportAlbumAudio,^(NSArray *items,NSString *shareError){if(items.count)SAPShareItems(items);else SAPMessage(shareError?:@"Could not prepare the album folder. The exported files remain in Pixie Exports.");});}else SAPMessage(error?:@"No audio files were exported.");};
+                void (^show)(void)=^{if(cancelled)return;if(files.count){SAPPrepareAudioExportShareItems(files,action==SAPSettingsExportAlbumAudio,^(NSArray *items,NSString *shareError){if(items.count)SAPShareItems(items);else SAPMessage(shareError?:SAPLocalized(@"Could not prepare the album folder. The exported files remain in Pixie Exports."));});}else SAPMessage(error?:SAPLocalized(@"No audio files were exported."));};
                 UIAlertController *progress=exportProgress;
                 if(progress.presentingViewController){if(SAPDownloadAlert==progress)SAPDownloadAlert=nil;[progress dismissViewControllerAnimated:YES completion:show];}else show();
             });break;
@@ -202,23 +202,23 @@ static void SAPShare(NSURL *url) {
                 NSURL *json=SAPJournalWriteReportSnapshot(report);if(json)[items addObject:json];
                 NSURL *log=[SAPDocuments() URLByAppendingPathComponent:report[@"log_file"]?:@"SpotifyAudioProbeJournal.log"];
                 if([NSFileManager.defaultManager fileExistsAtPath:log.path])[items addObject:log];
-                dispatch_async(dispatch_get_main_queue(),^{if(items.count)SAPShareItems(items);else SAPMessage(SAPL(@"Журнал пока пуст.",@"The log is empty."));});
+                dispatch_async(dispatch_get_main_queue(),^{if(items.count)SAPShareItems(items);else SAPMessage(SAPLocalized(@"The log is empty."));});
             });break;
         }
         case SAPSettingsResetJournal: {
-            UIAlertController *confirm=[UIAlertController alertControllerWithTitle:@"Reset log?" message:@"Clear the previous Pixie log?" preferredStyle:UIAlertControllerStyleAlert];
-            [confirm addAction:[UIAlertAction actionWithTitle:@"No" style:UIAlertActionStyleCancel handler:nil]];
-            [confirm addAction:[UIAlertAction actionWithTitle:@"Yes" style:UIAlertActionStyleDestructive handler:^(__unused UIAlertAction *action){
+            UIAlertController *confirm=[UIAlertController alertControllerWithTitle:SAPLocalized(@"Reset log?") message:SAPLocalized(@"Clear the previous Pixie log?") preferredStyle:UIAlertControllerStyleAlert];
+            [confirm addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"No") style:UIAlertActionStyleCancel handler:nil]];
+            [confirm addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"Yes") style:UIAlertActionStyleDestructive handler:^(__unused UIAlertAction *action){
                 dispatch_async(SAPReportQueue(),^{
                     NSError *journalError=nil,*traceError=nil;
                     BOOL journalCleared=SAPJournalResetLogFiles(&journalError),traceCleared=SAPTraceReset(&traceError);
                     SAPPlayerTraceReset();if(SAPDiagnosticsEnabled())SAPPlayerTraceSetActive(YES);
                     dispatch_async(dispatch_get_main_queue(),^{
                         SAPTracePlatformSetActive(SAPDiagnosticsEnabled());
-                        if(!journalCleared||!traceCleared){SAPMessage([NSString stringWithFormat:@"Log reset was not fully completed: %@",(journalError?:traceError).localizedDescription?:@"unknown file error"]);return;}
+                        if(!journalCleared||!traceCleared){SAPMessage([NSString stringWithFormat:SAPLocalized(@"Log reset was not fully completed: %@"),(journalError?:traceError).localizedDescription?:SAPLocalized(@"unknown file error")]);return;}
                         SAP_JOURNAL_ACTION(@"log_reset",@{@"previous_pixie_history_removed":@YES,@"diagnostics_enabled":@(SAPDiagnosticsEnabled())});
                         if(SAPDiagnosticsEnabled()){SAPTraceCaptureRuntimeManifest("manual_log_reset");SAPJournalRefresh(@"manual log reset");}
-                        SAPMessage(SAPDiagnosticsEnabled()?@"Previous Pixie logs cleared. A fresh log is now recording.":@"Previous Pixie logs cleared. Diagnostics remains off; enable it to record a new log.");
+                        SAPMessage(SAPDiagnosticsEnabled()?SAPLocalized(@"Previous Pixie logs cleared. A fresh log is now recording."):SAPLocalized(@"Previous Pixie logs cleared. Diagnostics remains off; enable it to record a new log."));
                     });
                 });
             }]];
@@ -231,14 +231,14 @@ static void SAPShare(NSURL *url) {
                 NSData *json=[NSJSONSerialization dataWithJSONObject:report options:NSJSONWritingPrettyPrinted error:NULL];
                 NSURL *url=[SAPDocuments() URLByAppendingPathComponent:@"SpotifyAudioProbe.json"];
                 BOOL saved=json && [json writeToURL:url atomically:YES];
-                dispatch_async(dispatch_get_main_queue(),^{if(saved)SAPShare(url);else SAPMessage(SAPL(@"Не удалось сохранить отчёт.",@"Could not save the report."));});
+                dispatch_async(dispatch_get_main_queue(),^{if(saved)SAPShare(url);else SAPMessage(SAPLocalized(@"Could not save the report."));});
             });break;
         }
         case SAPSettingsSendLog: {
             SAP_JOURNAL_ACTION(@"send_log_requested",@{@"diagnostics_enabled":@(SAPDiagnosticsEnabled())});
             NSDictionary *native=[self diagnosticSnapshot];
             SAPExportSupportLog(native,^(NSURL *url,NSError *error){
-                if(url)SAPShare(url);else SAPMessage([NSString stringWithFormat:@"Could not save the support log: %@",error.localizedDescription?:@"unknown error"]);
+                if(url)SAPShare(url);else SAPMessage([NSString stringWithFormat:SAPLocalized(@"Could not save the support log: %@"),error.localizedDescription?:SAPLocalized(@"unknown error")]);
             });break;
         }
     }

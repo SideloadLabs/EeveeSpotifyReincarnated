@@ -35,6 +35,16 @@ class HttpClientURLSessionHook: ClassHook<NSObject>, SpotifySessionDelegate {
             return
         }
 
+        // Offline, a downloaded song's saved lyrics stand in for the failed request.
+        if let saved = savedLyrics(forFailed: url, error: error) {
+            if let ok = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "2.0", headerFields: [:]) {
+                orig.URLSession(session, dataTask: task, didReceiveResponse: ok, completionHandler: { _ in })
+            }
+            orig.URLSession(session, dataTask: task, didReceiveData: saved)
+            orig.URLSession(session, task: task, didCompleteWithError: nil)
+            return
+        }
+
         guard error == nil, SpotifyResponsePatcher.shouldModify(url) else {
             orig.URLSession(session, task: task, didCompleteWithError: error)
             return
@@ -75,7 +85,7 @@ class HttpClientURLSessionHook: ClassHook<NSObject>, SpotifySessionDelegate {
                 let semaphore = DispatchSemaphore(value: 0)
                 var customLyricsData: Data?
                 DispatchQueue.global(qos: .userInitiated).async {
-                    customLyricsData = try? getLyricsDataForCurrentTrack(url.path, originalLyrics: originalLyrics)
+                    customLyricsData = try? eeveeLyricsData(url.path, originalLyrics: originalLyrics, task: task)
                     semaphore.signal()
                 }
                 _ = semaphore.wait(timeout: .now() + .milliseconds(18000))
@@ -134,7 +144,7 @@ class HttpClientURLSessionHook: ClassHook<NSObject>, SpotifySessionDelegate {
         // Calling getLyricsDataForCurrentTrack synchronously here would block the
         // delegate queue and prevent subsequent delegate callbacks from firing.
         DispatchQueue.global(qos: .userInitiated).async { [self] in
-            let data = try? getLyricsDataForCurrentTrack(url.path)
+            let data = try? eeveeLyricsData(url.path, task: task)
 
             guard let lyricsData = data,
                   let ok = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "2.0", headerFields: [:]) else {

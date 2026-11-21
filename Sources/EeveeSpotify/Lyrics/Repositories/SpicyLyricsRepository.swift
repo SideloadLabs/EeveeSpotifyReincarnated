@@ -53,14 +53,15 @@ class SpicyLyricsRepository: LyricsRepository {
         var responseStatus = 0
         var responseError: Error?
 
-        session.dataTask(with: request) { data, response, error in
+        let task = session.dataTask(with: request) { data, response, error in
             responseData = data
             responseStatus = (response as? HTTPURLResponse)?.statusCode ?? 0
             responseError = error
             semaphore.signal()
-        }.resume()
+        }
+        try LyricsDownloadHTTP.start(task)
 
-        semaphore.wait()
+        try LyricsDownloadHTTP.wait(semaphore, task: task, accepting: [401, 403, 404])
 
         if let error = responseError {
             eeveeLog("[EeveeSpotify][SpicyLyrics] %@ network error: %@", trackId, String(describing: error))
@@ -167,7 +168,7 @@ class SpicyLyricsRepository: LyricsRepository {
             ? .romanized
             : (lines.map(\.content).canBeRomanized ? .canBeRomanized : .original)
 
-        if !karaokeLines.isEmpty {
+        if !karaokeLines.isEmpty, !LyricsDownloadHTTP.isDownloading {
             let songWriters = root["SongWriters"]?.arrayValue?.compactMap { $0.stringValue } ?? []
             let attribution = root["UploadAttribution"]
 
@@ -256,7 +257,7 @@ class SpicyLyricsRepository: LyricsRepository {
             ? .romanized
             : (lines.map(\.content).canBeRomanized ? .canBeRomanized : .original)
 
-        if !karaokeLines.isEmpty {
+        if !karaokeLines.isEmpty, !LyricsDownloadHTTP.isDownloading {
             let attribution = root["UploadAttribution"]
             let filledKaraokeLines = LyricsUncensorFill.fillKaraoke(
                 lines: karaokeLines,

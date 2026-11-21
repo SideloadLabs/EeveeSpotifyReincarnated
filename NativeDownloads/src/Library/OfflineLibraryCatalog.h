@@ -11,6 +11,10 @@
 dispatch_block_t SAPFetchOfflineLibrary(void (^progress)(NSUInteger completed, NSUInteger total),
     void (^completion)(NSArray<NSDictionary *> *tracks, NSString *error));
 
+// Same verified membership as the full catalog, without metadata or display cache writes.
+__attribute__((visibility("default")))
+dispatch_block_t SAPFetchDownloadedTrackURIs(void (^completion)(NSArray<NSString *> *tracks, NSString *error));
+
 // Main-queue, process-lifetime display snapshot. nil means no completed scan;
 // an empty array is a successfully verified empty library. Never proves current
 // membership: SAPFetchOfflineLibrary still validates native contexts/items.

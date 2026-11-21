@@ -122,6 +122,7 @@ void SAPOfflineLibraryStoreFlushForTesting(void) {dispatch_sync(snapshotQueue(),
 @interface SAPOfflineLibraryFetch:NSObject
 @property(nonatomic,copy)void(^progress)(NSUInteger,NSUInteger);
 @property(nonatomic,copy)void(^completion)(NSArray *,NSString *);
+@property(nonatomic)BOOL identitiesOnly;
 @property(nonatomic)BOOL stopped;
 @property(nonatomic,strong)NSMutableDictionary<NSString *,dispatch_block_t> *reads;
 @property(nonatomic,strong)NSMutableOrderedSet<NSString *> *candidates;
@@ -145,7 +146,7 @@ void SAPOfflineLibraryStoreFlushForTesting(void) {dispatch_sync(snapshotQueue(),
  for(dispatch_block_t cancel in self.reads.allValues)cancel();[self.reads removeAllObjects];[self.metadataWaiters removeAllObjects];
  // Errors/cancellation never replace the previous display snapshot. A later
  // scan or a verified deletion supersedes this writer.
- if(rows && self.snapshotGeneration==cacheGeneration){cachedTracks=[rows copy];persistSnapshot(cachedTracks);}
+ if(rows && !self.identitiesOnly && self.snapshotGeneration==cacheGeneration){cachedTracks=[rows copy];persistSnapshot(cachedTracks);}
  void(^callback)(NSArray *,NSString *)=self.completion;self.completion=nil;self.progress=nil;if(callback)callback(rows,error);
 }
 - (void)read:(NSString *)service method:(NSString *)method payload:(NSData *)payload reply:(void(^)(NSData *,NSString *))reply{
@@ -169,11 +170,12 @@ void SAPOfflineLibraryStoreFlushForTesting(void) {dispatch_sync(snapshotQueue(),
 }
 - (void)begin{
  if([self isStopped])return;
- loadPersistedSnapshot();
- self.snapshotGeneration=++cacheGeneration;
- NSMutableDictionary *previous=NSMutableDictionary.dictionary;
- for(NSDictionary *row in cachedTracks)if([row[@"metadata_complete"]isEqual:@YES] && validURI(row[@"uri"],@"track"))previous[row[@"uri"]]=row;
- self.previousRows=previous;
+ if(!self.identitiesOnly){
+  loadPersistedSnapshot();self.snapshotGeneration=++cacheGeneration;
+  NSMutableDictionary *previous=NSMutableDictionary.dictionary;
+  for(NSDictionary *row in cachedTracks)if([row[@"metadata_complete"]isEqual:@YES] && validURI(row[@"uri"],@"track"))previous[row[@"uri"]]=row;
+  self.previousRows=previous;
+ }
  self.reads=NSMutableDictionary.dictionary;self.candidates=NSMutableOrderedSet.orderedSet;
  self.downloaded=NSMutableArray.array;self.rows=NSMutableDictionary.dictionary;self.metadataCache=NSMutableDictionary.dictionary;self.metadataWaiters=NSMutableDictionary.dictionary;
  // Descriptor at executable offset 0xa4a60e0: no pagination fields exist.
@@ -198,7 +200,10 @@ void SAPOfflineLibraryStoreFlushForTesting(void) {dispatch_sync(snapshotQueue(),
 }
 - (void)validateNext{
  if([self isStopped])return;
- if(self.validationOffset==self.candidates.count){if(self.progress)self.progress(0,self.downloaded.count);[self hydrateNext];return;}
+ if(self.validationOffset==self.candidates.count){
+  if(self.identitiesOnly){[self finish:nil rows:[self.downloaded copy]];return;}
+  if(self.progress)self.progress(0,self.downloaded.count);[self hydrateNext];return;
+ }
  NSUInteger count=MIN((NSUInteger)128,self.candidates.count-self.validationOffset);
  NSArray *batch=[self.candidates.array subarrayWithRange:NSMakeRange(self.validationOffset,count)];
  NSMutableData *payload=NSMutableData.data;for(NSString *uri in batch)[payload appendData:SAPProtoBytes(1,[uri dataUsingEncoding:NSUTF8StringEncoding])];
@@ -269,5 +274,10 @@ void SAPOfflineLibraryStoreFlushForTesting(void) {dispatch_sync(snapshotQueue(),
 
 dispatch_block_t SAPFetchOfflineLibrary(void(^progress)(NSUInteger,NSUInteger),void(^completion)(NSArray *,NSString *)){
  SAPOfflineLibraryFetch *fetch=SAPOfflineLibraryFetch.new;fetch.progress=progress;fetch.completion=completion;
+ dispatch_async(dispatch_get_main_queue(),^{[fetch begin];});return ^{[fetch cancel];};
+}
+
+dispatch_block_t SAPFetchDownloadedTrackURIs(void(^completion)(NSArray<NSString *> *,NSString *)){
+ SAPOfflineLibraryFetch *fetch=SAPOfflineLibraryFetch.new;fetch.identitiesOnly=YES;fetch.completion=completion;
  dispatch_async(dispatch_get_main_queue(),^{[fetch begin];});return ^{[fetch cancel];};
 }

@@ -183,8 +183,8 @@ class LrclibLyricsRepository: LyricsRepository {
             semaphore.signal()
         }
 
-        task.resume()
-        semaphore.wait()
+        try LyricsDownloadHTTP.start(task)
+        try LyricsDownloadHTTP.wait(semaphore, task: task, accepting: [404])
 
         if error != nil, request.url != url {
             // IPv4-direct attempt failed; retry with the original hostname URL.
@@ -203,8 +203,8 @@ class LrclibLyricsRepository: LyricsRepository {
                 fallbackSemaphore.signal()
             }
 
-            fallbackTask.resume()
-            fallbackSemaphore.wait()
+            try LyricsDownloadHTTP.start(fallbackTask)
+            try LyricsDownloadHTTP.wait(fallbackSemaphore, task: fallbackTask, accepting: [404])
         }
 
         if let error = error {
@@ -273,6 +273,8 @@ class LrclibLyricsRepository: LyricsRepository {
             do {
                 song = try getSong(trackName: strippedTitle, artistName: query.primaryArtist)
             } catch {
+                // A failed download request is not a missing song.
+                if LyricsDownloadHTTP.isDownloading, !(error is DecodingError) { throw error }
                 throw LyricsError.noSuchSong
             }
         }

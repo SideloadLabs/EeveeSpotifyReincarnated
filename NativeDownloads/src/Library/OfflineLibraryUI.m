@@ -1,3 +1,4 @@
+#import "Localization.h"
 #import "OfflineLibraryUI.h"
 #import "OfflineLibraryCatalog.h"
 #import "OfflineLibraryExport.h"
@@ -131,7 +132,7 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
     if (self.catalogCancel) { self.catalogCancel(); self.catalogCancel = nil; }
     NSUInteger generation = ++self.catalogGeneration;
     SAPOfflineLibraryController *root=self.root;
-    root.title=@"Downloaded tracks";
+    root.title=SAPLocalized(@"Downloaded tracks");
     __weak typeof(self) weakSelf = self;
     self.catalogCancel = SAPFetchOfflineLibrary(^(NSUInteger done, NSUInteger total) {
         SAPOfflineLibraryState *self = weakSelf; if (!self || self.dismissed || generation != self.catalogGeneration) return;
@@ -140,10 +141,10 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
         SAPOfflineLibraryState *self = weakSelf; if (!self || self.dismissed || generation != self.catalogGeneration) return;
         self.catalogCancel = nil;
         [self.root refreshCatalogProgressHeader];
-        self.root.title=@"Downloaded tracks";
+        self.root.title=SAPLocalized(@"Downloaded tracks");
         if (!tracks) {
             [self refresh];
-            [self showMessage:@"Couldn’t load downloads" detail:error ?: @"The native offline catalog is unavailable."];
+            [self showMessage:SAPLocalized(@"Couldn’t load downloads") detail:error ?: SAPLocalized(@"The native offline catalog is unavailable.")];
             return;
         }
         BOOL changed=![self.tracks isEqualToArray:tracks];
@@ -154,7 +155,7 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
         [self.selectedURIs intersectSet:available];
         if(self.selecting)for(NSDictionary *row in tracks)if([self.selectedArtistKeys containsObject:SAPOfflineArtistKey(row)])[self.selectedURIs addObject:row[@"uri"]];
         if(changed)[self refresh];else{[self.root updateLoading];[self refreshSelection];}
-        if (error.length) [self showMessage:@"Some track details are unavailable" detail:error];
+        if (error.length) [self showMessage:SAPLocalized(@"Some track details are unavailable") detail:error];
     });
     [root updateLoading];[root refreshCatalogProgressHeader];
 }
@@ -205,8 +206,8 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
 }
 - (void)showMessage:(NSString *)title detail:(NSString *)detail {
     if(self.dismissed || !self.navigation.topViewController.viewIfLoaded.window)return;
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:title message:detail preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:title message:detail ? SAPLocalized(detail) : nil preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"OK") style:UIAlertActionStyleDefault handler:nil]];
     [self.navigation.topViewController presentViewController:alert animated:YES completion:nil];
 }
 // After a deletion Spotify keeps the files of removed downloads in its cache. The button runs Spotify's
@@ -214,10 +215,10 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
 - (void)showDeleted:(NSString *)title detail:(NSString *)detail offerCacheClear:(BOOL)offer {
     if(!offer){[self showMessage:title detail:detail];return;}
     if(self.dismissed || !self.navigation.topViewController.viewIfLoaded.window)return;
-    UIAlertController *alert=[UIAlertController alertControllerWithTitle:title message:detail preferredStyle:UIAlertControllerStyleAlert];
+    UIAlertController *alert=[UIAlertController alertControllerWithTitle:title message:detail ? SAPLocalized(detail) : nil preferredStyle:UIAlertControllerStyleAlert];
     __weak typeof(self) weakSelf=self;
-    [alert addAction:[UIAlertAction actionWithTitle:@"Not now" style:UIAlertActionStyleCancel handler:nil]];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Clear Spotify cache" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action){[weakSelf clearSpotifyCache];}]];
+    [alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"Not now") style:UIAlertActionStyleCancel handler:nil]];
+    [alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"Clear Spotify cache") style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action){[weakSelf clearSpotifyCache];}]];
     alert.preferredAction=alert.actions.lastObject;
     [self.navigation.topViewController presentViewController:alert animated:YES completion:nil];
 }
@@ -225,10 +226,10 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
     __weak typeof(self) weakSelf=self;
     SAPClearSpotifyCache(^(NSDictionary *result,NSString *error){
         SAPOfflineLibraryState *self=weakSelf;if(!self||self.dismissed)return;
-        if(error.length){[self showMessage:@"Couldn’t clear cache" detail:error];return;}
+        if(error.length){[self showMessage:SAPLocalized(@"Couldn’t clear cache") detail:error];return;}
         unsigned long long freed=[result[@"freed_bytes"]unsignedLongLongValue];
-        NSString *detail=result[@"freed_bytes"]?(freed?[NSString stringWithFormat:@"Freed %@.",[NSByteCountFormatter stringFromByteCount:(long long)freed countStyle:NSByteCountFormatterCountStyleFile]]:@"Nothing more to clear."):@"Spotify cleared its cache.";
-        [self showMessage:@"Cache cleared" detail:detail];
+        NSString *detail=result[@"freed_bytes"]?(freed?[NSString stringWithFormat:SAPLocalized(@"Freed %@."),[NSByteCountFormatter stringFromByteCount:(long long)freed countStyle:NSByteCountFormatterCountStyleFile]]:SAPLocalized(@"Nothing more to clear.")):SAPLocalized(@"Spotify cleared its cache.");
+        [self showMessage:SAPLocalized(@"Cache cleared") detail:detail];
     });
 }
 - (void)cancelWork {
@@ -243,16 +244,16 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
     if (!rows.count || self.deleteProgress) return;
     if(self.exportProgress){[self appendExportRows:rows];return;}
     if(rows.count==1){[self beginExport:rows zip:NO save:save];return;}
-    UIAlertController *choice = [UIAlertController alertControllerWithTitle:save ? @"Save downloads" : @"Share downloads" message:@"Choose how to package the selected tracks." preferredStyle:UIAlertControllerStyleActionSheet];
+    UIAlertController *choice = [UIAlertController alertControllerWithTitle:save ? SAPLocalized(@"Save downloads") : SAPLocalized(@"Share downloads") message:SAPLocalized(@"Choose how to package the selected tracks.") preferredStyle:UIAlertControllerStyleActionSheet];
     __weak typeof(self) weakSelf = self;__weak UIAlertController *weakChoice=choice;
     for (NSNumber *zip in @[@NO, @YES]) {
-        NSString *title = zip.boolValue ? @"ZIP archive" : @"Folder";
+        NSString *title = zip.boolValue ? SAPLocalized(@"ZIP archive") : SAPLocalized(@"Folder");
         [choice addAction:[UIAlertAction actionWithTitle:title style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
             dispatch_block_t begin=^{[weakSelf beginExport:rows zip:zip.boolValue save:save];};
             if(weakChoice.presentingViewController)[weakChoice dismissViewControllerAnimated:YES completion:begin];else begin();
         }]];
     }
-    [choice addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+    [choice addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"Cancel") style:UIAlertActionStyleCancel handler:nil]];
     choice.popoverPresentationController.barButtonItem = ((SAPOfflineLibraryController *)self.navigation.topViewController).exportButton;
     [self.navigation.topViewController presentViewController:choice animated:YES completion:nil];
 }
@@ -282,7 +283,7 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
         SAPOfflineLibraryState *self=weakSelf;if(!self){if(package)SAPReleaseOfflineLibraryPackage(package);return;}
         self.exportProgress=nil;
         if(self.exportCancelled || self.dismissed){if(package)SAPReleaseOfflineLibraryPackage(package);self.exportCancelled=NO;[self refreshProgress];return;}
-        if(!package){[self refreshProgress];[self showMessage:@"Export failed" detail:error?:@"No files could be prepared."];return;}
+        if(!package){[self refreshProgress];[self showMessage:SAPLocalized(@"Export failed") detail:error?:SAPLocalized(@"No files could be prepared.")];return;}
         self.pendingPackage=package;self.pendingFailures=failures;[self refreshProgress];
         if(!self.navigation.topViewController.presentedViewController)[self reviewPackage];
     });
@@ -294,14 +295,14 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
     if(self.pendingFailures.count) {
         NSMutableArray *names=NSMutableArray.array;
         for(NSDictionary *failure in [self.pendingFailures subarrayWithRange:NSMakeRange(0,MIN((NSUInteger)5,self.pendingFailures.count))])
-            [names addObject:SAPOfflineString(failure[@"name"],SAPOfflineString(failure[@"uri"],@"Track"))];
-        NSString *detail=[NSString stringWithFormat:@"%lu item(s) could not be exported: %@%@",(unsigned long)self.pendingFailures.count,[names componentsJoinedByString:@", "],self.pendingFailures.count>5?@", …":@""];
-        UIAlertController *summary=[UIAlertController alertControllerWithTitle:@"Partial export" message:detail preferredStyle:UIAlertControllerStyleAlert];__weak UIAlertController *weakSummary=summary;
-        [summary addAction:[UIAlertAction actionWithTitle:@"Continue" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *a){
+            [names addObject:SAPOfflineString(failure[@"name"],SAPOfflineString(failure[@"uri"],SAPLocalized(@"Track")))];
+        NSString *detail=[NSString stringWithFormat:SAPLocalized(@"%lu item(s) could not be exported: %@%@"),(unsigned long)self.pendingFailures.count,[names componentsJoinedByString:@", "],self.pendingFailures.count>5?@", …":@""];
+        UIAlertController *summary=[UIAlertController alertControllerWithTitle:SAPLocalized(@"Partial export") message:detail ? SAPLocalized(detail) : nil preferredStyle:UIAlertControllerStyleAlert];__weak UIAlertController *weakSummary=summary;
+        [summary addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"Continue") style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *a){
             dispatch_block_t deliver=^{self.pendingFailures=nil;[self deliverPackage:package save:self.pendingSave];};
             if(weakSummary.presentingViewController)[weakSummary dismissViewControllerAnimated:YES completion:deliver];else deliver();
         }]];
-        [summary addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:^(__unused UIAlertAction *a){[self releasePendingPackage];}]];
+        [summary addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"Cancel") style:UIAlertActionStyleCancel handler:^(__unused UIAlertAction *a){[self releasePendingPackage];}]];
         [self.navigation.topViewController presentViewController:summary animated:YES completion:nil];
     }else[self deliverPackage:package save:self.pendingSave];
 }
@@ -339,22 +340,22 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
         if([error isEqual:SAPOfflineLibraryDeleteBusyError]) {
             // Nothing was sent to Spotify and nothing changed: keep the list and selection for a retry.
             [self refreshProgress];
-            [self showMessage:@"Still downloading" detail:@"This album is still downloading. Wait until the download finishes, then delete the tracks."];
+            [self showMessage:SAPLocalized(@"Still downloading") detail:SAPLocalized(@"This album is still downloading. Wait until the download finishes, then delete the tracks.")];
             return;
         }
         NSUInteger offline=0,library=0;NSMutableArray *details=NSMutableArray.array;
         for(NSDictionary *result in results) {
             BOOL local=[result[@"offline_removed"]isEqual:@YES],saved=[result[@"library_removed"]isEqual:@YES];offline+=local;library+=saved;
-            if((!local||!saved)&&details.count<5)[details addObject:[NSString stringWithFormat:@"%@: %@",SAPOfflineString(result[@"name"],@"Track"),SAPOfflineString(result[@"detail"],@"Removal was not confirmed.")]];
+            if((!local||!saved)&&details.count<5)[details addObject:[NSString stringWithFormat:@"%@: %@",SAPOfflineString(result[@"name"],SAPLocalized(@"Track")),SAPOfflineString(result[@"detail"],SAPLocalized(@"Removal was not confirmed."))]];
         }
         self.tracks=SAPOfflineLibraryRemainingTracks(self.tracks,selection,results);SAPUpdateOfflineLibraryCachedTracks(self.tracks);self.artists=[SAPOfflineLibraryController artistRowsForTracks:self.tracks];
         self.selecting=NO;[self.selectedURIs removeAllObjects];[self.selectedArtistKeys removeAllObjects];[self refresh];
         BOOL complete=offline==selection.count&&library==selection.count&&!error.length;
-        if(complete){[self showDeleted:@"Deleted" detail:@"Clear Spotify's cache to fully remove what you just deleted." offerCacheClear:YES];return;}
-        NSString *message=[NSString stringWithFormat:@"Offline removal confirmed: %lu / %lu\nLibrary removal confirmed: %lu / %lu",(unsigned long)offline,(unsigned long)selection.count,(unsigned long)library,(unsigned long)selection.count];
+        if(complete){[self showDeleted:SAPLocalized(@"Deleted") detail:SAPLocalized(@"Clear Spotify's cache to fully remove what you just deleted.") offerCacheClear:YES];return;}
+        NSString *message=[NSString stringWithFormat:SAPLocalized(@"Offline removal confirmed: %lu / %lu\nLibrary removal confirmed: %lu / %lu"),(unsigned long)offline,(unsigned long)selection.count,(unsigned long)library,(unsigned long)selection.count];
         if(details.count)message=[message stringByAppendingFormat:@"\n\n%@",[details componentsJoinedByString:@"\n"]];
         if(error.length)message=[message stringByAppendingFormat:@"\n\n%@",error];
-        [self showDeleted:@"Removal incomplete" detail:message offerCacheClear:offline>0];
+        [self showDeleted:SAPLocalized(@"Removal incomplete") detail:message offerCacheClear:offline>0];
     });
     [self refreshProgress];
 }
@@ -365,11 +366,11 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
     NSMutableDictionary<NSString *, NSMutableArray *> *groups = NSMutableDictionary.dictionary;
     for (NSDictionary *row in tracks) { NSString *key = SAPOfflineArtistKey(row); if (!groups[key]) groups[key] = NSMutableArray.array; [groups[key] addObject:row]; }
     NSMutableArray *result = NSMutableArray.array;
-    for (NSString *key in [[groups allKeys] sortedArrayUsingComparator:^NSComparisonResult(NSString *a, NSString *b) { return [SAPOfflineString(groups[a].firstObject[@"artist_name"], SAPOfflineUnknownArtist) localizedCaseInsensitiveCompare:SAPOfflineString(groups[b].firstObject[@"artist_name"], SAPOfflineUnknownArtist)]; }]) {
+    for (NSString *key in [[groups allKeys] sortedArrayUsingComparator:^NSComparisonResult(NSString *a, NSString *b) { return [SAPOfflineString(groups[a].firstObject[@"artist_name"], SAPLocalized(SAPOfflineUnknownArtist)) localizedCaseInsensitiveCompare:SAPOfflineString(groups[b].firstObject[@"artist_name"], SAPLocalized(SAPOfflineUnknownArtist))]; }]) {
         NSDictionary *first = groups[key].firstObject;
         NSString *artistCover = @"";
         for (NSDictionary *row in groups[key]) { NSString *candidate = SAPOfflineString(row[@"artist_cover_url"], @""); if (candidate.length) { artistCover = candidate; break; } }
-        [result addObject:@{@"key":key,@"name":SAPOfflineString(first[@"artist_name"], SAPOfflineUnknownArtist),@"artist_cover_url":artistCover,@"tracks":[groups[key] copy]}];
+        [result addObject:@{@"key":key,@"name":SAPOfflineString(first[@"artist_name"], SAPLocalized(SAPOfflineUnknownArtist)),@"artist_cover_url":artistCover,@"tracks":[groups[key] copy]}];
     }
     return result;
 }
@@ -381,7 +382,7 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
         if (!categories[category]) categories[category] = NSMutableDictionary.dictionary;
         if (!categories[category][key]) {
             categories[category][key] = NSMutableArray.array;
-            releaseByKey[key] = [@{@"key":key,@"name":SAPOfflineString(row[@"album_name"], SAPOfflineUnknownAlbum),@"cover_url":SAPOfflineString(row[@"cover_url"], @""),@"tracks":categories[category][key]} mutableCopy];
+            releaseByKey[key] = [@{@"key":key,@"name":SAPOfflineString(row[@"album_name"], SAPLocalized(SAPOfflineUnknownAlbum)),@"cover_url":SAPOfflineString(row[@"cover_url"], @""),@"tracks":categories[category][key]} mutableCopy];
         }
         [categories[category][key] addObject:row];
     }
@@ -408,7 +409,7 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
     for (NSString *category in categoryNames) {
         NSMutableArray *releases = NSMutableArray.array;
         for (NSString *key in [categoryGroups[category] keysSortedByValueUsingComparator:^NSComparisonResult(NSArray *a, NSArray *b) {
-            return [SAPOfflineString(a.firstObject[@"album_name"], SAPOfflineUnknownAlbum) localizedCaseInsensitiveCompare:SAPOfflineString(b.firstObject[@"album_name"], SAPOfflineUnknownAlbum)];
+            return [SAPOfflineString(a.firstObject[@"album_name"], SAPLocalized(SAPOfflineUnknownAlbum)) localizedCaseInsensitiveCompare:SAPOfflineString(b.firstObject[@"album_name"], SAPLocalized(SAPOfflineUnknownAlbum))];
         }]) [releases addObject:releaseByKey[key]];
         [sections addObject:@{@"category":category,@"releases":[releases copy]}];
     }
@@ -437,9 +438,9 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
     [self.loadingBackground addSubview:loading];
     [NSLayoutConstraint activateConstraints:@[[loading.centerXAnchor constraintEqualToAnchor:self.loadingBackground.centerXAnchor],[loading.centerYAnchor constraintEqualToAnchor:self.loadingBackground.centerYAnchor],[loading.widthAnchor constraintEqualToAnchor:self.loadingBackground.widthAnchor constant:-48],[self.loadingLabel.widthAnchor constraintEqualToAnchor:loading.widthAnchor]]];
     self.navigationItem.largeTitleDisplayMode=UINavigationItemLargeTitleDisplayModeNever;
-    self.selectButton=[[UIBarButtonItem alloc]initWithTitle:@"Select" style:UIBarButtonItemStylePlain target:self action:@selector(toggleSelection)];self.selectButton.tintColor=UIColor.whiteColor;
-    self.exportButton=[[UIBarButtonItem alloc]initWithTitle:@"Export selected" style:UIBarButtonItemStylePlain target:self action:@selector(exportSelection)];self.exportButton.tintColor=UIColor.whiteColor;
-    self.deleteButton=[[UIBarButtonItem alloc]initWithTitle:@"Delete selected" style:UIBarButtonItemStylePlain target:self action:@selector(deleteSelection)];self.deleteButton.tintColor=UIColor.systemRedColor;
+    self.selectButton=[[UIBarButtonItem alloc]initWithTitle:SAPLocalized(@"Select") style:UIBarButtonItemStylePlain target:self action:@selector(toggleSelection)];self.selectButton.tintColor=UIColor.whiteColor;
+    self.exportButton=[[UIBarButtonItem alloc]initWithTitle:SAPLocalized(@"Export selected") style:UIBarButtonItemStylePlain target:self action:@selector(exportSelection)];self.exportButton.tintColor=UIColor.whiteColor;
+    self.deleteButton=[[UIBarButtonItem alloc]initWithTitle:SAPLocalized(@"Delete selected") style:UIBarButtonItemStylePlain target:self action:@selector(deleteSelection)];self.deleteButton.tintColor=UIColor.systemRedColor;
     if(self.level==0) {
         UIBarButtonItem *refresh=[[UIBarButtonItem alloc]initWithBarButtonSystemItem:UIBarButtonSystemItemRefresh target:self action:@selector(refreshCatalog)];refresh.tintColor=UIColor.whiteColor;
         self.navigationItem.rightBarButtonItems=@[self.selectButton,refresh];
@@ -534,8 +535,8 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
     self.loadingLabel.hidden=!empty;
     if(empty) {
         BOOL loading=!self.state.tracks && self.state.catalogCancel!=nil;
-        if(loading)self.loadingLabel.text=self.state.loadTotal?[NSString stringWithFormat:@"Loading downloaded tracks…\n%lu / %lu",(unsigned long)self.state.loadCompleted,(unsigned long)self.state.loadTotal]:@"Loading downloaded tracks…";
-        else self.loadingLabel.text=self.state.tracks?@"No downloaded tracks":@"Tap Refresh to load downloaded tracks.";
+        if(loading)self.loadingLabel.text=self.state.loadTotal?[NSString stringWithFormat:SAPLocalized(@"Loading downloaded tracks…\n%lu / %lu"),(unsigned long)self.state.loadCompleted,(unsigned long)self.state.loadTotal]:SAPLocalized(@"Loading downloaded tracks…");
+        else self.loadingLabel.text=self.state.tracks?SAPLocalized(@"No downloaded tracks"):SAPLocalized(@"Tap Refresh to load downloaded tracks.");
         if(loading)[self.loadingSpinner startAnimating];else[self.loadingSpinner stopAnimating];
     }else[self.loadingSpinner stopAnimating];
 }
@@ -560,11 +561,11 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
     return newRows;
 }
 - (void)updateToolbar {
-    self.selectButton.title=self.state.selecting?@"Cancel":@"Select";self.selectButton.enabled=!self.state.deleteProgress&&(self.scope?:self.state.tracks).count>0;
+    self.selectButton.title=self.state.selecting?SAPLocalized(@"Cancel"):SAPLocalized(@"Select");self.selectButton.enabled=!self.state.deleteProgress&&(self.scope?:self.state.tracks).count>0;
     NSUInteger count=[self newExportRows].count;BOOL appending=self.state.exportProgress!=nil;
-    self.exportButton.title=[NSString stringWithFormat:@"%@ · %lu",appending?@"Add to export":@"Export selected",(unsigned long)count];
+    self.exportButton.title=[NSString stringWithFormat:@"%@ · %lu",appending?SAPLocalized(@"Add to export"):SAPLocalized(@"Export selected"),(unsigned long)count];
     self.exportButton.enabled=count>0 && !self.state.exportCancelled && !self.state.deleteProgress;
-    self.deleteButton.title=self.state.deleteProgress?@"Deleting…":@"Delete selected";self.deleteButton.enabled=count>0&&!self.state.exportProgress&&!self.state.deleteProgress;
+    self.deleteButton.title=self.state.deleteProgress?SAPLocalized(@"Deleting…"):SAPLocalized(@"Delete selected");self.deleteButton.enabled=count>0&&!self.state.exportProgress&&!self.state.deleteProgress;
     if(self.exportToolbar.items.firstObject!=self.deleteButton)self.exportToolbar.items=@[self.deleteButton,[UIBarButtonItem flexibleSpaceItem],self.exportButton];
     [self updateBottomControls];[self updateProgressPanel];
 }
@@ -640,7 +641,7 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
         self.progressAction.titleLabel.numberOfLines=1;self.progressAction.titleLabel.adjustsFontSizeToFitWidth=YES;self.progressAction.titleLabel.minimumScaleFactor=0.6;
         self.progressShareAction=[UIButton buttonWithType:UIButtonTypeSystem];self.progressShareAction.translatesAutoresizingMaskIntoConstraints=NO;self.progressShareAction.configuration=[button copy];
         self.progressShareAction.titleLabel.numberOfLines=1;self.progressShareAction.titleLabel.adjustsFontSizeToFitWidth=YES;self.progressShareAction.titleLabel.minimumScaleFactor=0.6;
-        [self.progressShareAction setTitle:@"Share" forState:UIControlStateNormal];[self.progressShareAction addTarget:self action:@selector(progressShareTapped) forControlEvents:UIControlEventTouchUpInside];
+        [self.progressShareAction setTitle:SAPLocalized(@"Share") forState:UIControlStateNormal];[self.progressShareAction addTarget:self action:@selector(progressShareTapped) forControlEvents:UIControlEventTouchUpInside];
         self.progressActionHeight=[self.progressAction.heightAnchor constraintEqualToConstant:30];
         self.progressTitleTrailing=[self.progressTitle.trailingAnchor constraintEqualToAnchor:self.progressAction.leadingAnchor constant:-12];
         [self.progressHeader addSubview:self.progressPanel];
@@ -672,14 +673,14 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
     }
     NSString *phase=snapshot[@"phase"];NSUInteger done=[snapshot[@"completed"]unsignedIntegerValue],total=[snapshot[@"total"]unsignedIntegerValue],failed=[snapshot[@"failed"]unsignedIntegerValue];
     NSString *title;
-    if([phase isEqual:@"packaging"])title=[NSString stringWithFormat:@"Packaging selection · %.0f%%",[snapshot[@"fraction"]doubleValue]*100];
-    else if([phase isEqual:@"ready"])title=@"Files ready";
-    else if([phase isEqual:@"cancelled"])title=@"Export cancelled";
-    else if([phase isEqual:@"failed"])title=@"Export failed";
-    else title=[NSString stringWithFormat:@"Preparing files · %lu / %lu",(unsigned long)done,(unsigned long)total];
+    if([phase isEqual:@"packaging"])title=[NSString stringWithFormat:SAPLocalized(@"Packaging selection · %.0f%%"),[snapshot[@"fraction"]doubleValue]*100];
+    else if([phase isEqual:@"ready"])title=SAPLocalized(@"Files ready");
+    else if([phase isEqual:@"cancelled"])title=SAPLocalized(@"Export cancelled");
+    else if([phase isEqual:@"failed"])title=SAPLocalized(@"Export failed");
+    else title=[NSString stringWithFormat:SAPLocalized(@"Preparing files · %lu / %lu"),(unsigned long)done,(unsigned long)total];
     NSString *detail=snapshot[@"message"];
-    if(![phase isEqual:@"preparing"])detail=[NSString stringWithFormat:@"%lu / %lu files processed · %@",(unsigned long)done,(unsigned long)total,detail];
-    self.progressTitle.text=title;self.progressDetail.text=failed?[NSString stringWithFormat:@"%lu failed · %@",(unsigned long)failed,detail]:detail;
+    if(![phase isEqual:@"preparing"])detail=[NSString stringWithFormat:SAPLocalized(@"%lu / %lu files processed · %@"),(unsigned long)done,(unsigned long)total,detail];
+    self.progressTitle.text=title;self.progressDetail.text=failed?[NSString stringWithFormat:SAPLocalized(@"%lu failed · %@"),(unsigned long)failed,detail]:detail;
     float fraction=[snapshot[@"fraction"]floatValue];
     BOOL animate=self.displayedProgressModel==self.state.progressModel && self.progressBar.window!=nil &&
         fraction>self.progressBar.progress && !UIAccessibilityIsReduceMotionEnabled();
@@ -691,7 +692,7 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
     BOOL shareReady=!self.state.exportProgress&&self.state.pendingPackage!=nil;
     self.progressShareAction.hidden=!shareReady;
     CGFloat titleTrailing=shareReady?-96:-12;if(fabs(self.progressTitleTrailing.constant-titleTrailing)>.5)self.progressTitleTrailing.constant=titleTrailing;
-    [self.progressAction setTitle:self.state.exportProgress?@"Cancel":@"Done" forState:UIControlStateNormal];
+    [self.progressAction setTitle:self.state.exportProgress?SAPLocalized(@"Cancel"):SAPLocalized(@"Done") forState:UIControlStateNormal];
     self.progressAction.enabled=!self.state.deleteProgress;self.progressShareAction.enabled=!self.state.deleteProgress;
     [self layoutProgressPanel:YES];
     self.updatingProgressPanel=NO;
@@ -719,23 +720,23 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
 - (void)exportSelection {
     NSArray *rows=[self newExportRows];if(!rows.count)return;
     if(self.state.exportProgress){[self.state appendExportRows:rows];return;}
-    UIAlertController *choice=[UIAlertController alertControllerWithTitle:@"Export selected" message:nil preferredStyle:UIAlertControllerStyleActionSheet];
+    UIAlertController *choice=[UIAlertController alertControllerWithTitle:SAPLocalized(@"Export selected") message:nil preferredStyle:UIAlertControllerStyleActionSheet];
     __weak typeof(self) weakSelf=self;__weak UIAlertController *weakChoice=choice;
     for(NSNumber *save in @[@NO,@YES]) {
-        [choice addAction:[UIAlertAction actionWithTitle:save.boolValue?@"Save to Files":@"Share" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action){
+        [choice addAction:[UIAlertAction actionWithTitle:save.boolValue?SAPLocalized(@"Save to Files"):SAPLocalized(@"Share") style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action){
             [weakSelf afterDialog:weakChoice perform:^{[weakSelf.state exportRows:rows save:save.boolValue];}];
         }]];
     }
-    [choice addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+    [choice addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"Cancel") style:UIAlertActionStyleCancel handler:nil]];
     choice.popoverPresentationController.barButtonItem=self.exportButton;[self presentViewController:choice animated:YES completion:nil];
 }
 - (void)deleteSelection {
     NSArray *rows=[self selectedRows];if(!rows.count||self.state.exportProgress||self.state.deleteProgress)return;
-    NSString *title=[NSString stringWithFormat:@"Delete %lu selected tracks?",(unsigned long)rows.count];
-    UIAlertController *confirm=[UIAlertController alertControllerWithTitle:title message:@"Remove these tracks from Spotify's offline storage on this device and from your library? Albums and playlists containing unselected tracks will be kept. Files saved outside Spotify are not deleted." preferredStyle:UIAlertControllerStyleAlert];
+    NSString *title=[NSString stringWithFormat:SAPLocalized(@"Delete %lu selected tracks?"),(unsigned long)rows.count];
+    UIAlertController *confirm=[UIAlertController alertControllerWithTitle:title message:SAPLocalized(@"Remove these tracks from Spotify's offline storage on this device and from your library? Albums and playlists containing unselected tracks will be kept. Files saved outside Spotify are not deleted.") preferredStyle:UIAlertControllerStyleAlert];
     __weak typeof(self) weakSelf=self;__weak UIAlertController *weakConfirm=confirm;
-    [confirm addAction:[UIAlertAction actionWithTitle:@"Delete" style:UIAlertActionStyleDestructive handler:^(__unused UIAlertAction *action){[weakSelf afterDialog:weakConfirm perform:^{[weakSelf.state deleteRows:rows];}];}]];
-    [confirm addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+    [confirm addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"Delete") style:UIAlertActionStyleDestructive handler:^(__unused UIAlertAction *action){[weakSelf afterDialog:weakConfirm perform:^{[weakSelf.state deleteRows:rows];}];}]];
+    [confirm addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"Cancel") style:UIAlertActionStyleCancel handler:nil]];
     [self presentViewController:confirm animated:YES completion:nil];
 }
 - (void)afterDialog:(UIAlertController *)dialog perform:(dispatch_block_t)action {
@@ -764,7 +765,7 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
 // animated, and when loading ends the label just hides.
 - (void)applyCatalogProgress:(SAPArtistCategoryHeader *)header {
     BOOL loading=self.level==0 && self.state.catalogCancel!=nil && self.state.tracks.count>0 && self.state.loadTotal>0;
-    NSString *text=loading?[NSString stringWithFormat:@"Loading %lu/%lu",(unsigned long)MIN(self.state.loadCompleted,self.state.loadTotal),(unsigned long)self.state.loadTotal]:nil;
+    NSString *text=loading?[NSString stringWithFormat:SAPLocalized(@"Loading %lu/%lu"),(unsigned long)MIN(self.state.loadCompleted,self.state.loadTotal),(unsigned long)self.state.loadTotal]:nil;
     UILabel *label=header.catalogProgressLabel;
     [UIView performWithoutAnimation:^{
         label.font=[UIFont monospacedDigitSystemFontOfSize:[UIFont preferredFontForTextStyle:UIFontTextStyleFootnote].pointSize weight:UIFontWeightRegular];
@@ -778,13 +779,13 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
     if([header isKindOfClass:SAPArtistCategoryHeader.class])[self applyCatalogProgress:header];
 }
 - (void)configureHeader:(SAPArtistCategoryHeader *)header section:(NSInteger)section {
-    NSString *title=self.level==0?@"Artists":self.level==1?self.releaseSections[section][@"category"]:@"Tracks";
+    NSString *title=self.level==0?SAPLocalized(@"Artists"):self.level==1?SAPLocalized(self.releaseSections[section][@"category"]):SAPLocalized(@"Tracks");
     header.categoryTitle.text=[NSString stringWithFormat:@"%@ (%ld)",title,(long)[self tableView:self.tableView numberOfRowsInSection:section]];
     [self applyCatalogProgress:header];header.selectionButton.hidden=!self.state.selecting;header.selectionButton.tag=section;
     NSArray *rows=[self rowsInSection:section];header.selectionButton.selected=rows.count>0 && SAPOfflineLibrarySelection(rows,self.state.selectedURIs,YES).count==rows.count;
     [header.selectionButton removeTarget:self action:@selector(toggleSection:) forControlEvents:UIControlEventTouchUpInside];
     [header.selectionButton addTarget:self action:@selector(toggleSection:) forControlEvents:UIControlEventTouchUpInside];
-    header.selectionButton.accessibilityLabel=[@"Select " stringByAppendingString:title];
+    header.selectionButton.accessibilityLabel=[SAPLocalized(@"Select ") stringByAppendingString:title];
 }
 - (UIView *)tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
     SAPArtistCategoryHeader *header=(id)[tableView dequeueReusableHeaderFooterViewWithIdentifier:@"OfflineCategory"];
@@ -807,10 +808,10 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
     SAPOfflineArtworkCell *cell=(id)base;if(![cell isKindOfClass:SAPOfflineArtworkCell.class])return;
     NSDictionary *item=self.catalogItems[identifier];if(!item)return;
     NSArray *rows;BOOL artist=self.level==0;NSString *title,*subtitle,*url,*identity;
-    if(artist){rows=item[@"tracks"];title=item[@"name"];subtitle=[NSString stringWithFormat:@"%lu tracks",(unsigned long)rows.count];url=item[@"artist_cover_url"];identity=item[@"key"];}
+    if(artist){rows=item[@"tracks"];title=item[@"name"];subtitle=[NSString stringWithFormat:SAPLocalized(@"%lu tracks"),(unsigned long)rows.count];url=item[@"artist_cover_url"];identity=item[@"key"];}
     else if(self.level==1){rows=item[@"tracks"];title=item[@"name"];NSDictionary *first=rows.firstObject;NSString *year=[first[@"year"]integerValue]?[first[@"year"]stringValue]:nil;
-        subtitle=[NSString stringWithFormat:@"%@%@%@ · %lu tracks",year?:@"",year?@" · ":@"",self.catalogCategories[identifier],(unsigned long)rows.count];url=item[@"cover_url"];identity=item[@"key"];}
-    else {rows=@[item];title=SAPOfflineString(item[@"name"],@"Unknown track");subtitle=SAPOfflineString(item[@"artist_name"],SAPOfflineUnknownArtist);url=item[@"cover_url"];identity=item[@"uri"];}
+        subtitle=[NSString stringWithFormat:SAPLocalized(@"%@%@%@ · %lu tracks"),year?:@"",year?@" · ":@"",self.catalogCategories[identifier],(unsigned long)rows.count];url=item[@"cover_url"];identity=item[@"key"];}
+    else {rows=@[item];title=SAPOfflineString(item[@"name"],SAPLocalized(@"Unknown track"));subtitle=SAPOfflineString(item[@"artist_name"],SAPOfflineUnknownArtist);url=item[@"cover_url"];identity=item[@"uri"];}
     UIListContentConfiguration *old=(id)cell.contentConfiguration;
     BOOL same=[cell.imageIdentity isEqual:identity] && [cell.artworkURL?:@"" isEqual:url?:@""];
     UIListContentConfiguration *content=same && [old isKindOfClass:UIListContentConfiguration.class]?[old copy]:[UIListContentConfiguration subtitleCellConfiguration];
@@ -836,20 +837,20 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
     if(![cell isKindOfClass:SAPOfflineArtworkCell.class])return;
     BOOL selected=rows.count>0 && SAPOfflineLibrarySelection(rows,self.state.selectedURIs,YES).count==rows.count;
     NSString *symbol=nil,*label=nil;UIColor *color=UIColor.secondaryLabelColor;
-    if(self.state.selecting){symbol=selected?@"checkmark.circle.fill":@"circle";label=selected?@"Selected":@"Not selected";if(selected)color=UIColor.systemGreenColor;}
-    else if(self.level<2){symbol=@"chevron.right";label=@"Open";}
+    if(self.state.selecting){symbol=selected?@"checkmark.circle.fill":@"circle";label=selected?SAPLocalized(@"Selected"):SAPLocalized(@"Not selected");if(selected)color=UIColor.systemGreenColor;}
+    else if(self.level<2){symbol=@"chevron.right";label=SAPLocalized(@"Open");}
     else {
         NSString *status=[self.state.progressModel stateForTrackURI:rows.firstObject[@"uri"]];
-        if([status isEqual:@"queued"]){symbol=@"clock";label=@"Queued for export";}
-        else if([status isEqual:@"preparing"]){symbol=@"arrow.up.circle";label=@"Preparing export";color=UIColor.systemGreenColor;}
-        else if([status isEqual:@"converting"]){symbol=@"arrow.triangle.2.circlepath";label=@"Converting to M4A";color=UIColor.systemGreenColor;}
-        else if([status isEqual:@"prepared"]){symbol=@"checkmark.circle";label=@"Prepared";color=UIColor.systemGreenColor;}
-        else if([status isEqual:@"failed"]){symbol=@"exclamationmark.circle";label=@"Export failed";color=UIColor.systemRedColor;}
-        else if([status isEqual:@"cancelled"]){symbol=@"stop.circle";label=@"Export cancelled";color=UIColor.systemOrangeColor;}
-        else if([status isEqual:@"not_exported"]){symbol=@"minus.circle";label=@"Not exported";}
+        if([status isEqual:@"queued"]){symbol=@"clock";label=SAPLocalized(@"Queued for export");}
+        else if([status isEqual:@"preparing"]){symbol=@"arrow.up.circle";label=SAPLocalized(@"Preparing export");color=UIColor.systemGreenColor;}
+        else if([status isEqual:@"converting"]){symbol=@"arrow.triangle.2.circlepath";label=SAPLocalized(@"Converting to M4A");color=UIColor.systemGreenColor;}
+        else if([status isEqual:@"prepared"]){symbol=@"checkmark.circle";label=SAPLocalized(@"Prepared");color=UIColor.systemGreenColor;}
+        else if([status isEqual:@"failed"]){symbol=@"exclamationmark.circle";label=SAPLocalized(@"Export failed");color=UIColor.systemRedColor;}
+        else if([status isEqual:@"cancelled"]){symbol=@"stop.circle";label=SAPLocalized(@"Export cancelled");color=UIColor.systemOrangeColor;}
+        else if([status isEqual:@"not_exported"]){symbol=@"minus.circle";label=SAPLocalized(@"Not exported");}
     }
     BOOL created=!cell.staticIndicator;
-    if(created)cell.staticIndicator=SAPArtistStateIcon(@"circle",UIColor.secondaryLabelColor,@"Not selected");
+    if(created)cell.staticIndicator=SAPArtistStateIcon(@"circle",UIColor.secondaryLabelColor,SAPLocalized(@"Not selected"));
     if(created||![(label?:@"")isEqual:cell.staticIndicator.accessibilityLabel?:@""]) {
         cell.staticIndicator.image=symbol?[UIImage systemImageNamed:symbol]:nil;cell.staticIndicator.tintColor=color;cell.staticIndicator.accessibilityLabel=label;
         cell.staticIndicator.hidden=symbol==nil;[cell setDownloadIndicator:cell.staticIndicator];cell.accessoryType=UITableViewCellAccessoryNone;
@@ -892,6 +893,6 @@ void SAPShowOfflineLibrary(UIViewController *presenter) {
     UINavigationController *navigation=presenter.navigationController;
     if(!navigation || presenter.presentedViewController)return;
     SAPOfflineLibraryState *state=SAPOfflineLibraryState.new;state.navigation=navigation;state.originalToolbarHidden=navigation.toolbarHidden;
-    SAPOfflineLibraryController *root=SAPOfflineLibraryController.new;root.state=state;root.level=0;root.title=@"Downloaded tracks";state.root=root;
+    SAPOfflineLibraryController *root=SAPOfflineLibraryController.new;root.state=state;root.level=0;root.title=SAPLocalized(@"Downloaded tracks");state.root=root;
     [navigation pushViewController:root animated:YES];
 }

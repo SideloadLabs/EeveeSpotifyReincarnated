@@ -58,3 +58,24 @@ UIViewController *EeveePixieMakeDownloadsController(void) {
     UIViewController *(*make)(void) = PixieDownloadsFactory();
     return make ? make() : nil;
 }
+
+void EeveePixieFetchLyricsMetadata(NSString *trackURI, void (^completion)(NSDictionary *)) {
+    // Resolve per call: Eevee may have initialized before the optional companion.
+    void (*fetch)(NSString *,void (^)(NSDictionary *))=dlsym(RTLD_DEFAULT,"SAPFetchOfflineLyricsMetadata");
+    // Without the companion nothing was asked, which is not a definite miss.
+    if(fetch)fetch(trackURI,completion);else completion(@{@"unavailable":@YES});
+}
+
+dispatch_block_t EeveePixieReadDownloadedTrackURIs(void (^completion)(NSArray<NSString *> *)) {
+    dispatch_block_t (*fetch)(void (^)(NSArray<NSString *> *, NSString *)) = dlsym(RTLD_DEFAULT, "SAPFetchDownloadedTrackURIs");
+    if (!fetch) {
+        dispatch_async(dispatch_get_main_queue(), ^{ completion(nil); });
+        return nil;
+    }
+    return fetch(^(NSArray<NSString *> *tracks, NSString *error) { completion(error ? nil : tracks); });
+}
+
+void EeveePixieObserveDownloadCompletion(BOOL enabled) {
+    void (*observe)(BOOL) = dlsym(RTLD_DEFAULT, "SAPNativeDownloadCompletionSetActive");
+    if (observe) observe(enabled);
+}
