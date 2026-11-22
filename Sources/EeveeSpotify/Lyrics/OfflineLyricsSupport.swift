@@ -248,6 +248,22 @@ func eeveeLyricsData(_ path: String, originalLyrics: Lyrics? = nil, task: URLSes
     }
 }
 
+/// Completion of a successful Spotify `/download/track/` request. The provider
+/// fetch for such a (usually not playing) track can take seconds, so it never
+/// runs while Spotify's delegate queue waits: every other Spotify response on
+/// that queue would stall behind it. `deliver` gets the provider's payload, or
+/// Spotify's own body if there is none. Returns false for every other request,
+/// which keeps upstream's path unchanged.
+func answerLyricsDownloadAsync(_ url: URL, buffer: Data, task: URLSessionTask,
+                               deliver: @escaping (Data) -> Void) -> Bool {
+    guard url.path.contains("/download/track/") else { return false }
+    DispatchQueue.global(qos: .utility).async {
+        let originalLyrics = try? Lyrics(serializedBytes: buffer)
+        deliver((try? eeveeLyricsData(url.path, originalLyrics: originalLyrics, task: task)) ?? buffer)
+    }
+    return true
+}
+
 private func pluginDownloadLyrics(trackId: String) throws -> Lyrics {
     if let saved = cachedOfflineLyrics(trackId: trackId) { return saved }
     let execution = EeveeOfflineLyricsDownloader.shared.foreground

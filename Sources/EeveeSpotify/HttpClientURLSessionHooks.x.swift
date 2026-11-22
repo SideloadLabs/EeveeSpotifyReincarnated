@@ -80,6 +80,10 @@ class HttpClientURLSessionHook: ClassHook<NSObject>, SpotifySessionDelegate {
 
         do {
             if url.isLyrics {
+                if answerLyricsDownloadAsync(url, buffer: buffer, task: task, deliver: { [self] data in
+                    orig.URLSession(session, dataTask: task, didReceiveData: data)
+                    orig.URLSession(session, task: task, didCompleteWithError: nil)
+                }) { return }
                 let originalLyrics = try? Lyrics(serializedBytes: buffer)
 
                 let semaphore = DispatchSemaphore(value: 0)
