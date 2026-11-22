@@ -9,7 +9,6 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 
 echo "==> [1/3] Running ResolveConfigurationSnapshot test..."
 python3 Tests/ResolveConfigurationSnapshot/test.py
-python3 Tests/LyricsBackgroundConfig/test.py
 python3 Tests/NativeLyricsOfflineCache/test.py
 
 echo "==> [2/3] Compiling and running Swift test suites..."

@@ -16,7 +16,6 @@ import patch_lyrics_offline_cache as lyrics_cache
 from export_release_materials import notices
 from pixie_target import PROFILE
 from signing_metadata import embedded_entitlements
-from lyrics_background_config import BACKGROUND_PROCESSING_MARKER, patch_info
 
 APP = 'Payload/Spotify.app/'
 EXECUTABLE = APP + 'Spotify'
@@ -33,7 +32,6 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('input', type=Path)
     parser.add_argument('--output', type=Path)
-    parser.add_argument('--signing-bundle-identifier', help='Bundle identifier used to package the lyrics task')
     parser.add_argument('--report', type=Path)
     args = parser.parse_args()
     with ZipFile(args.input) as source:
@@ -116,14 +114,7 @@ def main():
                 changed = [entry.filename for entry in source.infolist()
                            if (entry.CRC, entry.file_size) !=
                            (result.getinfo(entry.filename).CRC, result.getinfo(entry.filename).file_size)]
-                expected_changes = {EXECUTABLE, EEVEE}
-                info_name = APP + 'Info.plist'
-                expected_info = patch_info(source.read(info_name), signing_bundle_identifier=args.signing_bundle_identifier,
-                                           background_processing=BACKGROUND_PROCESSING_MARKER in result.read(EEVEE))
-                require(result.read(info_name) == expected_info, 'Unexpected app configuration changes')
-                if expected_info != source.read(info_name):
-                    expected_changes.add(info_name)
-                require(set(changed) == expected_changes, 'Unexpected changed original IPA entries')
+                require(set(changed) == {EXECUTABLE, EEVEE}, 'Unexpected changed original IPA entries')
                 packaged = result.read(EXECUTABLE)
                 require(embedded_entitlements(packaged) == embedded_entitlements(original),
                         'Executable entitlements changed')

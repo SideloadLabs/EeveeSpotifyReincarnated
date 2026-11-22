@@ -22,9 +22,8 @@ from export_headers import headers as export_headers
 from export_release_materials import notices, retain_relink_sources
 from companion_build import build_companion
 from patch_offline import patch_reminder
-from patch_lyrics_offline_cache import patch as patch_lyrics_offline_cache
 from signing_metadata import sign_preserving_entitlements
-from lyrics_background_config import BACKGROUND_PROCESSING_MARKER, patch_info
+from patch_lyrics_offline_cache import patch as patch_lyrics_offline_cache
 
 from pixie_target import PROFILE, ROOT, resolve_source, validate_sources
 UUID = bytes.fromhex(PROFILE["uuid"])
@@ -38,7 +37,6 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("ipa", type=Path)
     parser.add_argument("--eevee-dylib", type=Path, help="EeveeSpotify rebuilt from the local sources")
-    parser.add_argument("--signing-bundle-identifier", help="Bundle identifier after signing, if different from Info.plist")
     parser.add_argument("--output", type=Path, default=ROOT.parent / "outputs" /
         datetime.now().strftime("build-%Y%m%d-%H%M%S-%f") / f"Spotify-{PROFILE['spotify_version']}-EeveeSpotify-Pixie-v{PROFILE['pixie_version']}.ipa")
     args = parser.parse_args()
@@ -68,8 +66,7 @@ def main():
 
     with ZipFile(source) as archive:
         info_name = "Payload/Spotify.app/Info.plist"
-        original_info = archive.read(info_name)
-        info = plistlib.loads(original_info)
+        info = plistlib.loads(archive.read(info_name))
         if info.get("CFBundleShortVersionString") != PROFILE["spotify_version"]:
             raise RuntimeError(f"Expected Spotify {PROFILE['spotify_version']}")
         executable = "Payload/Spotify.app/Spotify"
@@ -80,8 +77,6 @@ def main():
             raise RuntimeError("Expected EeveeSpotify's EeveeSpotify.dylib")
         eevee_bytes = eevee.read_bytes() if eevee else archive.read("Payload/Spotify.app/Frameworks/EeveeSpotify.dylib")
 
-    packaged_info = patch_info(original_info, signing_bundle_identifier=args.signing_bundle_identifier,
-                               background_processing=BACKGROUND_PROCESSING_MARKER in eevee_bytes)
     patched, audio = patch_audio_imports(native)
     patched, limits = patch_limits(patched)
     patched, key = patch_key_mode(patched, runtime_selectable=False)
@@ -115,7 +110,7 @@ def main():
                 raise RuntimeError(f"Audio import not redirected: {change['symbol']}")
         with ZipFile(source) as original, ZipFile(output, "w", allowZip64=True) as result:
             for member in original.infolist():
-                replacement = packaged_info if member.filename == info_name else binary.read_bytes() if member.filename == executable else eevee.read_bytes() if eevee and member.filename == "Payload/Spotify.app/Frameworks/EeveeSpotify.dylib" else original.read(member.filename)
+                replacement = binary.read_bytes() if member.filename == executable else eevee.read_bytes() if eevee and member.filename == "Payload/Spotify.app/Frameworks/EeveeSpotify.dylib" else original.read(member.filename)
                 result.writestr(member, replacement)
             result.write(companion, "Payload/Spotify.app/Frameworks/SpotifyAudioProbe.dylib")
             for name, data in notices().items():
@@ -127,10 +122,7 @@ def main():
         with ZipFile(source) as original:
             changed = [item.filename for item in original.infolist()
                        if original.read(item.filename) != check.read(item.filename)]
-            expected_changes = {executable, "Payload/Spotify.app/Frameworks/EeveeSpotify.dylib"}
-            if packaged_info != original_info:
-                expected_changes.add(info_name)
-            if set(changed) != expected_changes:
+            if set(changed) != {executable, "Payload/Spotify.app/Frameworks/EeveeSpotify.dylib"}:
                 raise RuntimeError(f"Unexpected changed IPA entries: {changed}")
             plugins = {name: hashlib.sha256(check.read(name)).hexdigest()
                        for name in original.namelist() if name.endswith('.dylib') and 'EeveeSpotify' not in name}
@@ -145,8 +137,8 @@ def main():
                       "phone_runtime_tested": False,
                       "spotify_uuid": UUID.hex(), "audio_imports": audio,
                       "native_limits": limits, "key_request_mode": key, "native_observation": native_trace,
-                      "export_observation": export, "offline_lyrics_cache": lyrics_cache,
-                      "stale_signature_bytes_removed": stale_bytes, "relink_sources": retain_relink_sources(output),
+                      "offline_lyrics_cache": lyrics_cache,
+                      "export_observation": export, "stale_signature_bytes_removed": stale_bytes, "relink_sources": retain_relink_sources(output),
                       "signing_metadata": signing_metadata,
                       "eevee_native_download_reminder": reminder}
     output.with_suffix('.build.json').write_text(json.dumps(report, indent=2) + '\n')
