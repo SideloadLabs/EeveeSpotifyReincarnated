@@ -24,8 +24,6 @@ run = re.compile(r"0x[0-9a-fA-F]{2}(?:\s*,\s*0x[0-9a-fA-F]{2})+")
 for path in (ROOT / "src").rglob("*"):
     if path.suffix not in {".m", ".c", ".h", ".swift"} or "Generated" in path.parts:
         continue
-    if str(path.relative_to(ROOT / "src")) == "Diagnostics/EncodedAudio.m":
-        continue  # research-only decoder, compiled out (SAP_PROBE_MEDIA_CACHE=0) and UUID-guarded
     text = path.read_text(errors="ignore").lower()
     flattened = [re.sub(r"[^0-9a-f]", "", re.sub(r"0x", "", m.group(0))) for m in run.finditer(text)]
     for version, uuid in foreign.items():
@@ -35,7 +33,7 @@ assert "SAP_SPOTIFY_UUID_BYTES" in (ROOT / "src/Export/ExportObservation.m").rea
 
 # The key owner's file descriptor moved from +0xc8 (9.1.90) to +0x120 (9.1.92); only the generated constant may be used.
 for path in (ROOT / "src").rglob("*.m"):
-    if "Generated" in path.parts or path.name == "EncodedAudio.m":
+    if "Generated" in path.parts:
         continue
     text = path.read_text(errors="ignore")
     assert not re.search(r"owner\s*\+\s*0xc8\b|UINTPTR_MAX-0xc8\b", text), f"{path}: hardcoded 9.1.90 owner descriptor offset"

@@ -1,0 +1,6 @@
+// Removed from NativeDownloads/src/Spotify/SpotifyTransportHooks.m (lines as of f266532)
+
+// --- lines 79-81
+#ifdef SAP_RUNTIME_TESTING
+                    SAPRememberNativeCall(self, serviceName, methodName);
+#endif

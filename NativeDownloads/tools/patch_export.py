@@ -1,11 +1,11 @@
-"""Install Pixie 1.4 export observations in the 9.1.92 Spotify executable.
+"""Install Pixie 1.4 export observations in the target Spotify executable.
 
 Every observation is a guarded register snapshot (ABI 2) taken at a displaced
 function prologue. The original instructions, arguments, results and lifetimes
 are preserved; no executable memory is written at runtime.
 
-Addresses and original bytes come from targets/spotify-9.1.92.json ("export").
-The input must be the current 9.1.92 executable: exact UUID, original
+Addresses and original bytes come from the PIXIE_TARGET profile ("export").
+The input must be that profile's executable: exact UUID, original
 instructions at every entry and zero-filled caves are required. Existing Pixie
 and Eevee patches are neither restored nor replaced.
 """

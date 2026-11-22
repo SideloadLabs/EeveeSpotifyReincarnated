@@ -1,0 +1,7 @@
+// Removed from NativeDownloads/src/Spotify/SpotifyTransport.h (lines as of f266532)
+
+// --- lines 59-62
+#ifdef SAP_RUNTIME_TESTING
+void SAPRememberNativeCall(id endpoint,id serviceName,id methodName);
+NSDictionary *SAPTransportInventoryForTesting(void);
+#endif

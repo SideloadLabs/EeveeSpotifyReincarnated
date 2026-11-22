@@ -75,9 +75,6 @@ NSArray *SAPInstallSpotifyTransportHooks(void) {
                 IMP original = method_getImplementation(method);
                 putHook(cls, command, method, ^id(id self, id serviceName, id methodName, id payload, id callback) {
                     SAPRememberTransport(self, NO, NO);
-#ifdef SAP_RUNTIME_TESTING
-                    SAPRememberNativeCall(self, serviceName, methodName);
-#endif
                     BOOL offline=[serviceName isKindOfClass:NSString.class] && [serviceName isEqual:SAPOfflineService];
                     BOOL read=[methodName isKindOfClass:NSString.class] && ([methodName hasPrefix:@"Get"] || [methodName hasPrefix:@"Subscribe"]);
                     // Stock Offline responses prove this service's route even

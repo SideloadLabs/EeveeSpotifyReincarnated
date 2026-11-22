@@ -1,0 +1,4 @@
+// Removed from NativeDownloads/src/Export/ExportObservation.m: never dispatched.
+
+extern void SAPObserveAesCtr(const uint64_t *,uintptr_t);
+extern void SAPObserveAesBlock(const uint64_t *,uintptr_t);

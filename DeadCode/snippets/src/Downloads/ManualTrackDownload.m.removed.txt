@@ -1,0 +1,13 @@
+// Removed from NativeDownloads/src/Downloads/ManualTrackDownload.m (lines as of f266532)
+
+// --- lines 582-591
+#ifdef SAP_RUNTIME_TESTING
+id SAP14PlayerForTesting(void) { return SAPTransportPlayer(); }
+NSArray *SAP14TransportsForTesting(void) { return SAPTransportCandidates(); }
+void SAP14SeedServices(id seedPlayer, id seedTransport) {
+    SAPTransportSetPlayer(seedPlayer); SAPRememberTransport(seedTransport, NO, NO);
+}
+NSDictionary *SAP14ServiceInventory(void) {
+    return SAPTransportInventoryForTesting();
+}
+#endif

@@ -1,6 +1,6 @@
-"""Generated headers for the Pixie 1.4 export feature on Spotify 9.1.92.
+"""Generated headers for the Pixie 1.4 export feature on the active Spotify target.
 
-Everything comes from targets/spotify-9.1.92.json ("export"). Run
+Everything comes from the PIXIE_TARGET profile ("export"). Run
 generate_export_headers.py to write them or --check to find stale files.
 """
 import struct
