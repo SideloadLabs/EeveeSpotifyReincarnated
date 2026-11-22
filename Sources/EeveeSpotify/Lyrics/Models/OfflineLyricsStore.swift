@@ -29,6 +29,8 @@ final class OfflineLyricsStore {
         private var bytes = 0
 
         var summary: Summary { Summary(tracks: filesByTrack.count, files: entries.count, bytes: bytes) }
+        var trackIds: [String] { Array(filesByTrack.keys) }
+        func names(of ids: Set<String>) -> [String] { entries.compactMap { ids.contains($0.value.id) ? $0.key : nil } }
 
         mutating func put(_ name: String, id: String, bytes length: Int) {
             remove(name)
@@ -291,6 +293,8 @@ final class OfflineLyricsStore {
     }
     func savedTrackIds() -> [String] {
         lock.lock(); defer { lock.unlock() }
+        // Only this store writes the folder, so a built index is the folder's content.
+        if let fileIndex { return fileIndex.trackIds }
         return Array(Set(lyricFiles().map(\.id)))
     }
     func remove(trackIds: [String]) throws {
@@ -302,9 +306,14 @@ final class OfflineLyricsStore {
         loadSuppressed()
         removedDownloads!.formUnion(ids)
         var failure: Error?
-        for file in lyricFiles() where ids.contains(file.id) {
+        // Removing a few tracks must not list thousands of files while the lock is held.
+        let files = fileIndex.map { index in
+            index.names(of: ids).map { (url: directory.appendingPathComponent($0, isDirectory: false), id: "") }
+        } ?? lyricFiles().filter { ids.contains($0.id) }
+        for file in files {
             do {
-                try FileManager.default.removeItem(at: file.url)
+                do { try FileManager.default.removeItem(at: file.url) }
+                catch CocoaError.fileNoSuchFile {}
                 fileIndex?.remove(file.url.lastPathComponent)
                 optionIndex[file.url.lastPathComponent] = nil
                 missingFiles.insert(file.url.lastPathComponent)

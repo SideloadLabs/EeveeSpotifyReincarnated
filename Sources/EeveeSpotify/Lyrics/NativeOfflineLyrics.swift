@@ -22,6 +22,11 @@ final class NativeOfflineLyrics {
         withLyricsLock.lock(); defer { withLyricsLock.unlock() }
         return withLyrics.contains(trackId)
     }
+    /// Cheap check for the track metadata hook, which Spotify calls very often.
+    var hasAnyProviderLyrics: Bool {
+        withLyricsLock.lock(); defer { withLyricsLock.unlock() }
+        return !withLyrics.isEmpty
+    }
     /// Downloaded tracks with no lyrics row of their own: Spotify's offline-lyrics
     /// download failed (it answers 403 here) and the provider found nothing, or our
     /// lyrics were removed while the track stayed downloaded. With the native flag on, Spotify's
@@ -110,8 +115,7 @@ final class NativeOfflineLyrics {
         enabled = true
         observer = NotificationCenter.default.addObserver(forName: .eeveeOfflineLyricsFilesChanged,
             object: nil, queue: nil) { [weak self] note in
-            let ids = note.userInfo?["tracks"] as? [String]
-            self?.queue.async { self?.reconcile(ids) }
+            self?.scheduleReconcile(note.userInfo?["tracks"] as? [String])
         }
         publish(active: true, reason: "native projection verified; Spotify controls its download configuration")
         reconcileAll()
@@ -124,6 +128,27 @@ final class NativeOfflineLyrics {
         writeDebugLog("[Lyrics][NativeOffline] database opened, journal=\(opened.journalMode)")
         database = opened
         return opened
+    }
+    /// A batch download saves one track at a time. Changes that arrive close
+    /// together are committed in one SQLite transaction instead of one each:
+    /// Spotify's own offline-lyrics plugin reads the same database meanwhile.
+    /// Runs on `queue`; reconcile reads the current files when it runs.
+    private var queuedTrackIds = Set<String>()
+    private var queuedAllTracks = false
+    private var reconcileScheduled = false
+    private func scheduleReconcile(_ ids: [String]?) {
+        queue.async {
+            if let ids { self.queuedTrackIds.formUnion(ids) } else { self.queuedAllTracks = true }
+            guard !self.reconcileScheduled else { return }
+            self.reconcileScheduled = true
+            self.queue.asyncAfter(deadline: .now() + 0.5) {
+                self.reconcileScheduled = false
+                let ids = self.queuedAllTracks ? nil : Array(self.queuedTrackIds)
+                self.queuedAllTracks = false
+                self.queuedTrackIds.removeAll()
+                self.reconcile(ids)
+            }
+        }
     }
     func reconcileAll() {
         guard enabled else { return }

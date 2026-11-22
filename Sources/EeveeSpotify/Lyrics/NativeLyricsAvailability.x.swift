@@ -12,14 +12,17 @@ class SPTPlayerTrackLyricsAvailabilityHook: ClassHook<NSObject> {
     typealias Group = NativeLyricsAvailabilityGroup
     static let targetName = "SPTPlayerTrack"
 
-    func metadata() -> [String: String] {
-        var meta = orig.metadata()
-        guard meta["has_lyrics"] != "true",
+    // NSDictionary, not [String: String]: Spotify reads track metadata very often,
+    // and a Swift dictionary would be bridged in and out on every call.
+    func metadata() -> NSDictionary {
+        let meta = orig.metadata()
+        guard NativeOfflineLyrics.shared.hasAnyProviderLyrics,
+              meta["has_lyrics"] as? String != "true",
               let uri = target.perform(NSSelectorFromString("URI"))?.takeUnretainedValue() as? NSURL,
-              let text = uri.absoluteString, text.hasPrefix("spotify:track:") else { return meta }
-        if NativeOfflineLyrics.shared.hasProviderLyrics(trackId: String(text.dropFirst(14))) {
-            meta["has_lyrics"] = "true"
-        }
-        return meta
+              let text = uri.absoluteString, text.hasPrefix("spotify:track:"),
+              NativeOfflineLyrics.shared.hasProviderLyrics(trackId: String(text.dropFirst(14))),
+              let marked = meta.mutableCopy() as? NSMutableDictionary else { return meta }
+        marked["has_lyrics"] = "true"
+        return marked
     }
 }
