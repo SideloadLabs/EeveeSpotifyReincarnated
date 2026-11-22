@@ -223,8 +223,11 @@ class CoreProductStateHook: ClassHook<NSObject> {
 }
 
 class AdsProductStateHook: ClassHook<NSObject> {
-    typealias Group = EeveePremiumForceGroup
-    static let targetName = "SPTAdsProductState"
+    typealias Group = EeveeAdsProductStateGroup
+    static let targetName = classNameFallback(
+        "SPTAdsProductState",
+        "_TtC18AdsPlatform_AdsAPI15AdsProductState"
+    )
 
     func adsEnabled() -> Bool {
         return enableAdsHook ? false : orig.adsEnabled()
@@ -253,6 +256,7 @@ private func swizzleBoolGetter(_ cls: AnyClass, _ name: String, _ value: Bool) {
 }
 
 struct EeveePremiumForceGroup: HookGroup {}
+struct EeveeAdsProductStateGroup: HookGroup {}
 
 private let enableDictRewrite = false
 private let enableDirectGetters = true
@@ -276,4 +280,14 @@ func activateEeveePremiumForce() {
         return
     }
     EeveePremiumForceGroup().activate()
+
+    // Spotify 9.2.2 moved this to a Swift class that no longer exposes the
+    // adsEnabled() selector, so only hook it when the method actually exists.
+    let adsTarget = AdsProductStateHook.targetName
+    if let cls = NSClassFromString(adsTarget) as? NSObject.Type,
+       cls.instancesRespond(to: Selector("adsEnabled")) {
+        EeveeAdsProductStateGroup().activate()
+    } else {
+        NSLog("[FORCE] Skipped AdsProductState hook: %@ lacks adsEnabled()", adsTarget)
+    }
 }
