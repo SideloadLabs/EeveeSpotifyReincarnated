@@ -206,7 +206,7 @@ static NSArray *albumTracks(NSData *data,NSString *uri,NSMutableDictionary *proo
  dispatch_block_t done=^{advance(@"callback");};self.readDeadline=SAPScheduleDeadline(dispatch_get_main_queue(),8,^{advance(@"timeout");});send(done);
 }
 - (void)removeLibrary:(NSArray *)uris next:(dispatch_block_t)next{if(!uris.count){next();return;}NSMutableData *payload=NSMutableData.data;for(NSString *u in uris)[payload appendData:SAPProtoBytes(2,str(1,u))];
- [self command:^(dispatch_block_t done){SAPInvokeServiceOnce(@"spotify.collection_esperanto.proto.CollectionService",SAPLocalized(@"Remove"),payload,^(NSData *d,NSString *e,SAPCommandInvocationDisposition disposition){
+ [self command:^(dispatch_block_t done){SAPInvokeServiceOnce(@"spotify.collection_esperanto.proto.CollectionService",@"Remove",payload,^(NSData *d,NSString *e,SAPCommandInvocationDisposition disposition){
   DELETE_TRACE("command_reply",@{@"method":@"Collection.Remove",@"targets":uris,@"transport_invoked":@(disposition==SAPCommandInvoked),@"response_received":@(d!=nil),@"response_bytes":@(d.length),@"response_shape":fieldShape(SAPProtoFields(d)),@"error":e?:NSNull.null,@"effect_confirmed":@NO});done();});}method:@"Collection.Remove" targets:uris next:next];}
 - (void)nextAlbum:(NSUInteger)index{
  if(![self active])return;if(index>=self.albumURIs.count){[self nextPlaylist:0];return;}NSString *u=self.albumURIs[index];NSDictionary *context=nil;for(NSDictionary *c in self.contexts)if([c[@"uri"]isEqual:u]){context=c;break;}
