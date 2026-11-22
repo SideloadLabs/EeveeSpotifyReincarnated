@@ -80,6 +80,9 @@ final class EeveeOfflineLyricsDownloader: NSObject {
     private var removalStarted: [String: Date] = [:]
     private var requestedAt: [String: Date] = [:]
     private var removedAt: [String: Date] = [:]
+    /// Removed tracks whose saving, cancelling and refresh run once for the whole burst.
+    private var removalBatch: Set<String> = []
+    private var removalFlushScheduled = false
     private var clearedAt = Date.distantPast
     private static func loadKnownLibrary() -> Set<String>? {
         let defaults = UserDefaults.container
@@ -182,6 +185,7 @@ final class EeveeOfflineLyricsDownloader: NSObject {
             forName: Notification.Name("EeveeOfflineLyricsRequested"), object: nil, queue: .main
         ) { [weak self] note in
             guard let self, let tracks = note.userInfo?["tracks"] as? [String] else { return }
+            self.flushRemovals()
             let context = note.userInfo?["context"] as? String ?? ""
             let issued = (note.userInfo?["requested_at"] as? NSNumber).map { Date(timeIntervalSince1970: $0.doubleValue) } ?? Date.distantPast
             // Native album/playlist membership may arrive after the user deleted
@@ -290,6 +294,7 @@ final class EeveeOfflineLyricsDownloader: NSObject {
     }
 
     private func audioTrackDownloaded(_ id: String, at time: Date) {
+        flushRemovals()
         guard UserDefaults.offlineLyricsEnabled, time >= cancelledAt,
               time >= (removedAt[id] ?? .distantPast) else { return }
         requestedAt[id] = max(time, requestedAt[id] ?? .distantPast)
@@ -553,6 +558,7 @@ final class EeveeOfflineLyricsDownloader: NSObject {
                          priority: Operation.QueuePriority = .normal, tracksRefresh: Bool = false,
                          rateLimitRetryIds: Set<String> = [],
                          completion: ((String) -> Void)? = nil) {
+        flushRemovals()
         defer { scheduleRateLimitRetriesIfReady(); changed() }
         let source = UserDefaults.lyricsSource
         let options = UserDefaults.lyricsOptions.downloadOptions
@@ -793,6 +799,7 @@ final class EeveeOfflineLyricsDownloader: NSObject {
     }
     private func removed(_ event: [AnyHashable: Any]) {
         if event["all"] as? Bool == true {
+            flushRemovals()
             Self.deleteSavedLyrics { error in if let error { writeDebugLog("[Lyrics] failed to clear offline lyrics: \(error)") } }
             NativeOfflineLyrics.shared.forgetNoLyrics(trackIds: nil)
             LyricsNotFoundStore.shared.forget(nil)
@@ -815,11 +822,26 @@ final class EeveeOfflineLyricsDownloader: NSObject {
         completedDuringLibraryRead.subtract(ids)
         completedDuringManualScan.subtract(ids)
         knownDownloadedIds?.subtract(ids)
+        // A mass removal posts one event per track. Writing the library, the store files,
+        // SQLite and the settings UI once per track made the main thread stutter, so the
+        // burst is applied once, before any later download event (see flushRemovals).
+        removalBatch.formUnion(ids)
+        guard !removalFlushScheduled else { return }
+        removalFlushScheduled = true
+        DispatchQueue.main.async { [weak self] in self?.flushRemovals() }
+    }
+    /// Applies removals collected from `removed`. Every path that can start or show
+    /// downloads calls it first, so events keep the order in which they arrived.
+    private func flushRemovals() {
+        removalFlushScheduled = false
+        guard !removalBatch.isEmpty else { return }
+        let removedIds = removalBatch
+        removalBatch.removeAll()
+        let ids = Array(removedIds)
         persistKnownLibrary()
         do { try OfflineLyricsStore.shared.remove(trackIds: ids) }
         catch { writeDebugLog("[Lyrics] failed to remove offline lyrics: \(error)") }
         foreground.recheckWaitingRequests()
-        let removedIds = Set(ids)
         for job in pending.values.filter({ removedIds.contains($0.id) }) {
             pending[job.key] = nil
             rateLimitedJobs[job.key] = nil
@@ -836,6 +858,7 @@ final class EeveeOfflineLyricsDownloader: NSObject {
 
     @objc static func settingsSnapshot() -> NSDictionary {
         let downloader = shared
+        downloader.flushRemovals()
         downloader.refreshStatisticsIfNeeded()
         let visibleBatch = downloader.batch.isEmpty ? downloader.refreshProgress?.snapshot ?? [:] : downloader.batch
         return ["library_known": downloader.knownDownloadedIds != nil, "library_total": downloader.knownDownloadedIds?.count ?? 0, "library_missing": downloader.missingIds.count,
@@ -846,6 +869,7 @@ final class EeveeOfflineLyricsDownloader: NSObject {
                 "tracks": downloader.savedTracks, "bytes": downloader.savedBytes, "source": UserDefaults.lyricsSource.description, "pending": downloader.pending.count, "batch": visibleBatch] as NSDictionary
     }
     @objc static func setDownloadsEnabled(_ enabled: Bool) {
+        shared.flushRemovals()
         let wasEnabled = UserDefaults.offlineLyricsEnabled
         UserDefaults.offlineLyricsEnabled = enabled
         if enabled != wasEnabled { EeveePixieObserveDownloadCompletion(enabled) }
@@ -856,6 +880,7 @@ final class EeveeOfflineLyricsDownloader: NSObject {
     }
     @objc(deleteSavedLyricsWithCompletion:)
     static func deleteSavedLyrics(completion: @escaping (NSString?) -> Void) {
+        shared.flushRemovals()
         let ids = shared.pending.values.map(\.id) + NativeOfflineLyrics.placeholderTrackIdsForRetry()
         shared.clearedAt = Date()
         shared.cancelPending()
@@ -944,6 +969,7 @@ final class EeveeOfflineLyricsDownloader: NSObject {
         }
     }
     private func startBatch(_ needed: [[String: String]], catalog: [[String: String]], token: UUID) {
+        flushRemovals()
         guard !needed.isEmpty else {
             batchID = nil; batch = [:]; scheduleRateLimitRetriesIfReady(); changed(); return
         }

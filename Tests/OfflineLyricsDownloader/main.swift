@@ -8,6 +8,8 @@ func pump(until condition: () -> Bool, _ message: String) {
     while !condition() && Date() < deadline { RunLoop.current.run(until: Date().addingTimeInterval(0.01)) }
     check(condition(), message)
 }
+/// Removal events are applied together on the next main-queue turn.
+func drainMain() { RunLoop.current.run(until: Date().addingTimeInterval(0.05)) }
 
 // Deliberately slow storage: a settings refresh must stay responsive even while
 // another queue is stuck reading a cold library. Compile the real downloader.
@@ -81,7 +83,9 @@ final class OfflineLyricsStore {
     func tracks(in context: String) -> [String] { [] }
     func allowDownloads(trackIds: [String]) throws { suppressed.subtract(trackIds); removedDownloads.subtract(trackIds) }
     func invalidatePendingWrites() {}
-    func remove(trackIds: [String]) throws { removedDownloads.formUnion(trackIds) }
+    var removeCalls = 0
+    var removeSizes: [Int] = []
+    func remove(trackIds: [String]) throws { removeCalls += 1; removeSizes.append(trackIds.count); removedDownloads.formUnion(trackIds) }
     func removeAll(additionallySuppressing: [String]) throws { suppressed.formUnion(additionallySuppressing) }
 }
 final class KaraokeLyricsStore {
@@ -94,7 +98,8 @@ final class NativeOfflineLyrics {
     static var placeholders: [String] = []
     static func placeholderTrackIdsForRetry() -> [String] { placeholders }
     var forgotten: [String] = []
-    func forgetNoLyrics(trackIds: [String]?) { forgotten += trackIds ?? [] }
+    var forgetCalls = 0
+    func forgetNoLyrics(trackIds: [String]?) { forgetCalls += 1; forgotten += trackIds ?? [] }
     func providerHasNoLyrics(trackId: String) {}
 }
 struct Lyrics {
@@ -558,10 +563,13 @@ emitDownload(removedOnly)
 NotificationCenter.default.post(name: removal, object: nil, userInfo: [
     "context": "spotify:track:\(removedOnly)", "token": "track-removal", "phase": "begin"
 ])
+drainMain()
+check(NativeOfflineLyrics.shared.forgotten.contains(removedOnly), "A per-track removal was not applied")
 let forgottenBeforeLateReply = NativeOfflineLyrics.shared.forgotten.count
 NotificationCenter.default.post(name: removal, object: nil, userInfo: [
     "context": album, "token": "album-removal", "phase": "resolved", "tracks": [uri]
 ])
+drainMain()
 check(NativeOfflineLyrics.shared.forgotten.count == forgottenBeforeLateReply,
       "Late album removal deleted lyrics after a newer download")
 libraryCallback?([])
@@ -634,6 +642,7 @@ check(launchAttempts() == [1, 1, 2, 2, 4], "The next day did not retry exactly t
 NotificationCenter.default.post(name: removal, object: nil, userInfo: [
     "context": "spotify:track:\(definiteMiss)", "token": "forget-removed", "phase": "begin"
 ])
+drainMain()
 check(!outcomes.entries(source: launchSource).contains(definiteMiss), "A removed download kept its remembered result")
 print("Launches skip known lyrics results and retry temporary failures only the next day")
 
@@ -649,3 +658,43 @@ outcomes.providerRefused(source: launchSource, now: yesterday)
 launch([afterRefusalTrack])
 check(attempts(afterRefusalTrack) == 1, "The provider was not asked again the next day")
 print("A rejected provider key pauses automatic lyrics downloads until the next day")
+
+// Pixie posts one removal per selected track. The burst must write the store, SQLite
+// projection and settings once instead of once per track, and still remove every track.
+// A cold launch above left a second downloader observing, so count calls per removal first.
+func postRemoval(_ id: String, token: String) {
+    NotificationCenter.default.post(name: removal, object: nil, userInfo: [
+        "context": "spotify:track:\(id)", "token": token, "phase": "begin", "tracks": ["spotify:track:\(id)"]
+    ])
+}
+var callsBefore = OfflineLyricsStore.shared.removeCalls
+postRemoval(String(format: "%022d", 9_099_999), token: "calibrate")
+drainMain()
+let callsPerRemoval = OfflineLyricsStore.shared.removeCalls - callsBefore
+check(callsPerRemoval >= 1, "A single removal was not applied")
+let massRemoved = (0..<300).map { String(format: "%022d", 9_100_000 + $0) }
+callsBefore = OfflineLyricsStore.shared.removeCalls
+let forgetCallsBefore = NativeOfflineLyrics.shared.forgetCalls
+for id in massRemoved { postRemoval(id, token: "mass-\(id)") }
+check(OfflineLyricsStore.shared.removeCalls == callsBefore, "A mass removal wrote the store once per track")
+drainMain()
+check(OfflineLyricsStore.shared.removeCalls == callsBefore + callsPerRemoval
+      && NativeOfflineLyrics.shared.forgetCalls == forgetCallsBefore + callsPerRemoval
+      && OfflineLyricsStore.shared.removeSizes.suffix(callsPerRemoval).allSatisfy { $0 == massRemoved.count },
+      "A mass removal was not applied as one batch")
+check(Set(massRemoved).isSubset(of: OfflineLyricsStore.shared.removedDownloads)
+      && Set(massRemoved).isSubset(of: Set(NativeOfflineLyrics.shared.forgotten)),
+      "A mass removal lost some of its tracks")
+// A download that follows the burst sees it applied first and keeps its own request.
+let massRedownload = massRemoved[0]
+NotificationCenter.default.post(name: removal, object: nil, userInfo: [
+    "context": "spotify:track:\(massRedownload)", "token": "mass-again", "phase": "begin"
+])
+callsBefore = OfflineLyricsStore.shared.removeCalls
+emitDownload(massRedownload, at: Date().addingTimeInterval(1))
+check(OfflineLyricsStore.shared.removeCalls == callsBefore + callsPerRemoval,
+      "A download event did not apply the earlier removal first")
+drainMain()
+check(OfflineLyricsStore.shared.removeCalls == callsBefore + callsPerRemoval,
+      "An already applied removal ran again")
+print("A mass removal is applied once and before later download events")
