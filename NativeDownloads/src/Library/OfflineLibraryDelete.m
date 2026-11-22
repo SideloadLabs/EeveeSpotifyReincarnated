@@ -136,7 +136,7 @@ static NSArray *albumTracks(NSData *data,NSString *uri,NSMutableDictionary *proo
   if(!library){retained=YES;[self note:@"Saved-library removal was not confirmed by an exact native readback." uri:u];}
   NSString *detail=[self.notes[u]array]?[[self.notes[u]array]componentsJoinedByString:@" "]:@"";
   [results addObject:@{@"uri":u,@"name":self.rows[u][@"name"]?:u,@"offline_removed":@(offline),@"library_removed":@(library),@"detail":detail}];}
- NSString *finalError=error?:retained?@"Spotify did not confirm removal of every selected track. Retained and uncertain results are listed individually.":nil;
+ NSString *finalError=error?:retained?@"Spotify did not confirm removal of every selected track.":nil;
  [self traceEntries:results stage:"result_items" facts:@{@"readback_required":@YES}];
  DELETE_TRACE("finished",@{@"cancelled":@(self.cancelled),@"selected_count":@(self.uris.count),@"unconfirmed_results":@(retained),@"verification_attempts":@(self.traceVerificationCount),@"error":finalError?:NSNull.null,@"success":@(!error.length&&!retained),@"filesystem_files_deleted_directly":@NO});
  void(^callback)(NSArray *,NSString *)=self.completion;self.completion=nil;self.event=nil;self.progress.cancellationHandler=nil;self.keepAlive=nil;
