@@ -1,6 +1,6 @@
 """Guard native restriction updates in the exact supplied Spotify 9.1.92 binary.
 
-A small leaf trampoline in verified zero-filled __TEXT header padding clamps the
+A small leaf trampoline in verified zero-filled __TEXT padding (header, or the tail after the last section) clamps the
 six-argument setter's two nonnegative music limits before the original setter.
 No runtime code writes, extra imports, polling, key material or episode changes.
 """
@@ -89,10 +89,16 @@ def patch_at(data, setter, cave, expected):
         return fileoff + address - vm
     stub = trampoline(cave, setter)
     start, target = offset(setter, len(expected)), offset(cave, len(stub))
-    if protection & 5 != 5 or not commands_end <= target or target + len(stub) > first_section:
-        raise ValueError('No executable header padding')
+    # A branch reaches +-128 MiB. Where the setter is further than that from the header padding
+    # (Spotify 9.2.2), the trampoline lives in the unused __TEXT space after the last section.
+    from patch_native_trace import text_tail_padding  # imported late: that module imports this one
+    tail_start, tail_end = text_tail_padding(data)
+    in_header = commands_end <= target and target + len(stub) <= first_section
+    in_tail = tail_start <= target and target + len(stub) <= tail_end
+    if protection & 5 != 5 or not (in_header or in_tail):
+        raise ValueError('No executable header or tail padding')
     if any(data[target:target+len(stub)]):
-        raise ValueError('Header padding occupied')
+        raise ValueError('Trampoline padding occupied')
     if data[start:start+len(expected)] != expected:
         raise ValueError('Native setter bytes differ')
     result = bytearray(data)

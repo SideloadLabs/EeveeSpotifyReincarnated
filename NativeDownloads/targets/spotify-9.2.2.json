@@ -1,0 +1,335 @@
+{
+  "id": "eevee-spotify-9.2.2-pixie-1.4",
+  "spotify_version": "9.2.2",
+  "spotify_build": "920202587",
+  "uuid": "bedf0071845d39bbb2d096f9a8095e66",
+  "pixie_version": "1.4",
+  "eevee_version": "7.5.0",
+  "minimum_ios": "15.0",
+  "preferred_address": "0x100000000",
+  "native": {
+    "setter": "0x1098eb350",
+    "setter_cave": "0x10d11a900",
+    "setter_original": "e6031eaa5ace3894fe0306aafd7b11a9",
+    "manager_vtable": "0x10d9cc718",
+    "window": "0x1098d06d8",
+    "call_site": "0x1098d06e4",
+    "window_original": "e4e30191e5c30091e00317aa2200805220013fd6a18301d1",
+    "provider": "0x10972d67c",
+    "provider_head": "ff0306d1fc6f12a9fa6713a9f85f14a9f65715a9f44f16a9fd7b17a9fdc30591f50305aaf40300aafc0308aa08404239",
+    "mapping": "0x10972d6e0",
+    "mapping_original": "f60301aa5f080071480080520815881a5f00007113159f1a",
+    "selector_cave": "0x10d11a930",
+    "dlsym_stub": "0x10a868de0",
+    "dlsym_stub_head": "909701f0106646f900021fd6",
+    "render_callback": "0x109f58804",
+    "manager_field_shift": 136,
+    "manager_setter_slot": 69
+  },
+  "groups": {
+    "transport": [
+      "Spotify/SpotifyTransportRegistry.m",
+      "Spotify/SpotifyTransportHooks.m",
+      "Spotify/SpotifyServiceCalls.m",
+      "Spotify/SpotifyCommands.m"
+    ],
+    "manual_download": [
+      "Downloads/ManualTrackDownload.m",
+      "@transport"
+    ],
+    "artist_session": [
+      "Downloads/ArtistDownloadSession.m",
+      "Downloads/ArtistSessionOwnership.m",
+      "Downloads/ArtistSessionState.m",
+      "Downloads/ArtistSessionObservation.m",
+      "Downloads/ArtistSessionScheduler.m",
+      "Downloads/ArtistSessionCancellation.m",
+      "Downloads/ReleaseDownloadOperation.m"
+    ],
+    "playlists": [
+      "Playlists/PlaylistTaskRegistry.m",
+      "Playlists/PlaylistRepository.m",
+      "Playlists/PlaylistDownloadTask.m",
+      "Playlists/IncrementalPlaylistTask.m",
+      "Playlists/ReleaseItemObservation.m"
+    ],
+    "journal": [
+      "Diagnostics/TrackJournal.m",
+      "Diagnostics/JournalFormatting.m",
+      "Diagnostics/JournalWriter.m",
+      "Diagnostics/JournalWireDecoder.m",
+      "Diagnostics/JournalObservation.m"
+    ],
+    "artist_ui": [
+      "UI/ArtistDownloadsUI.m",
+      "Artwork/ArtistArtworkLoader.m",
+      "UI/ArtistDownloadComponents.m",
+      "UI/ArtistPageButton.m",
+      "UI/PlaylistPickerController.m"
+    ],
+    "audio_export": [
+      "Export/TrackExport.m",
+      "Export/TrackCacheExport.m",
+      "Export/CacheStorageKey.m",
+      "Export/CacheEnvelope.c",
+      "Export/OggExport.c",
+      "Export/MediaDecode.c",
+      "Export/NativeCacheMap.m",
+      "Export/ExportObservation.m",
+      "Export/NativeMediaKeyPath.m",
+      "Export/ExportAlbumMetadata.m",
+      "Export/ExportNativeAdapters.m",
+      "Export/OggArtwork.c",
+      "Export/ExportArtworkMetadata.m",
+      "Export/ExportArtwork.m",
+      "Export/ExportLibrary.m",
+      "Export/ExportKeyVault.m",
+      "Export/ExportKeyStore.m",
+      "Export/M4AExport.m",
+      "Export/NativeShareHooks.m",
+      "Export/ExportShareFolder.m",
+      "Export/ExportCacheIndex.m",
+      "Export/TemporaryOfflineExport.m",
+      "Export/ShareFilePromise.m",
+      "Export/ShareCompletionRelay.m",
+      "Export/M4AConversionQueue.m",
+      "Export/OggInspection.c",
+      "Export/OggValidationTrace.m"
+    ],
+    "offline_library": [
+      "UI/PixiePageController.m",
+      "Library/OfflineLibraryCatalog.m",
+      "Library/OfflineLibraryDelete.m",
+      "Library/SpotifyCacheClear.m",
+      "Library/OfflineLibraryExport.m",
+      "Library/OfflineLibraryPackage.m",
+      "Library/OfflineLibraryUI.m",
+      "Library/OfflineLibraryChrome.m",
+      "Library/OfflineLibraryProgress.m"
+    ]
+  },
+  "companion_sources": [
+    "Diagnostics/AudioProbe.c",
+    "Diagnostics/DiagnosticsPreferences.m",
+    "UI/Localization.m",
+    "Spotify/OfflineFlags.m",
+    "Spotify/WireProto.m",
+    "Spotify/OfflineConfig.m",
+    "Diagnostics/TrackJournal.m",
+    "Diagnostics/NativeErrorLog.m",
+    "Diagnostics/PlayerTrace.m",
+    "Spotify/NativeOfflineAdapter.m",
+    "Spotify/NativeAlbumCommand.m",
+    "Downloads/ManualTrackDownload.m",
+    "UI/PixieManagerActions.m",
+    "UI/PixieManagerSettings.m",
+    "UI/PixiePageController.m",
+    "Diagnostics/EncodedAudio.m",
+    "Catalog/ArtistMetadata.m",
+    "Downloads/ArtistDownloadSession.m",
+    "UI/ArtistDownloadsUI.m",
+    "UI/ArtistPageButton.m",
+    "Playlists/PlaylistTaskRegistry.m",
+    "Diagnostics/SupportLogSerializer.m",
+    "Devices/OfflineCompatibilityChecks.m",
+    "Devices/OfflineDeviceManager.m",
+    "Devices/NativeDownloadQuality.m",
+    "Diagnostics/DiagnosticTrace.m",
+    "Diagnostics/TracePlatform.m",
+    "Diagnostics/NativeKeyTrace.m",
+    "Runtime/PixieBootstrap.m",
+    "Diagnostics/JournalFormatting.m",
+    "Artwork/ArtistArtworkLoader.m",
+    "UI/ArtistDownloadComponents.m",
+    "UI/PlaylistPickerController.m",
+    "Spotify/SpotifyTransportRegistry.m",
+    "Spotify/SpotifyTransportHooks.m",
+    "Spotify/SpotifyServiceCalls.m",
+    "Spotify/SpotifyCommands.m",
+    "Downloads/ArtistSessionOwnership.m",
+    "Downloads/ArtistSessionState.m",
+    "Downloads/ArtistSessionObservation.m",
+    "Downloads/ArtistSessionScheduler.m",
+    "Downloads/ArtistSessionCancellation.m",
+    "Downloads/ReleaseDownloadOperation.m",
+    "Diagnostics/SupportLogExporter.m",
+    "Playlists/PlaylistRepository.m",
+    "Playlists/PlaylistDownloadTask.m",
+    "Playlists/IncrementalPlaylistTask.m",
+    "Playlists/ReleaseItemObservation.m",
+    "Diagnostics/JournalWriter.m",
+    "Diagnostics/JournalWireDecoder.m",
+    "Diagnostics/JournalObservation.m",
+    "Export/TrackExport.m",
+    "Export/TrackCacheExport.m",
+    "Export/CacheStorageKey.m",
+    "Export/CacheEnvelope.c",
+    "Export/OggExport.c",
+    "Export/MediaDecode.c",
+    "Export/NativeCacheMap.m",
+    "Export/ExportObservation.m",
+    "Export/NativeMediaKeyPath.m",
+    "Export/ExportAlbumMetadata.m",
+    "Export/ExportNativeAdapters.m",
+    "Export/OggArtwork.c",
+    "Export/ExportArtworkMetadata.m",
+    "Export/ExportArtwork.m",
+    "Export/ExportLibrary.m",
+    "Export/ExportKeyVault.m",
+    "Export/ExportKeyStore.m",
+    "Export/M4AExport.m",
+    "Export/NativeShareHooks.m",
+    "Export/ExportShareFolder.m",
+    "Export/ExportCacheIndex.m",
+    "Export/TemporaryOfflineExport.m",
+    "Export/ShareFilePromise.m",
+    "Export/ShareCompletionRelay.m",
+    "Library/OfflineLibraryCatalog.m",
+    "Library/OfflineLibraryDelete.m",
+    "Library/SpotifyCacheClear.m",
+    "Library/OfflineLibraryExport.m",
+    "Library/OfflineLibraryPackage.m",
+    "Library/OfflineLibraryUI.m",
+    "Library/OfflineLibraryChrome.m",
+    "Library/OfflineLibraryProgress.m",
+    "Export/M4AConversionQueue.m",
+    "Export/OggInspection.c",
+    "Export/OggValidationTrace.m"
+  ],
+  "supported_packaging": [
+    "ipa-companion"
+  ],
+  "unsupported_packaging": [
+    "jailbreak-deb"
+  ],
+  "trace_points": [
+    {
+      "name": "Request",
+      "address": "0x1098d06e4",
+      "original": "02008052",
+      "kind": 0,
+      "cave": "0x10d11a9f0"
+    },
+    {
+      "name": "Success",
+      "address": "0x1098d0a10",
+      "original": "ff4301d1f44f03a9fd7b04a9fd030191",
+      "kind": 1,
+      "cave": "0x10d11aae0"
+    },
+    {
+      "name": "Failure",
+      "address": "0x1098d0a98",
+      "original": "ff4301d1f44f03a9fd7b04a9fd030191",
+      "kind": 2,
+      "cave": "0x10d11abe0"
+    }
+  ],
+  "export": {
+    "comment": "Spotify 9.2.2 sites located by structure against the 9.2.0 binary (normalised ARM64 matching, then call-graph and disassembly checks); every cave is in the zero padding after the last __TEXT section, the header padding being out of branch range.",
+    "cave_base": "0x10d11ace0",
+    "cave_stride": 512,
+    "points": {
+      "CacheKey": {
+        "address": "0x1092c36e8",
+        "original": "ff0301d1fd7b03a9fdc30091e20308aa",
+        "kind": 0,
+        "cave": "0x10d11ace0"
+      },
+      "StreamKey": {
+        "address": "0x109ee7bcc",
+        "original": "ff0302d1f65705a9f44f06a9fd7b07a9",
+        "kind": 1,
+        "cave": "0x10d11ae80"
+      },
+      "CacheCipher": {
+        "address": "0x10936b554",
+        "original": "f657bda9f44f01a9fd7b02a9fd830091",
+        "kind": 2,
+        "cave": "0x10d11b020"
+      },
+      "CacheCipherApple": {
+        "address": "0x10936b8a8",
+        "original": "fa67bba9f85f01a9f65702a9f44f03a9",
+        "kind": 3,
+        "cave": "0x10d11b1c0"
+      },
+      "MediaKeyPath": {
+        "address": "0x1098d054c",
+        "original": "ff4305d1fc6f0fa9fa6710a9f85f11a9",
+        "kind": 4,
+        "cave": "0x10d11b360"
+      },
+      "MediaKeyBlob": {
+        "address": "0x10993139c",
+        "original": "f657bda9f44f01a9fd7b02a9fd830091",
+        "kind": 5,
+        "cave": "0x10d11b500"
+      },
+      "MediaContext": {
+        "address": "0x109361888",
+        "original": "a15e4039",
+        "kind": 6,
+        "cave": "0x10d11b6a0"
+      },
+      "MediaRecord": {
+        "address": "0x10993142c",
+        "original": "fd7b42a9",
+        "kind": 7,
+        "cave": "0x10d11b830"
+      },
+      "UnsealedMediaKey": {
+        "address": "0x109362d60",
+        "original": "e003803d",
+        "kind": 10,
+        "cave": "0x10d11b9c0"
+      }
+    },
+    "windows": {
+      "layout0": {
+        "address": "0x1098d0a20",
+        "bytes": "130040f92000c03de003803d20c0c03ce0c3803c688640f8000540f9ff2300b9e103009195ffff97"
+      },
+      "layout1": {
+        "address": "0x1098d08bc",
+        "bytes": "600e40f9689240f9090040f9290940f90111009120013fd6"
+      },
+      "layout2": {
+        "address": "0x10a7bc700",
+        "bytes": "150040f9e00315aa130442f8"
+      },
+      "layout3": {
+        "address": "0x10a7bc844",
+        "bytes": "e00313aa9da2dc17e00313aa"
+      },
+      "cache_storage_owner": {
+        "address": "0x1092c1888",
+        "bytes": "e2b30291e02340f9e1031caa61ae0294e81740f9000140f9ea644f9488654f94000340f9e7644f9485654f94e023019169a9029434008052b4831638e0230191a16302d122008052f1ad0294e0230191e1b3029182028052edad0294e023019161e20a9123ae0294"
+      },
+      "unseal_guard": {
+        "address": "0x109362d58",
+        "bytes": "dd1d4d94c04af83ce003803d"
+      },
+      "unseal_caller": {
+        "address": "0x1099313fc",
+        "bytes": "000540f9080040f9081540f921510091e20313aa00013fd6"
+      },
+      "share_wrapper_guard": {
+        "address": "0x100ed2b88",
+        "bytes": "e00314aa6da1b595010080d2f40318aaed000094"
+      },
+      "share_constructor_guard": {
+        "address": "0x100ed2fac",
+        "bytes": "e00314aae20313aae30316aaed89b595"
+      },
+      "cache_key_body": {
+        "address": "0x1092c36f8",
+        "bytes": "08c842b9e81300b908e00a910001c03de003803d2000c03de043813c"
+      }
+    }
+  },
+  "swift_sources": [
+    "Export/NativeShareBridge.swift"
+  ],
+  "audio_export": "experimental15-native-unseal"
+}

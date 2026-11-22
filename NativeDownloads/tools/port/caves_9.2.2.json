@@ -1,0 +1,21 @@
+{
+ "trace": {
+  "Request": "0x10d11a9f0",
+  "Success": "0x10d11aae0",
+  "Failure": "0x10d11abe0"
+ },
+ "points": {
+  "CacheKey": "0x10d11ace0",
+  "StreamKey": "0x10d11ae80",
+  "CacheCipher": "0x10d11b020",
+  "CacheCipherApple": "0x10d11b1c0",
+  "MediaKeyPath": "0x10d11b360",
+  "MediaKeyBlob": "0x10d11b500",
+  "MediaContext": "0x10d11b6a0",
+  "MediaRecord": "0x10d11b830",
+  "UnsealedMediaKey": "0x10d11b9c0"
+ },
+ "setter_cave": "0x10d11a900",
+ "selector_cave": "0x10d11a930",
+ "cave_base": "0x10d11ace0"
+}

@@ -38,10 +38,11 @@ def main():
         info = plistlib.loads(source.read(APP + 'Info.plist'))
         require(info['CFBundleShortVersionString'] == PROFILE['spotify_version'], 'Wrong Spotify version')
         require(quota.layout(original)[3] == quota.UUID, 'Wrong Spotify UUID')
-        # The manager destructor publishes this table. Its unchanged slot 65
-        # points to the relocated six-argument restriction setter.
+        # The manager destructor publishes this table. One of its slots (65 in 9.2.0,
+        # 69 in 9.2.2) points to the relocated six-argument restriction setter.
         manager_table = int(PROFILE['native']['manager_vtable'], 16)
-        pointer = struct.unpack_from('<Q', original, manager_table - quota.PREFERRED + 65 * 8)[0]
+        setter_slot = int(PROFILE['native'].get('manager_setter_slot', 65))
+        pointer = struct.unpack_from('<Q', original, manager_table - quota.PREFERRED + setter_slot * 8)[0]
         require(pointer & 0xfffffffff == quota.SETTER - quota.PREFERRED, 'Manager vtable changed')
         render_offset = int(PROFILE['native']['render_callback'], 16) - quota.PREFERRED
         require(original[render_offset:render_offset+16] == bytes.fromhex('a3050035f85fbca9f65701a9f44f02a9'),
@@ -93,7 +94,8 @@ def main():
             raise ValueError('Repeated trace patch was accepted')
         report = {'spotify_version': PROFILE['spotify_version'], 'pixie_version': PROFILE['pixie_version'],
                   'spotify_uuid': quota.UUID.hex(), 'manager_vtable': hex(manager_table),
-                  'manager_setter_slot': 65, 'restriction_fields_unchanged': ['0x2b8', '0x2c0', '0x2c8', '0x2d0', '0x2d8'],
+                  'manager_setter_slot': setter_slot,
+                  'restriction_fields_unchanged': [hex(0x2b0 + int(PROFILE['native'].get('manager_field_shift', 0)) + 8 * i) for i in range(5)],
                   'hook_target_names_present': required, 'rejected_invalid_patch_cases': rejected,
                   'quota': quota_report, 'diagnostic_boundaries': trace_report, 'export_boundaries': export_report,
                   'phone_runtime_tested': False}
