@@ -20,6 +20,18 @@ static NSString * const SAPOfflineUnknownAlbum = @"Unknown album";
 static NSString *SAPOfflineString(id value, NSString *fallback) {
     return [value isKindOfClass:NSString.class] && [value length] ? value : fallback;
 }
+// The delete worker keeps a long note per track. The dialog shows one short reason per kind of outcome,
+// with a count; the per-track notes stay in the diagnostics trace.
+static NSString *SAPRemovalReason(NSString *detail) {
+    NSString *text=detail.lowercaseString;
+    if([text containsString:@"unselected"]||[text containsString:@"membership"]||([text containsString:@"policy"]&&[text containsString:@"preserved"])||
+       [text containsString:@"album was preserved"]||[text containsString:@"album as saved"])
+        return @"also in a downloaded playlist or album with tracks you did not select";
+    if([text containsString:@"could not be read"])return @"Spotify's current state could not be read";
+    if([text containsString:@"saved-library removal"])return @"Spotify did not confirm the library removal";
+    if([text containsString:@"still reports a download"])return @"Spotify still reports the download";
+    return @"Spotify did not confirm the removal";
+}
 static NSString *SAPOfflineArtistKey(NSDictionary *row) {
     NSString *uri = SAPOfflineString(row[@"artist_uri"], @"");
     return uri.length ? uri : [NSString stringWithFormat:@"%@|%@", SAPOfflineString(row[@"artist_name"], SAPOfflineUnknownArtist), SAPOfflineString(row[@"uri"], @"")];
@@ -342,18 +354,27 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
             [self showMessage:@"Still downloading" detail:@"This album is still downloading. Wait until the download finishes, then delete the tracks."];
             return;
         }
-        NSUInteger offline=0,library=0;NSMutableArray *details=NSMutableArray.array;
+        NSUInteger offline=0,library=0;NSMutableArray *reasons=NSMutableArray.array;NSMutableDictionary *reasonCounts=NSMutableDictionary.dictionary;
         for(NSDictionary *result in results) {
             BOOL local=[result[@"offline_removed"]isEqual:@YES],saved=[result[@"library_removed"]isEqual:@YES];offline+=local;library+=saved;
-            if((!local||!saved)&&details.count<5)[details addObject:[NSString stringWithFormat:@"%@: %@",SAPOfflineString(result[@"name"],@"Track"),SAPOfflineString(result[@"detail"],@"Removal was not confirmed.")]];
+            if(!local||!saved) {
+                NSString *reason=SAPRemovalReason(SAPOfflineString(result[@"detail"],@""));
+                if(!reasonCounts[reason])[reasons addObject:reason];
+                reasonCounts[reason]=@([reasonCounts[reason]unsignedIntegerValue]+1);
+            }
         }
         self.tracks=SAPOfflineLibraryRemainingTracks(self.tracks,selection,results);SAPUpdateOfflineLibraryCachedTracks(self.tracks);self.artists=[SAPOfflineLibraryController artistRowsForTracks:self.tracks];
         self.selecting=NO;[self.selectedURIs removeAllObjects];[self.selectedArtistKeys removeAllObjects];[self refresh];
         BOOL complete=offline==selection.count&&library==selection.count&&!error.length;
         if(complete){[self showDeleted:@"Deleted" detail:@"Clear Spotify's cache to fully remove what you just deleted." offerCacheClear:YES];return;}
-        NSString *message=[NSString stringWithFormat:@"Offline removal confirmed: %lu / %lu\nLibrary removal confirmed: %lu / %lu",(unsigned long)offline,(unsigned long)selection.count,(unsigned long)library,(unsigned long)selection.count];
-        if(details.count)message=[message stringByAppendingFormat:@"\n\n%@",[details componentsJoinedByString:@"\n"]];
-        if(error.length)message=[message stringByAppendingFormat:@"\n\n%@",error];
+        NSString *message=[NSString stringWithFormat:@"Removed from the library: %lu / %lu\nRemoved offline: %lu / %lu",(unsigned long)library,(unsigned long)selection.count,(unsigned long)offline,(unsigned long)selection.count];
+        if(reasons.count==1)message=[message stringByAppendingFormat:@"\n\nNot removed: %@.",reasons[0]];
+        else if(reasons.count) {
+            message=[message stringByAppendingString:@"\n\nNot removed:"];
+            for(NSString *reason in reasons)message=[message stringByAppendingFormat:@"\n%@ tracks: %@",reasonCounts[reason],reason];
+        }
+        // The generic "did not confirm" error repeats what the reasons above already say.
+        if(error.length&&![error hasPrefix:@"Spotify did not confirm removal of every selected track"])message=[message stringByAppendingFormat:@"\n\n%@",error];
         [self showDeleted:@"Removal incomplete" detail:message offerCacheClear:offline>0];
     });
     [self refreshProgress];
