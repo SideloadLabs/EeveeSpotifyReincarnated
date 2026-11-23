@@ -1,14 +1,14 @@
-name: Pixie 1.4 — Spotify 9.2.0
+name: Pixie 1.4 — Spotify 9.2.0 and 9.2.2
 
 on:
   push:
-    paths: ['NativeDownloads/**', 'Sources/**', 'Makefile', '.github/workflows/native-downloads.yml']
+    paths: ['NativeDownloads/**', 'Sources/**', 'Tests/PixieStartupLogging/**', 'Makefile', '.github/workflows/native-downloads.yml']
   pull_request:
-    paths: ['NativeDownloads/**', 'Sources/**', 'Makefile', '.github/workflows/native-downloads.yml']
+    paths: ['NativeDownloads/**', 'Sources/**', 'Tests/PixieStartupLogging/**', 'Makefile', '.github/workflows/native-downloads.yml']
   workflow_dispatch:
     inputs:
       ipa_url:
-        description: 'Optional HTTPS URL to the compatible Spotify 9.2.0 / EeveeSpotify 7.5.0 IPA'
+        description: 'Optional HTTPS URL to the compatible Spotify 9.2.0 or 9.2.2 / EeveeSpotify 7.5.0 IPA'
         required: false
         default: ''
         type: string
@@ -35,12 +35,24 @@ jobs:
           HOMEBREW_NO_AUTO_UPDATE: '1'
           HOMEBREW_NO_INSTALL_CLEANUP: '1'
       - run: python3 NativeDownloads/tools/validate_eevee_9192.py
+      - name: Check Pixie startup logging
+        run: swift Tests/PixieStartupLogging/main.swift
       - run: python3 NativeDownloads/tools/test.py --build-dir outputs/ci-host-tests
+      - name: Host tests for Spotify 9.2.2
+        env:
+          PIXIE_TARGET: targets/spotify-9.2.2.json
+        run: |
+          # The committed generated headers belong to the default target (9.2.0).
+          python3 NativeDownloads/tools/port/regenerate_headers.py
+          python3 NativeDownloads/tools/validate_eevee_9192.py
+          python3 NativeDownloads/tools/test.py --build-dir outputs/ci-host-tests-9.2.2
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: pixie-host-test-results
-          path: outputs/ci-host-tests
+          path: |
+            outputs/ci-host-tests
+            outputs/ci-host-tests-9.2.2
           retention-days: 7
 
   package:

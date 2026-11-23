@@ -1,6 +1,6 @@
 """Guard native restriction updates in the exact supplied Spotify 9.1.92 binary.
 
-A small leaf trampoline in verified zero-filled __TEXT header padding clamps the
+A small leaf trampoline in verified zero-filled __TEXT padding (header, or the tail after the last section) clamps the
 six-argument setter's two nonnegative music limits before the original setter.
 No runtime code writes, extra imports, polling, key material or episode changes.
 """
@@ -13,7 +13,7 @@ SETTER = native_address("setter")
 CAVE = native_address("setter_cave")
 ORIGINAL = native_bytes("setter_original")
 UUID = bytes.fromhex(PROFILE["uuid"])
-MINIMUM_TRACKS = 1_000_000
+MINIMUM_TRACKS = 10_000
 # The setter accepts signed int32 seconds even though its stored field is int64.
 MINIMUM_MUSIC_DURATION_SECONDS = (1 << 31) - 1
 
@@ -42,7 +42,7 @@ def trampoline(cave=CAVE, setter=SETTER):
         0x52800000 | ((MINIMUM_TRACKS & 0xffff) << 5) | 7,
         0x72a00000 | ((MINIMUM_TRACKS >> 16) << 5) | 7,
         0x6b00001f | (7 << 16) | (2 << 5),
-        0x1a800000 | (7 << 16) | (0xa << 12) | (2 << 5) | 2,
+        0x2a0703e2,                      # mov w2,w7: exact native-sized 10k track quota
         0xaa1e03e6,                      # original mov x6,x30
     ]
     words.append(branch(cave + len(words) * 4, setter + 4))
@@ -89,10 +89,16 @@ def patch_at(data, setter, cave, expected):
         return fileoff + address - vm
     stub = trampoline(cave, setter)
     start, target = offset(setter, len(expected)), offset(cave, len(stub))
-    if protection & 5 != 5 or not commands_end <= target or target + len(stub) > first_section:
-        raise ValueError('No executable header padding')
+    # A branch reaches +-128 MiB. Where the setter is further than that from the header padding
+    # (Spotify 9.2.2), the trampoline lives in the unused __TEXT space after the last section.
+    from patch_native_trace import text_tail_padding  # imported late: that module imports this one
+    tail_start, tail_end = text_tail_padding(data)
+    in_header = commands_end <= target and target + len(stub) <= first_section
+    in_tail = tail_start <= target and target + len(stub) <= tail_end
+    if protection & 5 != 5 or not (in_header or in_tail):
+        raise ValueError('No executable header or tail padding')
     if any(data[target:target+len(stub)]):
-        raise ValueError('Header padding occupied')
+        raise ValueError('Trampoline padding occupied')
     if data[start:start+len(expected)] != expected:
         raise ValueError('Native setter bytes differ')
     result = bytearray(data)

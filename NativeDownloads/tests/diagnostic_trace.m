@@ -117,6 +117,7 @@ int main(int argc,const char **argv){@autoreleasepool{
     FakeEndpoint *endpoint=FakeEndpoint.new;__block SAPTraceRPC *call;
     SAPTraceWithOperation(op,^{call=SAPTraceRPCBegin(@"spotify.offline_esperanto.proto.Offline",@"AddDownload",SAPProtoBytes(2,[@"spotify:album:1234567890123456789012"dataUsingEncoding:NSUTF8StringEncoding]),@"pixie",endpoint,NO);});
     assert(call);SAPTraceRPCReply(call,NSData.data);SAPTraceRPCReturned(call,nil);
+    SAPTraceRPCReturned(call,nil); // A completed synchronous call is not a missing-lifetime warning.
     SAPTraceRPC *silent=SAPTraceRPCBegin(@"spotify.offline_esperanto.proto.Offline",@"LicenseStatus",NSData.data,@"spotify",endpoint,NO);
     SAPTraceTestDrain();
     waitFor(^BOOL{SAPTraceTestDrain();return [SAPTraceReport()[@"rpc_slots_in_use"]unsignedIntValue]==0;});
@@ -156,7 +157,11 @@ int main(int argc,const char **argv){@autoreleasepool{
     uint8_t invalid[]={0xff};assert(![SAPTraceWireSummary(@"spotify.offline_esperanto.proto.Offline",@"LicenseStatus",[NSData dataWithBytes:invalid length:1],YES)[@"valid_protobuf"]boolValue]);
     SAPTraceTestDrain();NSDictionary *export=SAPTraceExport();NSArray *events=export[@"events"];
     assert(count(events,@"rpc",@"invocation")==6);
-    assert(count(events,@"rpc",@"lifetime_cancel_invoked")==2 && count(events,@"rpc",@"lifetime_acquire_invoked")==2 && count(events,@"rpc",@"callback_after_observation_end")==1);
+    assert(count(events,@"rpc",@"lifetime_cancel_invoked")==0 && count(events,@"rpc",@"lifetime_acquire_invoked")==0 && count(events,@"rpc",@"callback_after_observation_end")==1);
+    assert(count(events,@"rpc",@"invocation_returned")==0 && count(events,@"rpc",@"lifetime_unavailable")==0);
+    NSUInteger nativeCancels=0;
+    for(NSDictionary *event in events)if([event[@"stage"]isEqual:@"observation_ended"] && [event[@"facts"][@"reason"]isEqual:@"native_lifetime_cancel_invoked"])nativeCancels++;
+    assert(nativeCancels==2);
     assert(count(events,@"rpc",@"reply_not_observed")==1);
     assert(count(events,@"rpc",@"late_callback")==2);
     assert(count(events,@"rpc",@"exception")==1);

@@ -355,6 +355,25 @@ int main(void) {
         NSString *newActions=[NSString stringWithContentsOfFile:actionPath encoding:NSUTF8StringEncoding error:nil];
         assert([newActions containsString:@"after_manual_reset"]&&![newActions containsString:@"before_manual_reset"]);
         puts("PASS: action audit stays silent while OFF; manual reset removes old files and memory and permits fresh recording");
+        // A library snapshot larger than the old 24-context cache must not
+        // turn unchanged downloaded contexts into new log events every poll.
+        SAPJournalReset();SAPJournalDrainForTesting();
+        NSMutableData *library=[NSMutableData data];
+        for(NSUInteger i=0;i<64;i++)[library appendData:contextResponse(
+            [NSString stringWithFormat:@"spotify:album:noise-fixture-%03lu",(unsigned long)i],3,100,@[])];
+        SAPJournalObserveCall(@"GetContexts",nil,library,@"noise regression");SAPJournalDrainForTesting();
+        NSString *firstLog=[NSString stringWithContentsOfFile:[NSTemporaryDirectory()stringByAppendingPathComponent:@"SpotifyAudioProbeJournal.log"] encoding:NSUTF8StringEncoding error:NULL];
+        NSUInteger firstContexts=[firstLog componentsSeparatedByString:@" context "].count;
+        for(NSUInteger pass=0;pass<3;pass++){
+            SAPJournalObserveCall(@"GetContexts",nil,library,@"noise regression");SAPJournalDrainForTesting();
+        }
+        NSString *repeatLog=[NSString stringWithContentsOfFile:[NSTemporaryDirectory()stringByAppendingPathComponent:@"SpotifyAudioProbeJournal.log"] encoding:NSUTF8StringEncoding error:NULL];
+        assert([SAPJournalReport()[@"entities"]count]==64);
+        assert([repeatLog componentsSeparatedByString:@" context "].count==firstContexts);
+        SAPJournalObserveCall(@"GetContexts",nil,contextResponse(@"spotify:album:noise-fixture-000",4,50,@[]),@"real state change");SAPJournalDrainForTesting();
+        NSString *changedLog=[NSString stringWithContentsOfFile:[NSTemporaryDirectory()stringByAppendingPathComponent:@"SpotifyAudioProbeJournal.log"] encoding:NSUTF8StringEncoding error:NULL];
+        assert([changedLog componentsSeparatedByString:@" context "].count==firstContexts+1);
+        puts("PASS 64-context snapshots do not relog unchanged states; real state changes remain logged");
         printf("PASS: track journal records per-track state, progress, errors and core snapshots\n");
     }
     return 0;

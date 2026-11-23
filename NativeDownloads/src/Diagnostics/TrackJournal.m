@@ -1,4 +1,5 @@
 #import "JournalPrivate.h"
+#include <float.h>
 
 SAPJournalState SAPJournalStateStorage={.lock=OS_UNFAIR_LOCK_INIT,.journalKey=&SAPJournalStateStorage.journalKey};
 
@@ -65,6 +66,22 @@ void SAPJournalFlushActions(void) {
 }
 
 // --- учёт состояний -------------------------------------------------------
+
+NSMutableDictionary *SAPJournalEntityFor(NSString *uri) {
+    NSMutableDictionary *entry=SAPJournalStateStorage.entities[uri];
+    if(!entry) {
+        if(SAPJournalStateStorage.entities.count>=maximumEntities) {
+            NSString *oldest=nil;double oldestAt=DBL_MAX;
+            for(NSString *key in SAPJournalStateStorage.entities) {
+                double at=[SAPJournalStateStorage.entities[key][@"updated_at"] doubleValue];
+                if(!oldest || at<oldestAt){oldest=key;oldestAt=at;}
+            }
+            if(oldest)[SAPJournalStateStorage.entities removeObjectForKey:oldest];
+        }
+        entry=[NSMutableDictionary dictionary];SAPJournalStateStorage.entities[uri]=entry;
+    }
+    entry[@"updated_at"]=stamp(rightNow());return entry;
+}
 
 SAPTrack *SAPJournalRecordFor(NSString *uri) { // вызывать под stateLock
     SAPTrack *record = SAPJournalStateStorage.tracks[uri];
@@ -301,11 +318,7 @@ void SAPJournalNoteEntityRequest(NSString *entity, NSArray *trackURLs) {
             if (!record->entity) record->entity = copiedEntity;
             if (!record->requestedAt) record->requestedAt = moment;
         }
-        NSMutableDictionary *entry = SAPJournalStateStorage.entities[copiedEntity];
-        if (!entry) {
-            if (SAPJournalStateStorage.entities.count >= maximumEntities) [SAPJournalStateStorage.entities removeAllObjects];
-            entry = [NSMutableDictionary dictionary]; SAPJournalStateStorage.entities[copiedEntity] = entry;
-        }
+        NSMutableDictionary *entry = SAPJournalEntityFor(copiedEntity);
         entry[@"uri"] = copiedEntity; entry[@"requested_at"] = stamp(moment);
         entry[@"requested_tracks"] = @(uris.count);
         [SAPJournalStateStorage.entityEvents addObject:@{@"entity": copiedEntity, @"action": @"download", @"tracks": @(uris.count), @"at": stamp(moment) ?: @0}];

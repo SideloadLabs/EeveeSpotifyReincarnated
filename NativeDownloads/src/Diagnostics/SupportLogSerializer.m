@@ -19,12 +19,15 @@ NSDictionary *SAPSupportLogReadFile(NSURL *url) {
 BOOL SAPSupportLogWrite(NSURL *url,NSDictionary *diagnostics,NSDictionary *journal,
                         NSString *summary,NSArray *files,NSError **error) {
     NSMutableDictionary *report=[diagnostics mutableCopy]?:[NSMutableDictionary dictionary];
+    // The complete journal is already included in download_journal below.
+    // Remove only its redundant compact copy; retain all original events/files.
+    if(journal.count)[report removeObjectForKey:@"track_journal"];
     NSDictionary *trace=report[@"diagnostic_trace"]?:@{@"status":@"not_included"};[report removeObjectForKey:@"diagnostic_trace"];
     NSDictionary *value=@{@"log_schema":@"Pixie support log 3",
         @"generated_at":[[NSISO8601DateFormatter new]stringFromDate:NSDate.date],
         @"snapshot_note":@"Sections have their own observation times. File contents are captured separately; this is not an atomic snapshot of Spotify or its server.",
         @"sections":@{@"diagnostics":report,@"trace":trace,@"download_journal":journal?:@{},
             @"download_summary":summary?:@"",@"log_files":files?:@[]}};
-    NSData *data=[NSJSONSerialization dataWithJSONObject:value options:NSJSONWritingPrettyPrinted|NSJSONWritingSortedKeys error:error];
+    NSData *data=[NSJSONSerialization dataWithJSONObject:value options:NSJSONWritingSortedKeys error:error];
     return data && [data writeToURL:url options:NSDataWritingAtomic error:error];
 }

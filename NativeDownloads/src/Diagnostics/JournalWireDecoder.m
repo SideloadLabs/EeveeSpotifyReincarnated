@@ -80,11 +80,7 @@ static void noteContexts(NSArray *response, NSString *source) {
             NSUInteger state = (NSUInteger)SAPProtoNumber(context, 2, 0);
             double percent = round(floatField(context, 3) * 10) / 10;
             os_unfair_lock_lock(&SAPJournalStateStorage.lock);
-            NSMutableDictionary *entry = SAPJournalStateStorage.entities[uri];
-            if (!entry) {
-                if (SAPJournalStateStorage.entities.count >= maximumEntities) [SAPJournalStateStorage.entities removeAllObjects];
-                entry = [NSMutableDictionary dictionary]; SAPJournalStateStorage.entities[uri] = entry;
-            }
+            NSMutableDictionary *entry = SAPJournalEntityFor(uri);
             NSString *previousState = entry[@"state"] ?: @"";
             double previousPercent = [entry[@"percent_complete"] doubleValue];
             entry[@"uri"] = uri; entry[@"state"] = contextStateName(state); entry[@"state_code"] = @(state);
@@ -103,11 +99,7 @@ static void noteContextsProgress(NSArray *response) {
         if (!uri.length || !progress) continue;
         NSDictionary *value = progressDictionary(progress);
         os_unfair_lock_lock(&SAPJournalStateStorage.lock);
-        NSMutableDictionary *stored = SAPJournalStateStorage.entities[uri];
-        if (!stored) {
-            if (SAPJournalStateStorage.entities.count >= maximumEntities) [SAPJournalStateStorage.entities removeAllObjects];
-            stored = [NSMutableDictionary dictionary]; SAPJournalStateStorage.entities[uri] = stored;
-        }
+        NSMutableDictionary *stored = SAPJournalEntityFor(uri);
         NSMutableDictionary *previous=[stored[@"progress"] mutableCopy]; [previous removeObjectForKey:@"at"];
         NSMutableDictionary *comparable=[value mutableCopy]; [comparable removeObjectForKey:@"at"];
         BOOL changed=![previous isEqual:comparable];

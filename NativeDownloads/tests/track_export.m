@@ -194,7 +194,7 @@ int main(void){@autoreleasepool {
     // Match an independently generated two-layer encrypted native cache fixture.
     const uint8_t namespaceBytes[]={0xed,0x2a,0x9b,0x1f,0x0c,0x6d,0xc8,0xd0,0x91,0x4d,0x7e,0x23,0xb0,0x6b,0x92,0x33,0x59,0xa4,0x47,0x4a};
     memcpy(cacheOwner+SAPExportCacheNamespaceOffset,namespaceBytes,20);cacheDescriptor[20]=0;
-    image=calloc(1,SAPCacheStorageOwnerOffset+0x200);NSCAssert(image,@"test image allocation");
+    image=calloc(1,MAX(SAPCacheStorageOwnerOffset+0x200,SAPExportCacheKeyBodyOffset+sizeof(SAPExportCacheKeyBody)));NSCAssert(image,@"test image allocation");
     memcpy(image+SAPExportCacheKeyBodyOffset,mapGuard,sizeof(SAPExportCacheKeyBody));
     memcpy(image+SAPCacheStorageOwnerOffset,SAPCacheStorageOwnerCode,sizeof(SAPCacheStorageOwnerCode));
     uint8_t storageSource[20];for(unsigned i=0;i<20;i++)storageSource[i]=(uint8_t)(i+1);

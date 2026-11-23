@@ -99,6 +99,8 @@ have_premium_popup = "Aktif bir Premium aboneliğiniz var gibi görünüyor, bu 
 high_audio_quality_popup = "Çok yüksek ses kalitesi sunucu taraflıdır ve bu tweak ile kullanılamaz.";
 playlist_downloading_popup = "Çalma listesi indirme sunucu taraflıdır ve bu tweak ile kullanılamaz. Ancak podcast bölümlerini ve yerel çalma listelerini indirebilirsiniz.";
 download_local_playlist = "Yerel çalma listesini indir";
+local_playlist_download_button = "Çalma listesi indirme düğmesini göster";
+local_playlist_download_setting_hint = "Bu çalma listesi düğmesi yalnızca Wi-Fi üzerinden yerel dosyaları senkronize eder. Bunu EeveeSpotify Ayarları → Çeşitli → Çalma listesi indirme düğmesini göster bölümünden gizleyebilirsiniz.";
 
 //
 
@@ -514,3 +516,5 @@ karaoke_blur_intensity = "Bulanıklık yoğunluğu";
 glass_lyrics_view = "Cam şarkı sözleri görünümü";
 lyrics_source_restart_popup = "Yeni şarkı sözü kaynağının her yerde kullanılması için Spotify'ı yeniden başlatın. Daha önce çaldığınız şarkılar o zamana kadar eski sözlerini korur.";
 restart_later = "Sonra";
+manage_downloads = "İndirmeleri yönet";
+manage_downloads_subtitle = "Pixie çevrimdışı indirmeleri";

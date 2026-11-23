@@ -7,8 +7,6 @@
 #import <UIKit/UIKit.h>
 #import <AVFAudio/AVFAudio.h>
 #import <dlfcn.h>
-#import "AudioProbe.h"
-#import "SourceGraph.h"
 #import "OfflineFlags.h"
 #import "TrackDownload.h"
 #import "OfflineConfig.h"
@@ -95,30 +93,6 @@ static void SAPShare(NSURL *url) {
     SAPPresent(share);
 }
 
-static NSString *fourcc(uint32_t value) {
-    char text[5] = {(char)(value >> 24), (char)(value >> 16), (char)(value >> 8), (char)value, 0};
-    for (unsigned i = 0; i < 4; ++i) if (text[i] < 32 || text[i] > 126) text[i] = '?';
-    return [NSString stringWithUTF8String:text];
-}
-
-static NSDictionary *SAPLocationReport(const SAPCodeLocation *location) {
-    return @{@"address": [NSString stringWithFormat:@"0x%llx", (unsigned long long)location->address],
-        @"image_base": [NSString stringWithFormat:@"0x%llx", (unsigned long long)location->imageBase],
-        @"preferred_address": [NSString stringWithFormat:@"0x%llx", (unsigned long long)location->preferredAddress],
-        @"image": [NSString stringWithUTF8String:location->image] ?: @"",
-        @"symbol": [NSString stringWithUTF8String:location->symbol] ?: @""};
-}
-static NSDictionary *SAPSourceReport(void) {
-    SAPSourceGraph graph; SAPReadSourceGraph(&graph);
-    NSMutableArray *methods = [NSMutableArray arrayWithCapacity:8];
-    for (unsigned i = 0; i < 8; ++i) [methods addObject:SAPLocationReport(&graph.methods[i])];
-    return @{@"status": @(graph.status), @"callback": SAPLocationReport(&graph.callback),
-        @"owner": [NSString stringWithFormat:@"0x%llx", (unsigned long long)graph.owner],
-        @"source": [NSString stringWithFormat:@"0x%llx", (unsigned long long)graph.source],
-        @"vtable": [NSString stringWithFormat:@"0x%llx", (unsigned long long)graph.vtable],
-        @"methods": methods};
-}
-
 @implementation SAPSettingsActions
 + (NSDictionary *)snapshot {
     NSMutableDictionary *value=[@{@"diagnostics_enabled":@(SAPDiagnosticsEnabled()),
@@ -148,47 +122,17 @@ static NSDictionary *SAPSourceReport(void) {
     });
 }
 + (NSDictionary *)diagnosticSnapshot {
-    SAPSnapshot s; SpotifyAudioProbeReadSnapshot(&s);
-    NSString *source = [NSString stringWithUTF8String:s.callbackImage] ?: @"";
-    NSArray *ports = [AVAudioSession.sharedInstance.currentRoute.outputs valueForKey:@"portName"];
-    NSString *route = [ports componentsJoinedByString:@", "];
     NSDictionary *report = @{
         @"probe_version": @91,@"pixie_build":@SAP_BUILD_LABEL,@"audio_export":SAPTrackExportReport(),@"pixie_revision":@SAP_BUILD_REVISION,
-        @"diagnostics_enabled":@(SAPDiagnosticsEnabled()), @"backend_ready": @(s.backendReady), @"pcm_confirmed": @(s.pcmConfirmed),
-        @"au_set_calls": @(s.setPropertyCalls), @"au_callback_attempts": @(s.callbackAttempts),
-        @"au_last_scope": @(s.lastCallbackScope), @"au_last_type": fourcc(s.lastComponentType),
-        @"au_last_element": @(s.lastCallbackElement), @"au_last_subtype": fourcc(s.lastComponentSubtype),
-        @"au_last_status": @(s.lastSetStatus), @"objc_hooks": @(s.objcHooks),
-        @"sample_buffer_calls": @(s.sampleBufferCalls), @"player_buffer_calls": @(s.playerBufferCalls),
-        @"compressed_buffers": @(s.compressedBuffers), @"extraction_errors": @(s.extractionErrors),
-        @"last_sample_format": fourcc(s.lastSampleFormat),
-        @"registrations": @(s.registrations), @"output_starts": @(s.outputStarts), @"callbacks": @(s.callbacks),
-        @"frames": @(s.frames), @"pcm_bytes": @(s.pcmBytes), @"nonzero_callbacks": @(s.nonzeroCallbacks),
-        @"callback_errors": @(s.callbackErrors),
-        @"sample_rate": @(s.sampleRate), @"channels": @(s.channels), @"format": fourcc(s.formatID),
-        @"format_flags": @(s.formatFlags), @"bits_per_channel": @(s.bitsPerChannel),
-        @"source_image": source, @"source_callback": [NSString stringWithFormat:@"0x%llx", (unsigned long long)s.procAddress],
-        @"unit": [NSString stringWithFormat:@"0x%llx", (unsigned long long)s.unitAddress],
-        @"track_source": SAPSourceReport(), @"offline_flags": SAPOfflineFlagsReport(), @"offline_config": SAPOfflineConfigReport() ,
+        @"diagnostics_enabled":@(SAPDiagnosticsEnabled()),
+        @"offline_flags":SAPOfflineFlagsReport(), @"offline_config":SAPOfflineConfigReport(),
         @"key_request_mode":SAPKeyRequestModeReport(),@"compatibility_check":SAPDownloadCompatibilityReport(),
-        @"trace_coverage":SAPTraceReport(),@"native_key_trace":SAPNativeKeyTraceReport(),@"settings_integration":SAPDownloadSettingsInstallReport(),
-        @"route": route ?: @"", @"pool_exhausted": @(s.poolExhausted), @"retired": @(s.retired),
-        @"last_callback_age_seconds": @(s.lastCallbackAgeSeconds)
+        @"trace_coverage":SAPTraceReport(),@"native_key_trace":SAPNativeKeyTraceReport(),@"settings_integration":SAPDownloadSettingsInstallReport()
     };
 #if SAP_JAILBREAK
     NSMutableDictionary *withBootstrap=[report mutableCopy];withBootstrap[@"jailbreak_bootstrap"]=SAPJailbreakSupportReport();report=withBootstrap;
 #endif
-    NSString *message = [NSString stringWithFormat:SAPL(@"%@\nCallback: %llu · Кадров: %llu\nPCM: %llu байт · Ненулевых блоков: %llu\n%.0f Hz · %u ch · %u bit · %@\nИсточник: %@\nВыход: %@",@"%@\nCallbacks: %llu · Frames: %llu\nPCM: %llu bytes · Nonzero buffers: %llu\n%.0f Hz · %u ch · %u bit · %@\nSource: %@\nOutput: %@"),
-        [NSString stringWithFormat:SAPL(@"v26 · %@ · Хуков AV: %u\nAU вызовов: %u · Запусков: %u\nКолбэки: %u → %u · %@\nSampleBuffer: %llu · PlayerNode: %llu\nСжатых: %llu (%@) · Ошибок: %llu\n%@",@"v26 · %@ · AV hooks: %u\nAU calls: %u · Starts: %u\nCallbacks: %u → %u · %@\nSampleBuffer: %llu · PlayerNode: %llu\nCompressed: %llu (%@) · Errors: %llu\n%@"),
-            s.backendReady ? SAPL(@"библиотека готова",@"library ready") : SAPL(@"ошибка AudioToolbox",@"AudioToolbox error"), s.objcHooks,
-            s.setPropertyCalls, s.outputStarts, s.callbackAttempts, s.registrations, fourcc(s.lastComponentType),
-            (unsigned long long)s.sampleBufferCalls,
-            (unsigned long long)s.playerBufferCalls, (unsigned long long)s.compressedBuffers,
-            fourcc(s.lastSampleFormat), (unsigned long long)s.extractionErrors,
-            s.pcmConfirmed ? SAPL(@"PCM получен",@"PCM confirmed") : SAPL(@"PCM пока не подтверждён",@"PCM not confirmed yet")],
-        (unsigned long long)s.callbacks, (unsigned long long)s.frames, (unsigned long long)s.pcmBytes,
-        (unsigned long long)s.nonzeroCallbacks, s.sampleRate, s.channels, s.bitsPerChannel, fourcc(s.formatID),
-        source.lastPathComponent.length ? source.lastPathComponent : SAPL(@"не зарегистрирован",@"not registered"), route];
+    NSString *message=SAPDiagnosticsEnabled()?SAPL(@"Диагностика загрузок включена.",@"Download diagnostics are enabled."):SAPL(@"Диагностика выключена. Сохранённые данные могут быть устаревшими.",@"Diagnostics are off. Retained observations may be stale.");
     return @{ @"report":report, @"diagnostics":message, @"journal_summary":@"",
         @"download_active":@(SAPTrackDownloadActive()), @"key_request_mode":SAPKeyRequestModeReport() };
 }

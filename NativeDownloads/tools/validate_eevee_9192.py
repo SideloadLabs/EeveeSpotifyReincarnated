@@ -10,7 +10,8 @@ def main():
     validate_sources()
     assert resolve_source("TargetProfile.h").read_text() == target_header()
     manifest = json.loads((ROOT / f"NativeDownloads/provenance-pixie-v{PROFILE['pixie_version']}.json").read_text())
-    assert manifest["spotify_version"] == PROFILE["spotify_version"]
+    # One snapshot serves every target of this Pixie release; each target has its own profile.
+    assert manifest["pixie_version"] == PROFILE["pixie_version"]
     mismatched = []
     for relative, expected in manifest["source_sha256_by_file"].items():
         if relative.endswith(".md") or relative.endswith("BuildIdentity.h") \

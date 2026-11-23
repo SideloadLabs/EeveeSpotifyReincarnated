@@ -5,6 +5,7 @@ struct PlayerButtonsDeclutterGroup: HookGroup {}
 struct PlayerAddToDeclutterGroup: HookGroup {}
 struct PlayerLyricsPreviewDeclutterGroup: HookGroup {}
 struct PlayerCardsDeclutterGroup: HookGroup {}
+struct PlayerCardHeadersDeclutterGroup: HookGroup {}
 
 enum PlayerPart: String, CaseIterable, Codable {
     case lyricsPreview, shuffle, `repeat`, addTo, queue, share, connect
@@ -27,7 +28,7 @@ enum PlayerPart: String, CaseIterable, Codable {
     var cardMarkers: [String] {
         switch self {
         case .lyricsCard: return ["Lyrics_CardElementImpl"]
-        case .aboutArtist: return ["CreatorBiography"]
+        case .aboutArtist: return ["ArtistAbout", "CreatorBiography"]
         case .relatedVideos: return ["VideoRecommendations"]
         case .songDNA: return ["SongDNA"]
         case .liveEvents: return ["LiveEvents_", "OnTourEventCard"]
@@ -117,7 +118,10 @@ enum PlayerDeclutter {
         guard names.contains("NowPlaying_ScrollAPI") else { return (nil, false) }
         let matched = PlayerPart.cards.first { part in part.cardMarkers.contains { names.contains($0) } }
         let part: PlayerPart?
-        if let matched, hidden.contains(matched) {
+        if let matched, hidden.contains(matched) || hidden.contains(.allCards) {
+            // A known card wins over the generic mode-wrapper exclusion below. Spotify nests
+            // some cards inside a NowPlaying_ModesImpl view, which used to make them survive
+            // "Hide all cards" even after they were recognized.
             part = matched
         } else if hidden.contains(.allCards), !names.contains("NowPlaying_ModesImpl") {
             part = .allCards
@@ -128,6 +132,41 @@ enum PlayerDeclutter {
             eeveeLog("[EeveeSpotify][Player] Collapsed card %@", (matched ?? part).rawValue)
         }
         return (part, matched != nil || names.contains("NowPlaying_ModesImpl"))
+    }
+
+    /// Section headers/footers are separate from Element_List cells, so the cell hook alone
+    /// cannot remove the newer artist teaser section when all cards are hidden.
+    static func hideSupplementaryItemIfNeeded(_ view: UIView) {
+        guard hidden.contains(.allCards), isInNowPlayingScroll(view) else { return }
+        guard !containsClassNames(["SliderNowPlaying", "PlaybackControlsGridView"], in: view) else { return }
+        vanish(view)
+    }
+
+    static func isInNowPlayingScroll(_ view: UIView) -> Bool {
+        var current: UIView? = view
+        while let candidate = current {
+            let name = NSStringFromClass(type(of: candidate))
+            if name.contains("NowPlaying_Scroll") || name.contains("NPVScroll") { return true }
+            if let collection = candidate as? UICollectionView {
+                if let source = collection.dataSource,
+                   NSStringFromClass(type(of: source)).contains("NowPlaying_Scroll") { return true }
+                if let delegate = collection.delegate,
+                   NSStringFromClass(type(of: delegate)).contains("NowPlaying_Scroll") { return true }
+            }
+            current = candidate.superview
+        }
+        return false
+    }
+
+    static func containsClassNames(_ fragments: [String], in view: UIView) -> Bool {
+        var queue = [view]
+        while !queue.isEmpty {
+            let current = queue.removeFirst()
+            let name = NSStringFromClass(type(of: current))
+            if fragments.contains(where: name.contains) { return true }
+            queue += current.subviews
+        }
+        return false
     }
 }
 
@@ -148,6 +187,16 @@ class PlayerCardCellHook: ClassHook<UICollectionViewCell> {
         result.size = CGSize(width: result.size.width, height: 0)
         target.clipsToBounds = true
         return result
+    }
+}
+
+class PlayerSupplementaryItemHook: ClassHook<UICollectionReusableView> {
+    typealias Group = PlayerCardHeadersDeclutterGroup
+    static let targetName = "_TtC12Element_List21SupplementaryItemView"
+
+    func layoutSubviews() {
+        orig.layoutSubviews()
+        PlayerDeclutter.cardsMeter.measure { PlayerDeclutter.hideSupplementaryItemIfNeeded(target) }
     }
 }
 
@@ -214,6 +263,7 @@ func activatePlayerDeclutter() {
     activate("add to", hidden.contains(.addTo), PlayerAddToDeclutterGroup(), PlayerInfoDeclutterHook.targetName)
     activate("lyrics preview", hidden.contains(.lyricsPreview), PlayerLyricsPreviewDeclutterGroup(), PlayerLyricsPreviewHook.targetName)
     activate("cards", !hidden.isDisjoint(with: PlayerPart.cards), PlayerCardsDeclutterGroup(), PlayerCardCellHook.targetName)
+    activate("card headers", hidden.contains(.allCards), PlayerCardHeadersDeclutterGroup(), PlayerSupplementaryItemHook.targetName)
     eeveeLog("[EeveeSpotify][Player] Declutter: hiding %@; active %@ (%.2f ms)",
              hidden.map(\.rawValue).sorted().joined(separator: ", "), active.joined(separator: ", "),
              (CFAbsoluteTimeGetCurrent() - start) * 1000)
