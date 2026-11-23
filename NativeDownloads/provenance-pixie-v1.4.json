@@ -287,7 +287,6 @@
     "NativeDownloads/tools/patch_key_request_mode.py": "b0df3b678a91cac81711791233e0cb12bb27629fa65e899c26c0c342152022ec",
     "NativeDownloads/tools/patch_native_restrictions.py": "a7654855f44423016912bed034a4f4442c2678741293bef3934835b769eab91e",
     "NativeDownloads/tools/patch_native_trace.py": "b470aa1601bf74ba394baca429c09f50734db1c125ba3b942a6d88b2d38615de",
-    "NativeDownloads/tools/patch_offline.py": "97ee26b773dbca24c5f9f2f1705a07c692d90a3827f00728fbefec7507a1d184",
     "NativeDownloads/tools/pixie_target.py": "66b0c2688e110ef5a5e4daf928e54ef0bc53b37950bbdf805d18ebaceb472f36",
     "NativeDownloads/tools/rebuild_companion.py": "877b271780f3bd7891e0f6b59ae6e2909bd30e6c17563def256f162f55a8d873",
     "NativeDownloads/tools/signing_metadata.py": "16c6597ecaae01a11beab72e45e03203740650db04c09e26140718eb0cb26488",

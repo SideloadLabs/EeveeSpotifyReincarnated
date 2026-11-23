@@ -20,6 +20,7 @@ provenance entry named below.
 |---|---|
 | `NativeDownloads/src/Diagnostics/EncodedAudio.m`, `src/Public/EncodedAudio.h` | `SpotifyAudioProbeObserveOfflineKey` was never called by any patch, and its image check matched only the Spotify 9.1.88 UUID. The key table stayed empty, so `observed_audio_keys` in the download report was always 0. The cache probe inside was compiled out (`SAP_PROBE_MEDIA_CACHE=0`). |
 | `NativeDownloads/tests/cache_envelope.c` | Not listed in `tools/test.py` or anywhere else. |
+| `NativeDownloads/tools/patch_offline.py` | Renamed one class name inside `EeveeSpotify.dylib` at IPA build time to switch off Eevee's "playlist downloading is server-sided" popup. Eevee now skips that popup itself when Pixie is loaded, so a plain `EeveeSpotify.dylib` can be injected as is. |
 | `snippets/src/**/*.removed.txt` (`SAP_RUNTIME_TESTING`) | Test hooks behind a flag that no build or test ever defined. |
 | `snippets/src/Export/TrackCacheExport.m.removed.txt` (`SAP_RESEARCH_DUMP`) | Research dump of decoded media and key records to Documents; the flag was forced to 0. |
 | `snippets/src/Export/CacheStorageKey.*.removed.txt`, `ExportObservation.m.removed.txt` | AES/CommonCrypto capture buffers read only by that research dump. `SAPObserveAesCtr`, `SAPObserveAesBlock` and `SAPCaptureCCCrypto` had no caller. `captureAesKey` ran on every cache-key boundary and kept keys in memory for no reader. |

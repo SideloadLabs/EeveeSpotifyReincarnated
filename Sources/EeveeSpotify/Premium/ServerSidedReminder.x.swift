@@ -124,6 +124,14 @@ class ContentOffliningUIHelperImplementationHook: ClassHook<NSObject> {
         pageIdentifier: NSString,
         pageURI: NSURL
     ) {
+        // With Pixie loaded downloads work natively, so Spotify's own handler runs.
+        guard !pixieCompanionPresent else {
+            orig.downloadToggledWithCurrentAvailability(
+                availability, addAction: addAction, removeAction: removeAction,
+                pageIdentifier: pageIdentifier, pageURI: pageURI
+            )
+            return
+        }
         let isPlaylist = Dynamic.convert(pageURI, to: SPTURL.self)
             .isPlaylistURL()
         
@@ -164,6 +172,14 @@ class ContentOffliningUIHelperImplementationModernHook: ClassHook<NSObject> {
         pageURI: NSURL,
         interactionID: NSString
     ) {
+        // With Pixie loaded downloads work natively, so Spotify's own handler runs.
+        guard !pixieCompanionPresent else {
+            orig.downloadToggledWithCurrentAvailability(
+                availability, addAction: addAction, removeAction: removeAction,
+                pageIdentifier: pageIdentifier, pageURI: pageURI, interactionID: interactionID
+            )
+            return
+        }
         let isPlaylist = Dynamic.convert(pageURI, to: SPTURL.self)
             .isPlaylistURL()
         
