@@ -74,13 +74,12 @@ func savedOfflineLyricsEntry(trackId: String, allowOtherProvider: Bool) -> Offli
 
 /// Online, the selected provider's saved lyrics answer Spotify as the provider's own answer
 /// would: the same colors, and the custom lyrics button gets its saved lyrics too. A file
-/// saved before the button's lyrics were kept (or without them, for a provider that has a
-/// button) is skipped, so the provider is asked and the button appears as before.
+/// without the button's lyrics (Genius fallback text, or lyrics without timing) is used as
+/// well: online, those songs have no button lyrics either.
 private func savedSelectedProviderLyrics(trackId: String, originalLyrics: Lyrics?) -> Data? {
     guard let entry = savedOfflineLyricsEntry(trackId: trackId, allowOtherProvider: false),
           var lyrics = try? Lyrics(serializedBytes: entry.data), !lyrics.data.lines.isEmpty else { return nil }
     let buttonLyrics = entry.karaoke.flatMap { try? JSONDecoder().decode(KaraokeLyricsDto.self, from: $0) }
-    guard buttonLyrics != nil || !UserDefaults.lyricsSource.supportsCustomLyricsView else { return nil }
     applyLyricsColors(&lyrics, originalLyrics: originalLyrics)
     guard let data = try? lyrics.serializedData() else { return nil }
     // What the provider's fetch does: this request marks the playing song, and the button
