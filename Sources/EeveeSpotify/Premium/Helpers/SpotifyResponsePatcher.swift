@@ -4,6 +4,14 @@ import Foundation
 // kept in each caller because its async fetch doesn't fit a sync transform.
 enum SpotifyResponsePatcher {
 
+    static let interceptsAllResponses = UserDefaults.patchType.isPatching
+
+    static func shouldInterceptSession(_ url: URL?) -> Bool {
+        if interceptsAllResponses { return true }
+        guard HomeDeclutter.launchHidden.contains(.shortcutsOnly), let url else { return false }
+        return BrowsitaSectionStripper.shouldHandleHome(url)
+    }
+
     // Patched customize body, replayed for 304s and post-startup re-fetches
     // so ad flags can't re-enable mid-session. Touched from two hook classes on
     // URLSession's concurrent delegate queues — all access is lock-guarded.
@@ -184,6 +192,11 @@ enum SpotifyResponsePatcher {
             return PatchResult(data: Data(), tag: .dacEmpty)
         }
         if BrowsitaSectionStripper.shouldHandle(url) {
+            if HomeDeclutter.launchHidden.contains(.shortcutsOnly),
+               let filtered = BrowsitaSectionStripper.keepHomeShortcuts(buffer, url: url) {
+                return PatchResult(data: filtered, tag: .casitaStrip)
+            }
+            guard interceptsAllResponses else { return nil }
             if let stripped = BrowsitaSectionStripper.strip(buffer, url: url) {
                 return PatchResult(data: stripped, tag: .casitaStrip)
             }
