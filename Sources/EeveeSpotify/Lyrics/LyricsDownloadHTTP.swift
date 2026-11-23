@@ -18,6 +18,8 @@ enum LyricsDownloadHTTP {
     private final class Context {
         let isCancelled: () -> Bool
         let startRequest: RequestStart
+        /// The custom view's lyrics a provider made in this download (see `downloadedKaraoke`).
+        var karaoke: KaraokeLyricsDto?
 
         init(isCancelled: @escaping () -> Bool, startRequest: @escaping RequestStart) {
             self.isCancelled = isCancelled
@@ -29,11 +31,14 @@ enum LyricsDownloadHTTP {
                            _ body: () throws -> T) throws -> T {
         let dictionary = Thread.current.threadDictionary
         let previous = dictionary[key]
-        dictionary[key] = Context(isCancelled: isCancelled, startRequest: startRequest)
+        let context = Context(isCancelled: isCancelled, startRequest: startRequest)
+        dictionary[key] = context
         defer { if let previous { dictionary[key] = previous } else { dictionary.removeObject(forKey: key) } }
         var attempt = 0
         while true {
             if isCancelled() { throw URLError(.cancelled) }
+            // A retry starts without the previous attempt's lyrics.
+            context.karaoke = nil
             do { return try body() }
             catch {
                 // URLSession may cancel its own request after a connection or
@@ -59,6 +64,13 @@ enum LyricsDownloadHTTP {
         }
     }
     static var isDownloading: Bool { Thread.current.threadDictionary[key] is Context }
+
+    /// Word timing a provider produced during a download. It goes into the saved file,
+    /// never into the playback store. Always nil outside a download.
+    static var downloadedKaraoke: KaraokeLyricsDto? {
+        get { (Thread.current.threadDictionary[key] as? Context)?.karaoke }
+        set { (Thread.current.threadDictionary[key] as? Context)?.karaoke = newValue }
+    }
 
     /// A provider's `task.resume()`. Outside a download it is exactly that. In a
     /// download it first waits for the host's pacing, the foreground and the network.

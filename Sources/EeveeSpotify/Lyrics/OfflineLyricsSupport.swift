@@ -81,6 +81,23 @@ func cachedOfflineLyrics(trackId: String, offline: Bool = false) -> Lyrics? {
     return lyrics
 }
 
+/// The custom lyrics view learns a track's lyrics only from a fetch, and offline there is
+/// none: Spotify's native view reads its own offline database without asking Eevee.
+/// Offline only, when the playing track changes or the network goes away, the selected
+/// provider's saved lyrics fill the view. Online the fetch does it, as before.
+func publishSavedKaraokeLyrics(trackId: String) {
+    guard EeveeOfflineLyricsDownloader.shared.foreground.isOffline,
+          UserDefaults.karaokeOptions.enabled, UserDefaults.lyricsSource.supportsCustomLyricsView,
+          KaraokeLyricsStore.shared.lyrics(forTrackId: trackId) == nil else { return }
+    DispatchQueue.global(qos: .utility).async {
+        guard let entry = savedOfflineLyricsEntry(trackId: trackId, allowOtherProvider: false),
+              let saved = entry.karaoke,
+              let karaoke = try? JSONDecoder().decode(KaraokeLyricsDto.self, from: saved) else { return }
+        guard KaraokeLyricsStore.shared.lyrics(forTrackId: trackId) == nil else { return }
+        KaraokeLyricsStore.shared.set(trackId: trackId, lyrics: karaoke)
+    }
+}
+
 private let petitDownloadRepository = PetitLyricsRepository()
 
 private func downloadRepository(_ source: LyricsSource, options: LyricsOptions) -> LyricsRepository? {
@@ -139,29 +156,31 @@ func downloadProviderLyrics(trackId: String, metadata: (title: String, artist: S
         // answer makes a missing title definite.
         guard known() else { throw answered ? OfflineLyricsFetchError.noMetadata : OfflineLyricsFetchError.metadataUnavailable }
     }
-    func fetch(_ repository: LyricsRepository) throws -> LyricsDto {
+    // The provider's word timing comes back with its text, read before the download context ends.
+    func fetch(_ repository: LyricsRepository) throws -> (LyricsDto, KaraokeLyricsDto?) {
         let query = LyricsSearchQuery(title: title, primaryArtist: artist, spotifyTrackId: trackId)
         return try LyricsDownloadHTTP.perform(isCancelled: { !stillWanted() }, startRequest: startWhenActive) {
             let dto = try repository.getLyrics(query, options: options)
-            if dto.lines.isEmpty && repository is LrclibLyricsRepository { return dto }
+            if dto.lines.isEmpty && repository is LrclibLyricsRepository { return (dto, nil) }
             guard dto.lines.contains(where: { !$0.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else {
                 if repository is GeniusLyricsRepository { throw LyricsError.noSuchSong }
                 throw LyricsError.decodingError
             }
-            return dto
+            return (dto, LyricsDownloadHTTP.downloadedKaraoke)
         }
     }
     var used = source
     let dto: LyricsDto
+    var karaoke: KaraokeLyricsDto?
     do {
         if needsMetadata { try requireMetadata() }
         guard stillWanted() else { throw URLError(.cancelled) }
-        dto = try fetch(repository)
+        (dto, karaoke) = try fetch(repository)
     } catch let primaryError where source == .genius && geniusLyricsUnavailable(primaryError) {
         // SpicyLyrics can look up the same recording by Spotify ID.
         guard stillWanted() else { throw URLError(.cancelled) }
         used = .spicylyrics
-        do { dto = try fetch(SpicyLyricsRepository.shared) }
+        do { (dto, _) = try fetch(SpicyLyricsRepository.shared) }
         catch LyricsError.noSuchSong {
             // A missing metadata lookup is retryable even if Spicy had no lyrics.
             throw primaryError
@@ -186,7 +205,7 @@ func downloadProviderLyrics(trackId: String, metadata: (title: String, artist: S
         }
         used = .genius
         do {
-            dto = try fetch(GeniusLyricsRepository.shared)
+            (dto, _) = try fetch(GeniusLyricsRepository.shared)
         } catch {
             if shouldStopProviderFallback(error) { throw error }
             // Both providers must report a genuine miss before the worker may
@@ -204,10 +223,16 @@ func downloadProviderLyrics(trackId: String, metadata: (title: String, artist: S
     }
     if romanize { savedDTO.romanization = .romanized }
     let lyrics = Lyrics.with { $0.data = savedDTO.toSpotifyLyricsData(source: used.description) }
+    // The custom view's lyrics are made as playback makes them: a provider's own (Spicy Lyrics),
+    // or upstream's line-synced view of the provider's answer. Only the selected provider's,
+    // since the custom view follows it; nothing for a provider or song online has none for.
+    let viewLyrics = used == source && source.supportsCustomLyricsView
+        ? karaoke ?? KaraokeLyricsDto.lineSynced(from: dto, providerName: used.description) : nil
+    let savedKaraoke = viewLyrics.flatMap { try? JSONEncoder().encode($0) }
     guard try store.save(trackId: trackId, source: source.rawValue, options: options,
-                         data: lyrics.serializedData(), revision: revision) else { throw URLError(.cancelled) }
+                         data: lyrics.serializedData(), karaoke: savedKaraoke, revision: revision) else { throw URLError(.cancelled) }
     LyricsNotFoundStore.shared.succeeded(trackId, source: source.rawValue)
-    writeDebugLog("[Lyrics] download \(trackId): \(used.description), \(dto.lines.count) lines saved")
+    writeDebugLog("[Lyrics] download \(trackId): \(used.description), \(dto.lines.count) lines saved\(savedKaraoke == nil ? "" : " with the custom view's lyrics")")
     return lyrics
 }
 

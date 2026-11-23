@@ -170,6 +170,10 @@ final class EeveeOfflineLyricsDownloader: NSObject {
         foreground.networkLost = { [weak self] in
             DispatchQueue.main.async {
                 guard let self, self.foreground.networkUnavailable else { return }
+                // The song already playing gets its saved lyrics too, also when Spotify starts offline.
+                if let trackId = KaraokePlaybackTracker.shared.playerReportedTrackId() {
+                    publishSavedKaraokeLyrics(trackId: trackId)
+                }
                 // Spotify can finish its request while our persisted queue waits for the network.
                 for job in Array(self.pending.values) {
                     let callbacks = job.nativeCallbacks

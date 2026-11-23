@@ -1,6 +1,7 @@
 import Foundation
 
-struct KaraokeSyllableDto {
+/// Codable, like the line and lyrics types below: downloads save them for the offline custom view.
+struct KaraokeSyllableDto: Codable {
     var text: String
     var startMs: Int
     var endMs: Int
@@ -28,7 +29,7 @@ enum KaraokeTextDirection {
     case rightToLeft
 }
 
-struct KaraokeLineDto {
+struct KaraokeLineDto: Codable {
     var syllables: [KaraokeSyllableDto]
     var startMs: Int
     var endMs: Int
@@ -81,7 +82,7 @@ struct KaraokeLineDto {
     }
 }
 
-struct KaraokeLyricsDto {
+struct KaraokeLyricsDto: Codable {
     var lines: [KaraokeLineDto]
 
     var isRTL: Bool {

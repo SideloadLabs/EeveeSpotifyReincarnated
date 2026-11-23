@@ -101,6 +101,12 @@ final class LyricsForegroundExecution {
         if lost { networkLost?() }
     }
 
+    /// No network route at all, unlike `networkUnavailable`, which also covers a recent failed request.
+    var isOffline: Bool {
+        condition.lock(); defer { condition.unlock() }
+        return !hasNetworkPath
+    }
+
     var networkUnavailable: Bool {
         condition.lock(); defer { condition.unlock() }
         return !hasNetworkPath || (retryAfter ?? .distantPast) > Date()

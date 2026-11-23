@@ -106,4 +106,20 @@ check(OfflineLyricsStore(directory: folder).automaticallyRetryableTrackIds([trac
 try store.downloadsSeen(trackIds: [track])
 check(OfflineLyricsStore(directory: folder).automaticallyRetryableTrackIds([track]).isEmpty,
       "seeing a still-downloaded track undid Delete saved lyrics")
+// Word timing rides along in the same file and does not change the native payload.
+let timed = KaraokeLyricsDto(lines: [KaraokeLineDto(syllables: [
+    KaraokeSyllableDto(text: "Hel", startMs: 1000, endMs: 1200, isPartOfWord: true),
+    KaraokeSyllableDto(text: "lo", startMs: 1200, endMs: 1500, isPartOfWord: false)],
+    startMs: 1000, endMs: 1500)], songWriters: ["W"], providerCode: "spicy")
+let timedFolder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+defer { try? FileManager.default.removeItem(at: timedFolder) }
+check(try OfflineLyricsStore(directory: timedFolder).save(trackId: track, source: 5, options: options, data: payload,
+    karaoke: JSONEncoder().encode(timed)), "lyrics with word timing were not saved")
+let timedEntry = OfflineLyricsStore(directory: timedFolder).entry(trackId: track, source: 5, options: options)
+let decoded = timedEntry?.karaoke.flatMap { try? JSONDecoder().decode(KaraokeLyricsDto.self, from: $0) }
+check(timedEntry?.data == payload, "word timing changed the native lyrics payload")
+check(decoded?.lines.first?.syllables.map(\.text) == ["Hel", "lo"] && decoded?.lines.first?.syllables.last?.endMs == 1500
+      && decoded?.songWriters == ["W"], "word timing did not survive reopening")
+check(OfflineLyricsStore(directory: folder).entry(trackId: secondTrack, source: 5, options: options)?.karaoke == nil,
+      "a file without word timing reported some")
 print("OfflineLyricsStore tests passed")

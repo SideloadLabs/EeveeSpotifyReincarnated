@@ -40,7 +40,9 @@ for main_swift in Tests/*/main.swift; do
             ;;
         LyricsDownloadHTTP)
             extra_sources+=("Sources/EeveeSpotify/Lyrics/LyricsRequestGate.swift"
-                "Sources/EeveeSpotify/Lyrics/LyricsDownloadHTTP.swift")
+                "Sources/EeveeSpotify/Lyrics/LyricsDownloadHTTP.swift"
+                # The download context carries the custom view's lyrics.
+                "Sources/EeveeSpotify/Lyrics/Models/KaraokeLyricsDto.swift")
             ;;
         LyricsTaskState)
             extra_sources+=("Sources/EeveeSpotify/Lyrics/LyricsTaskState.swift")

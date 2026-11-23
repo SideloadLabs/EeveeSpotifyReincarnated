@@ -93,6 +93,12 @@ final class KaraokeLyricsStore {
     func remove(trackId: String) {}
     func clear() {}
 }
+// The offline custom lyrics hook the downloader calls when the network goes away.
+final class KaraokePlaybackTracker {
+    static let shared = KaraokePlaybackTracker()
+    func playerReportedTrackId() -> String? { nil }
+}
+func publishSavedKaraokeLyrics(trackId: String) {}
 final class NativeOfflineLyrics {
     static let shared = NativeOfflineLyrics()
     static var placeholders: [String] = []
