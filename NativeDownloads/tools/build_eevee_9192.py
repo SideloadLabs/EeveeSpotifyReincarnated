@@ -21,7 +21,6 @@ from strip_stale_signature import strip_stale_signature
 from export_headers import headers as export_headers
 from export_release_materials import notices, retain_relink_sources
 from companion_build import build_companion
-from patch_offline import patch_reminder
 from signing_metadata import sign_preserving_entitlements
 
 from pixie_target import PROFILE, ROOT, resolve_source, validate_sources
@@ -88,7 +87,6 @@ def main():
     with tempfile.TemporaryDirectory(prefix="eevee-9192-") as temporary:
         temporary = Path(temporary)
         staged_eevee = temporary / "EeveeSpotify.dylib"
-        eevee_bytes, reminder = patch_reminder(eevee_bytes)
         staged_eevee.write_bytes(eevee_bytes)
         run("codesign", "--force", "--sign", "-", "--timestamp=none", staged_eevee)
         run("codesign", "--verify", "--strict", staged_eevee)
@@ -136,8 +134,7 @@ def main():
                       "spotify_uuid": UUID.hex(), "audio_imports": audio,
                       "native_limits": limits, "key_request_mode": key, "native_observation": native_trace,
                       "export_observation": export, "stale_signature_bytes_removed": stale_bytes, "relink_sources": retain_relink_sources(output),
-                      "signing_metadata": signing_metadata,
-                      "eevee_native_download_reminder": reminder}
+                      "signing_metadata": signing_metadata}
     output.with_suffix('.build.json').write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps(report, indent=2))
 

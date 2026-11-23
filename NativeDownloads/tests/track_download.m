@@ -19,7 +19,6 @@ void SAPReadNativeTrackState(NSString *uri) {}
 void SAPRequestNativeAlbumDownload(NSString *uri, void (^completion)(BOOL, NSString *)) {
     if (completion) completion(YES, @"test album request");
 }
-NSUInteger SAPObservedAudioKeyCount(void) { return 0; }
 void SAPJournalVerifyTrack(NSString *uri,void (^completion)(NSDictionary *)) {if(completion)completion(nil);}
 NSDictionary *SAPNativeOfflineReport(void) { return @{@"test_stub":@YES}; }
 // Журнал здесь подменён: проверяем, что транспортный хук отдаёт ему каждый вызов

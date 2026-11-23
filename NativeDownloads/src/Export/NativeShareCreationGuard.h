@@ -1,7 +1,7 @@
 #pragma once
 #include <stdint.h>
 #include <stddef.h>
-// Offsets, guard bytes and the target UUID are generated from targets/spotify-9.1.92.json.
+// Offsets, guard bytes and the target UUID are generated from the active targets/spotify-<version>.json profile.
 #include "ShareCreationLayout.h"
 static inline int SAPShareCreationHasFrames(const uintptr_t *frames,size_t count,uintptr_t image) {
     int wrapper=0,constructor=0;

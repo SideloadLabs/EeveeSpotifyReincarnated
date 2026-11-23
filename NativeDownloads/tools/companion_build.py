@@ -20,7 +20,7 @@ def build_companion(library, workdir):
     command = ["xcrun", "clang", "-dynamiclib", "-arch", "arm64", "-target", "arm64-apple-ios15.0",
                "-isysroot", sdk, "-fobjc-arc", "-std=gnu11", "-O2", "-fvisibility=hidden",
                "-Wall", "-Wextra", "-Wno-unused-parameter", "-Wno-nullability-completeness",
-               "-Werror=implicit-function-declaration", "-DSAP_RESEARCH_DUMP=0", "-DSAP_ENABLE_WAV_CAPTURE=0"]
+               "-Werror=implicit-function-declaration"]
     command += ["-I" + str(path) for path in include_directories()]
     command += [str(path) for path in companion_sources()]
     command += ["-lm", "-lsqlite3", "-lz", *swift["link_args"]]
