@@ -531,7 +531,7 @@ static id SAPLyricsCatalogObserver;
 - (NSString *)tableView:(UITableView *)table titleForHeaderInSection:(NSInteger)section {return section==0?SAPLocalized(@"Downloading"):SAPLocalized(@"Saved lyrics");}
 - (NSString *)tableView:(UITableView *)table titleForFooterInSection:(NSInteger)section {
     if(section==1)return SAPLocalized(@"Deleting lyrics keeps your music. Removing a downloaded song also removes its saved lyrics.");
-    return [NSString stringWithFormat:SAPLocalized(@"Source: %@. Save lyrics alongside music. Turning this off keeps existing lyrics. Karaoke keeps its own switch. Up to two songs load at once, with at least 0.5 seconds between requests to each site."),self.lyrics[@"source"]?:@"—"];
+    return [NSString stringWithFormat:SAPLocalized(@"Source: %@. Save lyrics alongside music. Turning this off keeps existing lyrics. Karaoke keeps its own switch. One song loads at a time, with at least 0.5 seconds between requests to each site; the playing song goes first."),self.lyrics[@"source"]?:@"—"];
 }
 - (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)index {
     if(index.section==1) {

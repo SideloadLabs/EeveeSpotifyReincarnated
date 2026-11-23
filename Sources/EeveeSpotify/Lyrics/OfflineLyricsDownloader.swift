@@ -9,7 +9,8 @@ final class EeveeOfflineLyricsDownloader: NSObject {
     private let worker: OperationQueue = {
         let queue = OperationQueue()
         queue.name = "EeveeSpotify.OfflineLyrics"
-        queue.maxConcurrentOperationCount = 2
+        // One song at a time: providers rate-limit per client, and playback shares that limit.
+        queue.maxConcurrentOperationCount = 1
         queue.qualityOfService = .utility
         return queue
     }()

@@ -23,4 +23,26 @@ DispatchQueue.concurrentPerform(iterations: 30) { _ in
     lock.lock(); reservations.append(slot); lock.unlock()
 }
 check(Set(reservations).count == 30 && reservations.max() == 114.5, "concurrent requests received the same slot")
+// Playback holds downloads only while its request is in flight, at most playbackHold.
+let playback = LyricsRequestGate()
+playback.playbackStarted(now: 200)
+check(playback.playbackHoldEnd() == 200 + playback.playbackHold, "playback request did not hold downloads")
+playback.playbackStarted(now: 201)
+playback.playbackFinished(nil, request: nil, now: 202)
+check(playback.playbackHoldEnd() > 202, "one finished playback request released another's hold")
+playback.playbackFinished(nil, request: nil, now: 203)
+check(playback.playbackHoldEnd() == 203, "finished playback kept holding downloads")
+playback.playbackFinished(nil, request: nil, now: 204)
+check(playback.playbackHoldEnd() == 203, "an unmatched end moved the hold")
+// A 429 that playback receives pauses downloads to that provider, as a download's own does.
+let playbackRequest = URLRequest(url: URL(string: "https://spicy.example/lyrics")!)
+let playbackLimited = HTTPURLResponse(url: playbackRequest.url!, statusCode: 429, httpVersion: nil, headerFields: ["Retry-After": "8"])!
+playback.playbackStarted(now: 300)
+playback.playbackFinished(playbackLimited, request: playbackRequest, now: 300)
+check(playback.reserve(host: "spicy.example", now: 300) == 308, "playback's 429 did not pause downloads")
+check(playback.reserve(host: "other.example", now: 300) == 300, "playback's 429 paused another provider")
+let ok = HTTPURLResponse(url: playbackRequest.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+playback.playbackStarted(now: 400)
+playback.playbackFinished(ok, request: playbackRequest, now: 400)
+check(playback.reserve(host: "spicy.example", now: 400) == 400, "a successful playback answer paused downloads")
 print("LyricsRequestGate tests passed")

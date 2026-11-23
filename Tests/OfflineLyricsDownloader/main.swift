@@ -378,11 +378,15 @@ downloader.lyricsForNativeDownload(trackId: manualFirst) { result in
 }
 emitDownload(manualFirst)
 emitDownload(freshAudio)
-pump(until: { attempts(freshAudio) == 1 }, "New audio could not enqueue a text while a manual batch ran")
+// One song loads at a time: the new audio waits in the queue behind the manual fetch.
+pump(until: { EeveeOfflineLyricsDownloader.settingsSnapshot()["pending"] as? Int == 2 },
+     "New audio could not enqueue a text while a manual batch ran")
+check(attempts(freshAudio) == 0, "A second song loaded while one was already loading")
 check(attempts(manualFirst) == 1 && pluginReplies == 0, "Spotify's request did not join the manual fetch")
 manualGate.signal()
-pump(until: { pluginReplies == 1 && EeveeOfflineLyricsDownloader.settingsSnapshot()["pending"] as? Int == 0 },
-     "Manual and Spotify callers did not finish together")
+pump(until: { pluginReplies == 1 && attempts(freshAudio) == 1
+              && EeveeOfflineLyricsDownloader.settingsSnapshot()["pending"] as? Int == 0 },
+     "Manual and Spotify callers did not finish together, or the queued audio never loaded")
 check(attempts(manualFirst) == 1, "The same track fetched twice after joining")
 
 let audioFirst = "0000000000000000000711", completedDuringScan = "0000000000000000000712"
@@ -394,12 +398,14 @@ emitDownload(completedDuringScan)
 EeveeOfflineLyricsDownloader.downloadForTracks([["uri": "spotify:track:\(audioFirst)"]] as NSArray)
 pump(until: {
     let snapshot = EeveeOfflineLyricsDownloader.settingsSnapshot()
-    return snapshot["scan_active"] as? Bool == false && attempts(completedDuringScan) == 1
+    // One song loads at a time: the completed track waits behind the held fetch.
+    return snapshot["scan_active"] as? Bool == false && snapshot["pending"] as? Int == 2
 }, "The scan blocked a new audio completion or failed to start its batch")
 check(EeveeOfflineLyricsDownloader.settingsSnapshot()["library_total"] as? Int == 2,
       "The catalog snapshot lost the track completed during the scan")
 audioGate.signal()
 pump(until: { EeveeOfflineLyricsDownloader.settingsSnapshot()["pending"] as? Int == 0 }, "Joined batch did not complete")
+check(attempts(completedDuringScan) == 1, "The track completed during the scan never loaded")
 check(attempts(audioFirst) == 1, "Manual scan repeated the audio-initiated fetch")
 print("Manual, automatic and Spotify lyrics requests merge in either order")
 
@@ -472,12 +478,16 @@ downloader.refreshForCurrentSource(userInitiated: true)
 func visibleBatch() -> [String: Any] {
     EeveeOfflineLyricsDownloader.settingsSnapshot()["batch"] as? [String: Any] ?? [:]
 }
-pump(until: { attempts(refreshOne) == 1 && attempts(refreshTwo) == 1 }, "Provider refresh did not start")
+// One song loads at a time: the second waits until the first completes.
+pump(until: { attempts(refreshOne) + attempts(refreshTwo) == 1 }, "Provider refresh did not start")
 check(visibleBatch()["kind"] as? String == "refresh" && visibleBatch()["total"] as? Int == 2,
       "Automatic refresh did not publish its own visible progress")
-firstRefreshFetch.signal()
-pump(until: { visibleBatch()["completed"] as? Int == 1 }, "Refresh progress failed to count a completed job")
-secondRefreshFetch.signal()
+let refreshFirstGate = attempts(refreshOne) == 1 ? firstRefreshFetch : secondRefreshFetch
+let refreshSecondGate = attempts(refreshOne) == 1 ? secondRefreshFetch : firstRefreshFetch
+refreshFirstGate.signal()
+pump(until: { visibleBatch()["completed"] as? Int == 1 && attempts(refreshOne) == 1 && attempts(refreshTwo) == 1 },
+     "Refresh progress failed to count a completed job, or the next job never started")
+refreshSecondGate.signal()
 pump(until: { visibleBatch().isEmpty }, "Completed refresh left an active progress panel")
 print("Automatic provider refresh reports progress and clears its panel on completion")
 

@@ -76,6 +76,8 @@ enum LyricsDownloadHTTP {
     /// download it first waits for the host's pacing, the foreground and the network.
     static func start(_ task: URLSessionTask) throws {
         guard let context = Thread.current.threadDictionary[key] as? Context else {
+            // Playback or prefetch: downloads wait until it ends (see wait below).
+            LyricsRequestGate.shared.playbackStarted()
             task.resume()
             return
         }
@@ -97,6 +99,7 @@ enum LyricsDownloadHTTP {
     static func wait(_ completion: DispatchSemaphore, task: URLSessionTask, accepting statuses: Set<Int> = []) throws {
         guard let context = Thread.current.threadDictionary[key] as? Context else {
             completion.wait()
+            LyricsRequestGate.shared.playbackFinished(task.response as? HTTPURLResponse, request: task.originalRequest)
             return
         }
         while completion.wait(timeout: .now() + .milliseconds(100)) != .success {
