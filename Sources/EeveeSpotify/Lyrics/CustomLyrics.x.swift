@@ -157,11 +157,12 @@ private func loadCustomLyricsForTrackId(_ trackId: String) throws -> Lyrics {
 
     writeDebugLog("[Lyrics] \(trackId): \(source.description), \(lyricsDto.lines.count) lines, synced=\(lyricsDto.timeSynced)")
     publishLineSyncedKaraokeLyrics(lyricsDto, trackId: searchQuery.spotifyTrackId, source: source)
+    savePlaybackLyrics(trackId: searchQuery.spotifyTrackId, dto: lyricsDto, source: source)
 
     let lyrics = Lyrics.with {
         $0.data = lyricsDto.toSpotifyLyricsData(source: source.description)
     }
-    
+
     return lyrics
 }
 

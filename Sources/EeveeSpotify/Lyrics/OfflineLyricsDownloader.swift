@@ -507,6 +507,10 @@ final class EeveeOfflineLyricsDownloader: NSObject {
         guard id.count == 22, id.utf8.allSatisfy({ (48...57).contains($0) || (65...90).contains($0) || (97...122).contains($0) }) else { return nil }
         return id
     }
+    /// Whether Spotify has the track downloaded, as far as the library read knows (main thread).
+    func isDownloaded(_ trackId: String) -> Bool {
+        knownDownloadedIds?.contains(trackId) == true
+    }
     private func changed() {
         if !hasLyricsWork { foreground.workFinished() }
         if !hasLyricsWork || !foreground.isActive {

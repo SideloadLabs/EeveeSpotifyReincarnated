@@ -117,6 +117,52 @@ func publishSavedKaraokeLyrics(trackId: String) {
     }
 }
 
+/// What a saved file holds for a provider's answer: its text, romanized as the options say,
+/// and the custom view's lyrics.
+private func offlineEntry(_ dto: LyricsDto, used: LyricsSource, source: LyricsSource,
+                          options: LyricsOptions, karaoke: KaraokeLyricsDto?) -> (lyrics: Lyrics, karaoke: Data?) {
+    var savedDTO = dto
+    let romanize = options.romanization && dto.romanization == .canBeRomanized
+    savedDTO.lines = dto.lines.map { line in
+        let content = romanize ? (line.content.applyingTransform(.toLatin, reverse: false) ?? line.content) : line.content
+        return LyricsLineDto(content: content, offsetMs: line.offsetMs.map { Int(Int32(clamping: $0)) })
+    }
+    if romanize { savedDTO.romanization = .romanized }
+    let lyrics = Lyrics.with { $0.data = savedDTO.toSpotifyLyricsData(source: used.description) }
+    // The custom view's lyrics are made as playback makes them: a provider's own (Spicy Lyrics),
+    // or upstream's line-synced view of the provider's answer. Only the selected provider's,
+    // since the custom view follows it; nothing for a provider or song online has none for.
+    let viewLyrics = used == source && source.supportsCustomLyricsView
+        ? karaoke ?? KaraokeLyricsDto.lineSynced(from: dto, providerName: used.description) : nil
+    return (lyrics, viewLyrics.flatMap { try? JSONEncoder().encode($0) })
+}
+
+/// The selected provider answered while a downloaded song played: save that answer, so the
+/// song has the same lyrics offline without waiting for its turn in the download queue.
+/// A Genius fallback is not saved here: online it can stand in for a provider that was only
+/// busy, and the download queue still asks the provider.
+func savePlaybackLyrics(trackId: String, dto: LyricsDto, source: LyricsSource) {
+    guard UserDefaults.offlineLyricsEnabled, source == UserDefaults.lyricsSource, source.isReplacingLyrics,
+          dto.lines.contains(where: { !$0.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else { return }
+    let options = UserDefaults.lyricsOptions.downloadOptions
+    // Spicy Lyrics publishes its word timing while parsing this very answer.
+    let karaoke = source.supportsCustomLyricsView ? KaraokeLyricsStore.shared.lyrics(forTrackId: trackId) : nil
+    DispatchQueue.main.async {
+        guard EeveeOfflineLyricsDownloader.shared.isDownloaded(trackId) else { return }
+        DispatchQueue.global(qos: .utility).async {
+            let store = OfflineLyricsStore.shared
+            guard UserDefaults.lyricsSource == source, UserDefaults.lyricsOptions.downloadOptions == options,
+                  store.entry(trackId: trackId, source: source.rawValue, options: options) == nil else { return }
+            let (lyrics, savedKaraoke) = offlineEntry(dto, used: source, source: source, options: options, karaoke: karaoke)
+            guard let data = try? lyrics.serializedData(),
+                  (try? store.save(trackId: trackId, source: source.rawValue, options: options,
+                                   data: data, karaoke: savedKaraoke)) == true else { return }
+            LyricsNotFoundStore.shared.succeeded(trackId, source: source.rawValue)
+            writeDebugLog("[Lyrics] \(trackId): saved the playing \(source.description) answer for offline")
+        }
+    }
+}
+
 private let petitDownloadRepository = PetitLyricsRepository()
 
 private func downloadRepository(_ source: LyricsSource, options: LyricsOptions) -> LyricsRepository? {
@@ -234,20 +280,7 @@ func downloadProviderLyrics(trackId: String, metadata: (title: String, artist: S
         }
     }
     guard stillWanted() else { throw URLError(.cancelled) }
-    var savedDTO = dto
-    let romanize = options.romanization && dto.romanization == .canBeRomanized
-    savedDTO.lines = dto.lines.map { line in
-        let content = romanize ? (line.content.applyingTransform(.toLatin, reverse: false) ?? line.content) : line.content
-        return LyricsLineDto(content: content, offsetMs: line.offsetMs.map { Int(Int32(clamping: $0)) })
-    }
-    if romanize { savedDTO.romanization = .romanized }
-    let lyrics = Lyrics.with { $0.data = savedDTO.toSpotifyLyricsData(source: used.description) }
-    // The custom view's lyrics are made as playback makes them: a provider's own (Spicy Lyrics),
-    // or upstream's line-synced view of the provider's answer. Only the selected provider's,
-    // since the custom view follows it; nothing for a provider or song online has none for.
-    let viewLyrics = used == source && source.supportsCustomLyricsView
-        ? karaoke ?? KaraokeLyricsDto.lineSynced(from: dto, providerName: used.description) : nil
-    let savedKaraoke = viewLyrics.flatMap { try? JSONEncoder().encode($0) }
+    let (lyrics, savedKaraoke) = offlineEntry(dto, used: used, source: source, options: options, karaoke: karaoke)
     guard try store.save(trackId: trackId, source: source.rawValue, options: options,
                          data: lyrics.serializedData(), karaoke: savedKaraoke, revision: revision) else { throw URLError(.cancelled) }
     LyricsNotFoundStore.shared.succeeded(trackId, source: source.rawValue)
