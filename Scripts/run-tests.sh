@@ -64,6 +64,9 @@ for main_swift in Tests/*/main.swift; do
         NativeLyricsMetadata)
             extra_sources+=("Sources/EeveeSpotify/Lyrics/NativeLyricsMetadata.swift")
             ;;
+        NativeLyricsCard)
+            extra_sources+=("Sources/EeveeSpotify/Lyrics/NativeLyricsCard.swift")
+            ;;
         BrowsitaSectionStripper)
             extra_sources+=("Sources/EeveeSpotify/Premium/Helpers/BrowsitaSectionStripper.swift")
             ;;
