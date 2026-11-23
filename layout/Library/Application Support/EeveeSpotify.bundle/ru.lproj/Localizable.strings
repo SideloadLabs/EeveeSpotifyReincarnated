@@ -82,6 +82,8 @@ have_premium_popup = "Похоже, у Вас есть активная подп
 high_audio_quality_popup = "Очень высокое качество недоступно с твиком, так как предоставляется на стороне сервера.";
 playlist_downloading_popup = "Встроенная загрузка плейлистов осуществляется из сервера и недоступна с твиком. Однако вы можете загружать эпизоды подкастов и локальные плейлисты.";
 download_local_playlist = "Загрузить локальный плейлист";
+local_playlist_download_button = "Показывать кнопку скачивания плейлиста";
+local_playlist_download_setting_hint = "Эта кнопка плейлиста синхронизирует по Wi-Fi только локальные файлы. Скрыть её можно в настройках EeveeSpotify → Разное → Показывать кнопку скачивания плейлиста.";
 
 //
 
@@ -363,7 +365,7 @@ sponsorblock = "SponsorBlock (BETA)";
 appIcon = "App Icon";
 true_shuffle = "True Shuffle";
 true_shuffle_dec = "Blocks Spotify's free-tier Smart Shuffle from mixing recommended tracks into your queue. Shuffle stays inside the playlist. ";
-miscellaneous = "Miscellaneous";
+miscellaneous = "Разное";
 clean_share_links = "Clean Share Links";
 clean_share_links_description = "Removes tracking parameters from shared links.";
 developer_note = "Developer's Note";
