@@ -254,8 +254,23 @@ final class PlaylistActionRow: UIView {
         return bounds.intersects(frame) ? frame : nil
     }
 
+    // Spotify's PlayButtonView keeps its state in the Swift stored property isPlaying, which the Objective-C
+    // runtime lists as an ivar. Reading it works in every language; the button's label is localized.
+    private static let playButtonClass: AnyClass? = NSClassFromString(PlaylistPlayStateHook.targetName)
+    private static let playingOffset: Int? = playButtonClass
+        .flatMap { class_getInstanceVariable($0, "isPlaying") }
+        .map(ivar_getOffset)
+
+    private func isPlaying() -> Bool {
+        if let play, let offset = Self.playingOffset, let cls = Self.playButtonClass, play.isKind(of: cls) {
+            return Unmanaged.passUnretained(play).toOpaque().load(fromByteOffset: offset, as: UInt8.self) != 0
+        }
+        // Without that property only the English label can be read.
+        return (play?.accessibilityLabel ?? play?.eeveeFirst(UIControl.self)?.accessibilityLabel)?.lowercased().contains("pause") == true
+    }
+
     private func updatePlayButton() {
-        let playing = (play?.accessibilityLabel ?? play?.eeveeFirst(UIControl.self)?.accessibilityLabel)?.lowercased().contains("pause") == true
+        let playing = isPlaying()
         let title = playing ? Self.pauseTitle : Self.playTitle
         var config = playButton.configuration
         config?.image = playing ? Self.pauseImage : Self.playImage
