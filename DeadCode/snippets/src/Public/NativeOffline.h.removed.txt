@@ -1,8 +1,0 @@
-// Removed from NativeDownloads/src/Public/NativeOffline.h (lines as of f266532)
-
-// --- lines 15-19
-#ifdef SAP_RUNTIME_TESTING
-id SAPNativeOfflineWrapperForTesting(void);
-void SAPNativeOfflineSnapshotForTesting(void (^completion)(NSDictionary *));
-void SAPNativeOfflineZeroUpdateForTesting(void (^completion)(NSDictionary *));
-#endif
