@@ -4,8 +4,10 @@ import UIKit
 import Network
 #endif
 
-/// Only admission of new requests depends on activity. Existing requests
-/// keep their own lifetime and may finish as long as iOS lets them run.
+/// Admission of new lyrics requests. They run while Spotify is on screen and during the
+/// short time iOS grants after it is minimized; when that ends, only while Spotify keeps
+/// playing, since iOS keeps a playing app running. Otherwise new requests wait for the
+/// screen. Existing requests keep their own lifetime and may finish as long as iOS lets them run.
 final class LyricsForegroundExecution {
     private let condition = NSCondition()
     private var active = true
@@ -13,11 +15,19 @@ final class LyricsForegroundExecution {
     private var retryAfter: Date?
     #if canImport(UIKit)
     private let pathMonitor = NWPathMonitor()
+    /// The minimized time iOS granted, held only while there is lyrics work.
+    private var backgroundTask = UIBackgroundTaskIdentifier.invalid
     #endif
     private var observers: [NSObjectProtocol] = []
     var enteredBackground: (() -> Void)?
     var networkLost: (() -> Void)?
     var activityChanged: ((Bool) -> Void)?
+    /// Whether there is lyrics work to ask iOS for minimized time (main thread).
+    var hasWork: () -> Bool = { false }
+    /// Whether Spotify is playing, read when the minimized time ends.
+    var isPlaying: () -> Bool = { false }
+    /// Called when the minimized time ends; true when playback keeps the queue running.
+    var backgroundTimeEnded: ((Bool) -> Void)?
 
     func observe() {
         #if canImport(UIKit)
@@ -27,10 +37,9 @@ final class LyricsForegroundExecution {
         }
         pathMonitor.start(queue: DispatchQueue(label: "EeveeSpotify.lyrics.network"))
         let center = NotificationCenter.default
+        // Only leaving the screen matters: an inactive app (Control Center, a call banner)
+        // is still on screen and keeps its queue.
         observers = [
-            center.addObserver(forName: UIApplication.willResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
-                self?.willResignActive()
-            },
             center.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
                 self?.didEnterBackground()
             },
@@ -38,7 +47,8 @@ final class LyricsForegroundExecution {
                 self?.didBecomeActive()
             }
         ]
-        if UIApplication.shared.applicationState != .active { willResignActive() }
+        // Launched in the background by iOS: no minimized time is asked for.
+        if UIApplication.shared.applicationState == .background { endBackgroundTime() }
         #endif
     }
 
@@ -49,14 +59,42 @@ final class LyricsForegroundExecution {
         for observer in observers { NotificationCenter.default.removeObserver(observer) }
     }
 
-    func willResignActive() { setActive(false) }
-
     func didEnterBackground() {
-        willResignActive()
         enteredBackground?()
+        #if canImport(UIKit)
+        if backgroundTask == .invalid, hasWork() {
+            backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "EeveeSpotify lyrics") { [weak self] in
+                self?.endBackgroundTime()
+            }
+        }
+        if backgroundTask != .invalid { return }
+        #endif
+        endBackgroundTime()
     }
 
-    func didBecomeActive() { setActive(true) }
+    /// The minimized time ended, was not granted, or was not needed.
+    func endBackgroundTime() {
+        releaseBackgroundTask()
+        let playing = isPlaying()
+        if !playing { setActive(false) }
+        backgroundTimeEnded?(playing)
+    }
+
+    /// The queue has nothing left: give the minimized time back to iOS early.
+    func workFinished() { releaseBackgroundTask() }
+
+    func didBecomeActive() {
+        releaseBackgroundTask()
+        setActive(true)
+    }
+
+    private func releaseBackgroundTask() {
+        #if canImport(UIKit)
+        guard backgroundTask != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(backgroundTask)
+        backgroundTask = .invalid
+        #endif
+    }
 
     private func setActive(_ next: Bool) {
         condition.lock()

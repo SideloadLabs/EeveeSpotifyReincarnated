@@ -97,6 +97,7 @@ final class KaraokeLyricsStore {
 final class KaraokePlaybackTracker {
     static let shared = KaraokePlaybackTracker()
     func playerReportedTrackId() -> String? { nil }
+    func isPlaying() -> Bool { false }
 }
 func publishSavedKaraokeLyrics(trackId: String) {}
 final class NativeOfflineLyrics {
@@ -407,7 +408,6 @@ let finishInFlight = holdFetch(inFlight)
 EeveeOfflineLyricsDownloader.beginLibraryScan()
 EeveeOfflineLyricsDownloader.downloadForTracks([["uri": "spotify:track:\(inFlight)"]] as NSArray)
 pump(until: { attempts(inFlight) == 1 }, "The test fetch did not start")
-downloader.foreground.willResignActive()
 downloader.foreground.didEnterBackground()
 let arrivedWhileInactive = "0000000000000000000722"
 emitDownload(arrivedWhileInactive)
@@ -436,10 +436,21 @@ check(UserDefaults.container.data(forKey: checkpointKey) == nil, "Finishing the 
 check(attempts(inFlight) == 1 && attempts(arrivedWhileInactive) == 1,
       "Returning restarted an already completed request or duplicated the queued audio text")
 
+// Minimized while Spotify plays: iOS keeps it running, so the queue keeps going.
+let whilePlaying = "0000000000000000000799"
+downloader.foreground.isPlaying = { true }
+downloader.foreground.didEnterBackground()
+emitDownload(whilePlaying)
+pump(until: { attempts(whilePlaying) == 1 && EeveeOfflineLyricsDownloader.settingsSnapshot()["pending"] as? Int == 0 },
+     "Lyrics paused while Spotify kept playing in the background")
+downloader.foreground.isPlaying = { false }
+downloader.foreground.didBecomeActive()
+print("Minimized lyrics pause without playback and continue while Spotify plays")
+
 let finishFirstStep = holdFetch(multiStepTrack)
 emitDownload(multiStepTrack)
 pump(until: { attempts(multiStepTrack) == 1 }, "The first provider step did not start")
-downloader.foreground.willResignActive()
+downloader.foreground.didEnterBackground()
 finishFirstStep.signal()
 var reachedFollowup = false
 pump(until: {
@@ -504,7 +515,7 @@ downloader.lyricsForNativeDownload(trackId: nextOffline) { result in
 pump(until: { offlineReplies == 1 && EeveeOfflineLyricsDownloader.settingsSnapshot()["pending"] as? Int == 2 },
      "the native callback or one of the two offline jobs was lost")
 check(visibleBatch()["completed"] as? Int == 0 && attempts(nextOffline) == 0, "offline tracks were consumed")
-downloader.foreground.willResignActive()
+downloader.foreground.didEnterBackground()
 downloader.foreground.setNetworkAvailable(true)
 RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.1))
 check(attempts(disconnectedTrack) == 1 && attempts(nextOffline) == 0, "reconnection bypassed foreground admission")
@@ -594,7 +605,7 @@ let interruptedQueue = CheckpointFixture(source: UserDefaults.lyricsSource.rawVa
     recheckCatalog: false, rateLimitRetryIds: [restoredRateLimitRetry])
 UserDefaults.container.set(try PropertyListEncoder().encode(interruptedQueue), forKey: checkpointKey)
 let coldDownloader = EeveeOfflineLyricsDownloader()
-coldDownloader.foreground.willResignActive()
+coldDownloader.foreground.didEnterBackground()
 coldDownloader.start()
 RunLoop.current.run(until: Date().addingTimeInterval(0.2))
 check(attempts(checkpointTrack) == 0 && UserDefaults.container.data(forKey: checkpointKey) != nil,

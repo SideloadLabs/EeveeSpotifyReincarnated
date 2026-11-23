@@ -155,6 +155,13 @@ final class EeveeOfflineLyricsDownloader: NSObject {
         }
         guard observers.isEmpty else { return }
         foreground.enteredBackground = { [weak self] in self?.flushCheckpoint() }
+        foreground.hasWork = { [weak self] in self?.hasLyricsWork ?? false }
+        foreground.isPlaying = { KaraokePlaybackTracker.shared.isPlaying() }
+        foreground.backgroundTimeEnded = { [weak self] playing in
+            guard let self, self.hasLyricsWork else { return }
+            writeDebugLog(playing ? "[Lyrics] minimized time ended; Spotify is playing, lyrics continue"
+                                  : "[Lyrics] minimized time ended; lyrics wait for Spotify")
+        }
         foreground.activityChanged = { [weak self] active in
             guard let self else { return }
             self.worker.isSuspended = !active
@@ -501,6 +508,7 @@ final class EeveeOfflineLyricsDownloader: NSObject {
         return id
     }
     private func changed() {
+        if !hasLyricsWork { foreground.workFinished() }
         if !hasLyricsWork || !foreground.isActive {
             flushCheckpoint()
         } else if !checkpointWriteScheduled {
