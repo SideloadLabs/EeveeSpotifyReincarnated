@@ -181,7 +181,18 @@ final class PlaylistActionRow: UIView {
     private static let followImage = UIImage(systemName: "person.badge.plus", withConfiguration: UIImage.SymbolConfiguration(pointSize: 17, weight: .semibold))
     private static let followedImage = UIImage(systemName: "person.fill.checkmark", withConfiguration: UIImage.SymbolConfiguration(pointSize: 17, weight: .semibold))
     private static let plusImage = UIImage(systemName: "plus", withConfiguration: UIImage.SymbolConfiguration(pointSize: 17, weight: .semibold))
-    private static let checkImage = UIImage(systemName: "checkmark", withConfiguration: UIImage.SymbolConfiguration(pointSize: 17, weight: .semibold))
+    // The same 20-point accent disc with a dark glyph as Spotify's downloaded indicator. Drawn once into a
+    // bitmap: a button configuration recolors symbol images with its own tint, a plain image it leaves alone.
+    private static let savedImage: UIImage = {
+        let side: CGFloat = 22
+        return UIGraphicsImageRenderer(size: CGSize(width: side, height: side)).image { _ in
+            Theme.accent.setFill()
+            UIBezierPath(ovalIn: CGRect(x: 0, y: 0, width: side, height: side)).fill()
+            let check = UIImage(systemName: "checkmark", withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .bold))?
+                .withTintColor(.black, renderingMode: .alwaysOriginal)
+            check?.draw(at: CGPoint(x: (side - (check?.size.width ?? 0)) / 2, y: (side - (check?.size.height ?? 0)) / 2))
+        }.withRenderingMode(.alwaysOriginal)
+    }()
     private static let playTitle = "playlist_play".localized
     private static let pauseTitle = "playlist_pause".localized
     // Measured with the longer title, so the capsule keeps one width for Play and Pause.
@@ -444,8 +455,7 @@ final class PlaylistActionRow: UIView {
         let saved = sourceRoot.flatMap { root in pageURI(from: root).map { EeveePixieSavedState(root, $0) { [weak self] in self?.sync() } } } ?? -1
         let liked = saved >= 0 ? saved == 1 : add.flatMap(Self.savedState) ?? false
         var addConfig = addButton.configuration
-        addConfig?.image = liked ? Self.checkImage : Self.plusImage
-        addConfig?.baseForegroundColor = liked ? Theme.color(Theme.spotifyGreen) : .white
+        addConfig?.image = liked ? Self.savedImage : Self.plusImage
         if addButton.configuration != addConfig { addButton.configuration = addConfig }
 
         // Spotify marks shuffle with a small dot under its icon and swaps the icon for smart shuffle.
