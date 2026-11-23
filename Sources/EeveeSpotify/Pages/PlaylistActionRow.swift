@@ -84,6 +84,8 @@ final class PlaylistActionRow: UIView {
             let target = CGRect(x: 0, y: frame.midY - 24, width: host.bounds.width, height: 48)
             if self.frame != target { self.frame = target }
         }
+        // The round button follows Spotify's own when the header moves it.
+        if roundPlay, let frame = nativePlayFrame(), frame != playButton.frame { setNeedsLayout() }
         let pinned = collapsed() || convert(bounds, to: nil).minY < (window?.safeAreaInsets.top ?? 0) + 50
         playHolder.map { holder in
             if holder.alpha != (pinned ? 1 : 0) { holder.alpha = pinned ? 1 : 0 }
@@ -129,7 +131,11 @@ final class PlaylistActionRow: UIView {
         return button
     }()
     private let shareButton = PlaylistActionRow.circle("square.and.arrow.up")
-    private let playButton: UIButton = {
+    private let playButton = PlaylistActionRow.makePlayButton()
+    // Set while the row is too narrow for the capsule; Play is then a round button in the place of Spotify's own.
+    private var roundPlay = false
+
+    private static func makePlayButton() -> UIButton {
         var config = UIButton.Configuration.prominentGlass()
         config.cornerStyle = .capsule
         config.baseForegroundColor = .black
@@ -142,7 +148,7 @@ final class PlaylistActionRow: UIView {
         let button = UIButton(configuration: config)
         button.tintColor = .white
         return button
-    }()
+    }
 
     private static let playImage = UIImage(systemName: "play.fill", withConfiguration: UIImage.SymbolConfiguration(pointSize: 15, weight: .bold))
     private static let pauseImage = UIImage(systemName: "pause.fill", withConfiguration: UIImage.SymbolConfiguration(pointSize: 15, weight: .bold))
@@ -152,6 +158,13 @@ final class PlaylistActionRow: UIView {
     private static let checkImage = UIImage(systemName: "checkmark", withConfiguration: UIImage.SymbolConfiguration(pointSize: 17, weight: .semibold))
     private static let playTitle = "playlist_play".localized
     private static let pauseTitle = "playlist_pause".localized
+    // Measured with the longer title, so the capsule keeps one width for Play and Pause.
+    private static let capsuleFit: CGFloat = [playTitle, pauseTitle].map { title in
+        let button = makePlayButton()
+        button.configuration?.image = playImage
+        button.configuration?.title = title
+        return button.sizeThatFits(CGSize(width: 220, height: 48)).width
+    }.max() ?? 140
 
     private static func circle(_ symbol: String) -> UIButton {
         var config = UIButton.Configuration.glass()
@@ -200,12 +213,6 @@ final class PlaylistActionRow: UIView {
         super.layoutSubviews()
         let side: CGFloat = 48, gap: CGFloat = 12, edge: CGFloat = 16
         let y = (bounds.height - side) / 2
-        let playWidth = min(max(140, playButton.sizeThatFits(CGSize(width: 220, height: side)).width), max(96, bounds.width * 0.45))
-        let playFrame = CGRect(x: bounds.width - edge - playWidth, y: y, width: playWidth, height: side)
-        if playButton.frame != playFrame { playButton.frame = playFrame }
-        let start = preservesPreviewLayout ? nativePreviewEnd(in: self).map { max(edge, $0 + gap) } ?? edge : edge
-        let stripFrame = CGRect(x: start, y: y, width: max(0, playFrame.minX - gap - start), height: side)
-        if actions.frame != stripFrame { actions.frame = stripFrame }
         var x: CGFloat = 0
         for native in [explore, download].compactMap({ $0 }) where hosts(native) && !native.isHidden {
             let size = native === explore ? previewSize : CGSize(width: side, height: side)
@@ -221,9 +228,40 @@ final class PlaylistActionRow: UIView {
         }
         shuffleDot.center = CGPoint(x: side / 2, y: side - 7)
         let size = CGSize(width: max(0, x - gap), height: side)
+
+        let start = preservesPreviewLayout ? nativePreviewEnd(in: self).map { max(edge, $0 + gap) } ?? edge : edge
+        let capsuleWidth = min(max(140, Self.capsuleFit), max(96, bounds.width * 0.45))
+        let round = start + size.width + gap + capsuleWidth + edge > bounds.width
+        if round != roundPlay {
+            roundPlay = round
+            updatePlayButton()
+        }
+        let playFrame = round
+            ? nativePlayFrame() ?? CGRect(x: bounds.width - edge - side, y: y, width: side, height: side)
+            : CGRect(x: bounds.width - edge - capsuleWidth, y: y, width: capsuleWidth, height: side)
+        if playButton.frame != playFrame { playButton.frame = playFrame }
+        let stripFrame = CGRect(x: start, y: y, width: max(0, playFrame.minX - gap - start), height: side)
+        if actions.frame != stripFrame { actions.frame = stripFrame }
         if actions.contentSize != size { actions.contentSize = size }
         let offset = max(0, min(actions.contentOffset.x, size.width - actions.bounds.width))
         if actions.contentOffset.x != offset { actions.contentOffset.x = offset }
+    }
+
+    // Spotify's play button while it is laid out in this row. Once the row collapses it moves to the nav bar.
+    private func nativePlayFrame() -> CGRect? {
+        guard let play, play.window != nil, window != nil, play.bounds.width > 0 else { return nil }
+        let frame = play.convert(play.bounds, to: self)
+        return bounds.intersects(frame) ? frame : nil
+    }
+
+    private func updatePlayButton() {
+        let playing = (play?.accessibilityLabel ?? play?.eeveeFirst(UIControl.self)?.accessibilityLabel)?.lowercased().contains("pause") == true
+        let title = playing ? Self.pauseTitle : Self.playTitle
+        var config = playButton.configuration
+        config?.image = playing ? Self.pauseImage : Self.playImage
+        config?.title = roundPlay ? nil : title
+        if playButton.configuration != config { playButton.configuration = config }
+        if playButton.accessibilityLabel != title { playButton.accessibilityLabel = title }
     }
 
     private func previewBecameReady() {
@@ -359,11 +397,7 @@ final class PlaylistActionRow: UIView {
             shareButton.isHidden = share == nil
             setNeedsLayout()
         }
-        let playing = (play?.accessibilityLabel ?? play?.eeveeFirst(UIControl.self)?.accessibilityLabel)?.lowercased().contains("pause") == true
-        var config = playButton.configuration
-        config?.image = playing ? Self.pauseImage : Self.playImage
-        config?.title = playing ? Self.pauseTitle : Self.playTitle
-        if playButton.configuration != config { playButton.configuration = config }
+        updatePlayButton()
 
         // The album / playlist state comes from Spotify's collection state, which reports every change.
         let saved = sourceRoot.flatMap { root in pageURI(from: root).map { EeveePixieSavedState(root, $0) { [weak self] in self?.sync() } } } ?? -1
