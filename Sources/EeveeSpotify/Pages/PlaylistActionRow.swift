@@ -19,7 +19,10 @@ final class PlaylistActionRow: UIView {
     private var previewObservations = [NSKeyValueObservation]()
     private var previewUpdatePending = false
     weak var followControl: UIView?
-    weak var anchor: UIView?
+    weak var anchor: UIView? {
+        didSet { if anchor !== oldValue { observeAnchor() } }
+    }
+    private var anchorObservations = [NSKeyValueObservation]()
     // Spotify's single play button moves into the nav bar once its row collapses; ours steps aside and lets it show there.
     weak var playHolder: UIView?
     weak var controlsRow: UIView?
@@ -77,12 +80,35 @@ final class PlaylistActionRow: UIView {
         scrollObservation = scrollView.observe(\.contentOffset) { [weak self] _, _ in self?.place() }
     }
 
+    // Spotify moves its header content in layout passes of its own (cover and metadata arriving, insets
+    // settling) that neither scroll the list nor lay out the page controller, so the row used to catch up
+    // only on a later pass and jumped. The anchor's layer and those of its ancestors up to the host report
+    // every move, and the row follows in the same pass.
+    private func observeAnchor() {
+        anchorObservations.removeAll()
+        guard let anchor else { return }
+        var view: UIView? = anchor
+        while let current = view, current !== superview {
+            anchorObservations.append(current.layer.observe(\.position) { [weak self] _, _ in self?.place() })
+            view = current.superview
+        }
+        anchorObservations.append(anchor.layer.observe(\.bounds) { [weak self] _, _ in self?.place() })
+    }
+
     func place() {
         guard let host = superview, host.window != nil else { return }
         if let anchor, anchor.window != nil, anchor.bounds.height > 0 {
             let frame = anchor.convert(anchor.bounds, to: host)
             let target = CGRect(x: 0, y: frame.midY - 24, width: host.bounds.width, height: 48)
-            if self.frame != target { self.frame = target }
+            if self.frame == .zero {
+                // The first placement must not join a running transition animation and slide in from the corner.
+                UIView.performWithoutAnimation {
+                    self.frame = target
+                    self.layoutIfNeeded()
+                }
+            } else if self.frame != target {
+                self.frame = target
+            }
         }
         // The round button follows Spotify's own when the header moves it.
         if roundPlay, let frame = nativePlayFrame(), frame != playButton.frame { setNeedsLayout() }
