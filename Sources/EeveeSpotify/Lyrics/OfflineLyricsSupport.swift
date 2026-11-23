@@ -72,6 +72,26 @@ func savedOfflineLyricsEntry(trackId: String, allowOtherProvider: Bool) -> Offli
     return store.fallbackEntry(trackId: trackId, sources: others)
 }
 
+/// Online, the selected provider's saved lyrics answer Spotify as the provider's own answer
+/// would: the same colors, and the custom lyrics button gets its saved lyrics too. A file
+/// saved before the button's lyrics were kept (or without them, for a provider that has a
+/// button) is skipped, so the provider is asked and the button appears as before.
+private func savedSelectedProviderLyrics(trackId: String, originalLyrics: Lyrics?) -> Data? {
+    guard let entry = savedOfflineLyricsEntry(trackId: trackId, allowOtherProvider: false),
+          var lyrics = try? Lyrics(serializedBytes: entry.data), !lyrics.data.lines.isEmpty else { return nil }
+    let buttonLyrics = entry.karaoke.flatMap { try? JSONDecoder().decode(KaraokeLyricsDto.self, from: $0) }
+    guard buttonLyrics != nil || !UserDefaults.lyricsSource.supportsCustomLyricsView else { return nil }
+    applyLyricsColors(&lyrics, originalLyrics: originalLyrics)
+    guard let data = try? lyrics.serializedData() else { return nil }
+    // What the provider's fetch does: this request marks the playing song, and the button
+    // shows only lyrics this answer brings.
+    KaraokePlaybackTracker.shared.updateTrackIdFromLyricsFetch(trackId)
+    if let buttonLyrics { KaraokeLyricsStore.shared.set(trackId: trackId, lyrics: buttonLyrics) }
+    else { KaraokeLyricsStore.shared.remove(trackId: trackId) }
+    writeDebugLog("[Lyrics] \(trackId): saved \(UserDefaults.lyricsSource.description) lyrics, no request")
+    return data
+}
+
 /// Saved text for a lyrics request that already failed (no network). `offline`:
 /// another provider's saved text may stand in until the selected one is saved.
 func cachedOfflineLyrics(trackId: String, offline: Bool = false) -> Lyrics? {
@@ -253,7 +273,24 @@ func savedLyrics(forFailed url: URL, error: Error?) -> Data? {
 /// for the same task: one provider answer per task is shared between them.
 func eeveeLyricsData(_ path: String, originalLyrics: Lyrics? = nil, task: URLSessionTask) throws -> Data {
     guard path.contains("/download/track/") else {
-        return try getLyricsDataForCurrentTrack(path, originalLyrics: originalLyrics)
+        guard let trackId = extractTrackId(from: path) else {
+            return try getLyricsDataForCurrentTrack(path, originalLyrics: originalLyrics)
+        }
+        // 1. The selected provider's saved lyrics, without asking it again.
+        if let saved = savedSelectedProviderLyrics(trackId: trackId, originalLyrics: originalLyrics) { return saved }
+        // 2. The provider online, as upstream does.
+        do { return try getLyricsDataForCurrentTrack(path, originalLyrics: originalLyrics) }
+        catch {
+            // 3. Spotify has no lyrics of its own (its card may be one Eevee added for saved
+            // lyrics) and the provider has none online: lyrics saved with an earlier provider,
+            // as offline. With Spotify's own lyrics, those stay as before.
+            guard originalLyrics == nil, (error as? URLError)?.code != .cancelled,
+                  let entry = savedOfflineLyricsEntry(trackId: trackId, allowOtherProvider: true),
+                  var lyrics = try? Lyrics(serializedBytes: entry.data) else { throw error }
+            applyLyricsColors(&lyrics, originalLyrics: nil)
+            writeDebugLog("[Lyrics] \(trackId): provider has no lyrics online (\(error)); saved lyrics are shown")
+            return try lyrics.serializedData()
+        }
     }
     guard UserDefaults.lyricsSource.isReplacingLyrics, UserDefaults.offlineLyricsEnabled else {
         throw LyricsError.invalidSource

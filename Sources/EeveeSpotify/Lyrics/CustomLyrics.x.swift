@@ -438,7 +438,14 @@ func getLyricsDataForCurrentTrack(_ originalPath: String, originalLyrics: Lyrics
     guard var lyrics = fetchedLyrics else {
         throw LyricsError.noSuchSong
     }
-    
+
+    applyLyricsColors(&lyrics, originalLyrics: originalLyrics)
+    return try lyrics.serializedData()
+}
+
+/// The colors Spotify's lyrics view gets with a provider's lyrics. Shared with the saved
+/// lyrics that answer a request online (OfflineLyricsSupport), so both look the same.
+func applyLyricsColors(_ lyrics: inout Lyrics, originalLyrics: Lyrics?) {
     let lyricsColorsSettings = UserDefaults.lyricsColors
     
     if lyricsColorsSettings.displayOriginalColors, let originalLyrics = originalLyrics {
@@ -465,6 +472,4 @@ func getLyricsDataForCurrentTrack(_ originalPath: String, originalLyrics: Lyrics
             $0.activeLineColor = Color.white.uInt32
         }
     }
-    
-    return try lyrics.serializedData()
 }
