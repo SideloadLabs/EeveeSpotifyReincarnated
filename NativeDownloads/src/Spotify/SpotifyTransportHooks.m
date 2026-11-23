@@ -76,9 +76,6 @@ NSArray *SAPInstallSpotifyTransportHooks(void) {
                 IMP original = method_getImplementation(method);
                 putHook(cls, command, method, ^id(id self, id serviceName, id methodName, id payload, id callback) {
                     SAPRememberTransport(self, NO, NO);
-#ifdef SAP_RUNTIME_TESTING
-                    SAPRememberNativeCall(self, serviceName, methodName);
-#endif
                     BOOL offline=[serviceName isKindOfClass:NSString.class] && [serviceName isEqual:SAPOfflineService];
                     // Observe requests independently of diagnostic logging. The lyrics
                     // queue deduplicates the native UI and transport paths.

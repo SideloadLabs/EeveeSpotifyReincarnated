@@ -31,76 +31,6 @@ static NSString *safeName(NSString *name) {
     while([result lengthOfBytesUsingEncoding:NSUTF8StringEncoding]>180){NSRange last=[result rangeOfComposedCharacterSequenceAtIndex:result.length-1];result=[result substringToIndex:last.location];}
     return result.length&&![result isEqual:@"."]&&![result isEqual:@".."]?result:@"Track";
 }
-#ifndef SAP_RESEARCH_DUMP
-#define SAP_RESEARCH_DUMP 0
-#endif
-#if SAP_RESEARCH_DUMP
-// Research-only artifact. Writes the storage-decoded media payload and the
-// opaque 28-byte key record to the guest app's Documents so it can be pulled
-// locally. This code is compiled out of normal builds.
-static void researchDump(FILE *payload,NSString *fileID,NSString *cacheID,unsigned kind,unsigned index,
-                         const uint8_t *blob,BOOL haveBlob,const uint8_t *callback,BOOL haveCallback,
-                         uint64_t expected,size_t candidates,NSUInteger previewHits) {
-    if(!payload||!fileID.length||!cacheID.length)return;
-    NSFileManager *fm=NSFileManager.defaultManager;
-    NSURL *root=[[NSURL fileURLWithPath:[NSHomeDirectory() stringByAppendingPathComponent:@"Documents"] isDirectory:YES] URLByAppendingPathComponent:@"Pixie Research" isDirectory:YES];
-    if(![fm createDirectoryAtURL:root withIntermediateDirectories:YES attributes:@{NSFileProtectionKey:NSFileProtectionCompleteUntilFirstUserAuthentication} error:nil])return;
-    NSString *base=[NSString stringWithFormat:@"%@-%@",fileID,cacheID];
-    NSURL *payloadURL=[root URLByAppendingPathComponent:[base stringByAppendingString:@".payload"]];
-    FILE *out=fopen(payloadURL.path.fileSystemRepresentation,"wb");
-    if(out){if(fseeko(payload,0,SEEK_SET)){}uint8_t buffer[65536];size_t n;while((n=fread(buffer,1,sizeof(buffer),payload)))if(fwrite(buffer,1,n,out)!=n)break;fclose(out);}
-    NSMutableData *keys=[NSMutableData data];uint8_t flags=(haveBlob?1:0)|(haveCallback?2:0);[keys appendBytes:&flags length:1];
-    if(haveBlob)[keys appendBytes:blob length:28];if(haveCallback)[keys appendBytes:callback length:16];
-    [keys writeToURL:[root URLByAppendingPathComponent:[base stringByAppendingString:@".keys"]] atomically:YES];
-    uint8_t recentKeys[4*24]={0},recentContexts[4*64]={0},recentLengths[4]={0};
-    NSUInteger recentCount=SAPCopyRecentMediaKeys24(recentKeys,recentContexts,recentLengths,4);
-    NSMutableData *keys24=[NSMutableData data];uint8_t count=(uint8_t)recentCount;[keys24 appendBytes:&count length:1];
-    for(NSUInteger i=0;i<recentCount;i++){[keys24 appendBytes:recentKeys+i*24 length:24];[keys24 appendBytes:&recentLengths[i] length:1];[keys24 appendBytes:recentContexts+i*64 length:64];}
-    [keys24 writeToURL:[root URLByAppendingPathComponent:[base stringByAppendingString:@".keys24"]] atomically:YES];
-    uint8_t mediaOutputs[4*32]={0},mediaOutputLengths[4]={0};
-    NSUInteger mediaOutputCount=SAPCopyRecentMediaOutputs(mediaOutputs,mediaOutputLengths,4);
-    NSMutableData *outputs=[NSMutableData data];uint8_t outputCount=(uint8_t)mediaOutputCount;[outputs appendBytes:&outputCount length:1];
-    for(NSUInteger i=0;i<mediaOutputCount;i++){[outputs appendBytes:&mediaOutputLengths[i] length:1];[outputs appendBytes:mediaOutputs+i*32 length:32];}
-    [outputs writeToURL:[root URLByAppendingPathComponent:[base stringByAppendingString:@".mediaout"]] atomically:YES];
-    memset_s(mediaOutputs,sizeof(mediaOutputs),0,sizeof(mediaOutputs));
-    uint8_t mediaRecords[8*56]={0};
-    NSUInteger mediaRecordCount=SAPCopyRecentMediaRecords(mediaRecords,8);
-    NSMutableData *recordData=[NSMutableData data];uint8_t recordCount=(uint8_t)mediaRecordCount;[recordData appendBytes:&recordCount length:1];
-    for(NSUInteger i=0;i<mediaRecordCount;i++)[recordData appendBytes:mediaRecords+i*56 length:56];
-    [recordData writeToURL:[root URLByAppendingPathComponent:[base stringByAppendingString:@".mediarec"]] atomically:YES];
-    memset_s(mediaRecords,sizeof(mediaRecords),0,sizeof(mediaRecords));
-    uint8_t aesKeyRecords[16*41]={0};
-    NSUInteger aesKeyCount=SAPCopyRecentAesKeys(aesKeyRecords,16);
-    NSMutableData *aesKeyData=[NSMutableData data];uint8_t aesKeyByte=(uint8_t)aesKeyCount;[aesKeyData appendBytes:&aesKeyByte length:1];
-    for(NSUInteger i=0;i<aesKeyCount;i++)[aesKeyData appendBytes:aesKeyRecords+i*41 length:41];
-    [aesKeyData writeToURL:[root URLByAppendingPathComponent:[base stringByAppendingString:@".aeskeys"]] atomically:YES];
-    memset_s(aesKeyRecords,sizeof(aesKeyRecords),0,sizeof(aesKeyRecords));
-    uint8_t ccRecords[16*62]={0};
-    NSUInteger ccCount=SAPCopyRecentCCCryptos(ccRecords,16);
-    NSMutableData *ccData=[NSMutableData data];uint8_t ccByte=(uint8_t)ccCount;[ccData appendBytes:&ccByte length:1];
-    for(NSUInteger i=0;i<ccCount;i++)[ccData appendBytes:ccRecords+i*62 length:62];
-    [ccData writeToURL:[root URLByAppendingPathComponent:[base stringByAppendingString:@".cccryptos"]] atomically:YES];
-    memset_s(ccRecords,sizeof(ccRecords),0,sizeof(ccRecords));
-    uint8_t ctrRecords[8*56]={0};
-    NSUInteger ctrCount=SAPCopyRecentAesCtrs(ctrRecords,8);
-    NSMutableData *ctrData=[NSMutableData data];uint8_t ctrByte=(uint8_t)ctrCount;[ctrData appendBytes:&ctrByte length:1];
-    for(NSUInteger i=0;i<ctrCount;i++)[ctrData appendBytes:ctrRecords+i*56 length:56];
-    [ctrData writeToURL:[root URLByAppendingPathComponent:[base stringByAppendingString:@".aesctr"]] atomically:YES];
-    memset_s(ctrRecords,sizeof(ctrRecords),0,sizeof(ctrRecords));
-    uint8_t blockRecords[8*338]={0};
-    NSUInteger blockCount=SAPCopyRecentAesBlocks(blockRecords,8);
-    NSMutableData *blockData=[NSMutableData data];uint8_t blockByte=(uint8_t)blockCount;[blockData appendBytes:&blockByte length:1];
-    for(NSUInteger i=0;i<blockCount;i++)[blockData appendBytes:blockRecords+i*338 length:338];
-    [blockData writeToURL:[root URLByAppendingPathComponent:[base stringByAppendingString:@".aesblock"]] atomically:YES];
-    memset_s(blockRecords,sizeof(blockRecords),0,sizeof(blockRecords));
-    memset_s(recentKeys,sizeof(recentKeys),0,sizeof(recentKeys));memset_s(recentContexts,sizeof(recentContexts),0,sizeof(recentContexts));
-    NSDictionary *meta=@{@"file_identifier":fileID,@"cache_id":cacheID,@"descriptor_kind":@(kind),@"descriptor_index":@(index),
-        @"have_blob":@(haveBlob),@"have_callback_key":@(haveCallback),@"expected_duration_ms":@(expected),
-        @"candidates":@(candidates),@"preview_hits":@(previewHits),@"created":@(NSDate.date.timeIntervalSince1970)};
-    NSData *json=[NSJSONSerialization dataWithJSONObject:meta options:NSJSONWritingPrettyPrinted error:nil];
-    [json writeToURL:[root URLByAppendingPathComponent:[base stringByAppendingString:@".json"]] atomically:YES];
-}
-#endif
 static int exportContinue(void *context) {
     BOOL (^cancelled)(void)=(__bridge id)context;
     return !cancelled || !cancelled();
@@ -465,9 +395,6 @@ BOOL SAPExportTrackFromCache(NSDictionary *track,NSURL *folder,NSUInteger number
             }
             SAP_TRACE("export","media_decode_matrix",0,@{@"file_identifier":idHex,@"cache_id_hex":cacheID,
                 @"candidates":@(variantCount),@"preview_hits":@(previewHits),@"validated":@(success),@"native_keys_24":@(nativeKeyCount),@"native_contexts":@(recentContextCount),@"native_unsealed_key_available":@(nativeUnsealed),@"key_in_log":@NO});
-#if SAP_RESEARCH_DUMP
-            if(!success)researchDump(input,idHex,cacheID,kind,index,keyBlob,haveKeyBlob,key,haveKey,[track[@"duration_ms"]unsignedLongLongValue],variantCount,previewHits);
-#endif
             matrixHits+=previewHits;
             free(variants);
             // The native key-store derivation returns a 32-byte result whose

@@ -56,7 +56,3 @@ static inline void SAPAcquireTransportHandle(id handle) {
     SEL sel = NSSelectorFromString(@"acquire"); Method method;
     if (SAPTransportSignature(object_getClass(handle), sel, 2, 'v', &method)) ((void (*)(id, SEL))objc_msgSend)(handle, sel);
 }
-#ifdef SAP_RUNTIME_TESTING
-void SAPRememberNativeCall(id endpoint,id serviceName,id methodName);
-NSDictionary *SAPTransportInventoryForTesting(void);
-#endif

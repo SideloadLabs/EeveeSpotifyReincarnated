@@ -124,7 +124,6 @@
     "UI/PixieManagerActions.m",
     "UI/PixieManagerSettings.m",
     "UI/PixiePageController.m",
-    "Diagnostics/EncodedAudio.m",
     "Catalog/ArtistMetadata.m",
     "Downloads/ArtistDownloadSession.m",
     "UI/ArtistDownloadsUI.m",

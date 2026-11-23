@@ -6,8 +6,6 @@
 #import "DiagnosticTrace.h"
 extern void SAPObserveMediaKeyPath(const uint64_t *,uintptr_t);
 extern void SAPObserveMediaRecord(const uint64_t *,uintptr_t);
-extern void SAPObserveAesCtr(const uint64_t *,uintptr_t);
-extern void SAPObserveAesBlock(const uint64_t *,uintptr_t);
 #import "NativeCacheMap.h"
 #import "TrackExport.h"
 #import "CacheStorageKey.h"

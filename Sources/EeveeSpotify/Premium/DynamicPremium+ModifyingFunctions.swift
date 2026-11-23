@@ -695,5 +695,6 @@ if needsLocalSyncOffline || pixieCompanionPresent {
 }
 }
 
-private let pixieCompanionPresent: Bool =
+// Pixie (native downloads) is loaded next to Eevee.
+let pixieCompanionPresent: Bool =
     dlsym(UnsafeMutableRawPointer(bitPattern: -2), "SAPUpdateArtistDownloadsExternal") != nil
