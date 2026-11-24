@@ -118,11 +118,11 @@ int main(void) { @autoreleasepool {
     NSData *wire=response(artist);NSDictionary *catalog=SAPParseArtistMetadata(wire,artistURI);
     assert([catalog[@"name"]isEqual:@"Fixture artist"] && [catalog[@"release_count"]unsignedIntValue]==9);
     assert([catalog[@"skipped_incomplete_releases"]unsignedIntValue]==1);
-    assert(([[catalog[@"sections"]valueForKey:@"title"]isEqual:@[@"Albums",@"EPs",@"Singles",@"Singles & EPs",@"Compilations",@"Appears on"]]));
-    NSArray *albums=section(catalog,@"Albums")[@"releases"],*eps=section(catalog,@"EPs")[@"releases"];
+    assert(([[catalog[@"sections"]valueForKey:@"title"]isEqual:@[@"albums",@"eps",@"singles",@"singles_eps",@"compilations",@"appears_on"]]));
+    NSArray *albums=section(catalog,@"albums")[@"releases"],*eps=section(catalog,@"eps")[@"releases"];
     assert([albums[0][@"name"]isEqual:@"First (Deluxe)"] && [albums[0][@"year"]intValue]==2020 && [albums[0][@"date_order"]intValue]==20200229);
     assert([albums[1][@"year"]intValue]==0 && [eps[0][@"name"]isEqual:@"Later EP"] && [eps[1][@"type"]intValue]==4);
-    assert([section(catalog,@"Appears on")[@"releases"]count]==1);
+    assert([section(catalog,@"appears_on")[@"releases"]count]==1);
     assert(SAPParseArtistMetadata(wire,@"spotify:artist:0000000000000000000002")==nil);
     for(NSString *invalid in @[@"spotify:album:0000000000000000000001",@"spotify:artist:short",@"spotify:artist:000000000000000000000!"])
         assert(!SAPParseArtistMetadata(wire,invalid));
@@ -141,7 +141,7 @@ int main(void) { @autoreleasepool {
         SAPProtoBytes(5,group(@[album(gid(22),@"Same title",1,2026,nil)]))]));
     NSDictionary *editionCatalog=SAPParseArtistMetadata(editionArtist,artistURI);
     assert([editionCatalog[@"release_count"]intValue]==2 && [editionCatalog[@"resolved_edition_count"]intValue]==3);
-    NSArray *editionRows=section(editionCatalog,@"Albums")[@"releases"];
+    NSArray *editionRows=section(editionCatalog,@"albums")[@"releases"];
     NSMutableSet *editionURIs=[NSMutableSet set];for(NSDictionary *row in editionRows)[editionURIs addObject:row[@"uri"]];
     assert([editionURIs containsObject:@"spotify:album:000000000000000000000k"] && [editionURIs containsObject:@"spotify:album:000000000000000000000m"] && ![editionURIs containsObject:@"spotify:album:000000000000000000000l"]);
     // A fully parsed alternate is initially selectable. A later hydrated first
@@ -150,7 +150,7 @@ int main(void) { @autoreleasepool {
     for(NSNumber *primaryWorks in @[@YES,@NO]){
         NSString *primary=@"spotify:album:000000000000000000000k";
         readResponses=@{artistURI:pendingEdition,primary:SAPProtoBytes(1,SAPProtoBytes(3,album(gid(primaryWorks.boolValue?20:99),@"Primary",1,2026,nil)))};fetched=NO;
-        SAPFetchArtistMetadata(artistURI,^(NSDictionary *value,NSString *error){assert(value && !error && [value[@"release_count"]intValue]==1);NSDictionary *row=section(value,@"Albums")[@"releases"][0];assert([row[@"uri"]isEqual:primaryWorks.boolValue?primary:@"spotify:album:000000000000000000000l"]);fetched=YES;});waitFor(^BOOL{return fetched;});
+        SAPFetchArtistMetadata(artistURI,^(NSDictionary *value,NSString *error){assert(value && !error && [value[@"release_count"]intValue]==1);NSDictionary *row=section(value,@"albums")[@"releases"][0];assert([row[@"uri"]isEqual:primaryWorks.boolValue?primary:@"spotify:album:000000000000000000000l"]);fetched=YES;});waitFor(^BOOL{return fetched;});
     }
     NSDictionary *recorded=[NSJSONSerialization JSONObjectWithData:[NSData dataWithContentsOfFile:@"tests/fixtures/artist-release-groups.json"] options:0 error:nil];assert(recorded);
     for(NSDictionary *entry in recorded[@"artists"]){
@@ -193,7 +193,7 @@ int main(void) { @autoreleasepool {
     SAPFetchArtistMetadataCancellable(artistURI,^(NSUInteger done,NSUInteger total){assert(NSThread.isMainThread && total==6);completedMetadata=done;},^(NSDictionary *value,NSString *error){
         assert(NSThread.isMainThread && value && !error);
         assert([value[@"release_count"]intValue]==3 && [value[@"hydrated_releases"]intValue]==3 && [value[@"unresolved_releases"]intValue]==2);
-        assert([value[@"load_warning"]length] && section(value,@"Albums") && section(value,@"EPs") && section(value,@"Singles"));fetched=YES;
+        assert([value[@"load_warning"]length] && section(value,@"albums") && section(value,@"eps") && section(value,@"singles"));fetched=YES;
     });
     waitFor(^BOOL{return fetched;});assert(completedMetadata==6 && maximumReadsActive==4 && readsActive==0);
     BOOL captured=NO,mismatch=NO,failedRead=NO;
@@ -312,7 +312,7 @@ int main(void) { @autoreleasepool {
         for(NSNumber *enabled in @[@NO,@YES]) {
             readResponses=@{artistURI:oneReference,albumURI:catalogAlbum};metadataEvents=[NSMutableArray array];tracing=enabled.boolValue;fetched=NO;
             NSUInteger beforeReads=readCalls;
-            SAPFetchArtistMetadata(artistURI,^(NSDictionary *value,NSString *error){assert(value && !error);NSDictionary *item=section(value,@"Albums")[@"releases"][0];assert([item[@"track_count_verified"]boolValue]==(trackCount.unsignedIntegerValue>0));assert([item[@"track_uris"]count]==trackCount.unsignedIntegerValue);if(trackCount.unsignedIntegerValue)assert([item[@"verified_track_count"]unsignedIntegerValue]==trackCount.unsignedIntegerValue && [item[@"track_uris"][0]isEqual:@"spotify:track:0000000000000000000001"]);fetched=YES;});waitFor(^BOOL{return fetched;});tracing=NO;
+            SAPFetchArtistMetadata(artistURI,^(NSDictionary *value,NSString *error){assert(value && !error);NSDictionary *item=section(value,@"albums")[@"releases"][0];assert([item[@"track_count_verified"]boolValue]==(trackCount.unsignedIntegerValue>0));assert([item[@"track_uris"]count]==trackCount.unsignedIntegerValue);if(trackCount.unsignedIntegerValue)assert([item[@"verified_track_count"]unsignedIntegerValue]==trackCount.unsignedIntegerValue && [item[@"track_uris"][0]isEqual:@"spotify:track:0000000000000000000001"]);fetched=YES;});waitFor(^BOOL{return fetched;});tracing=NO;
             assert(readCalls==beforeReads+2);
             if(!enabled.boolValue) {assert(metadataEvents.count==0);continue;}
             BOOL membershipFound=NO;
@@ -335,6 +335,6 @@ int main(void) { @autoreleasepool {
     puts("PASS: catalog diagnostics reuse the hydration reply with no extra reads; missing membership is unavailable; 513 tracks retain count with a 512-URI incomplete sample; diagnostics off emit nothing");
     NSData *progressiveWire=response(join(@[SAPProtoBytes(1,gid(1)),text(2,@"Progressive artist"),SAPProtoBytes(5,group(@[album(gid(22),@"Ready",1,2026,nil)])),SAPProtoBytes(5,group(@[SAPProtoBytes(1,gid(20)),album(gid(21),@"Alternate",1,2026,nil)]))]));
     readResponses=@{artistURI:progressiveWire,@"spotify:album:000000000000000000000k":SAPProtoBytes(1,SAPProtoBytes(3,album(gid(20),@"Preferred",1,2026,nil)))};fetched=NO;__block NSUInteger previews=0;
-    SAPFetchArtistMetadataProgressively(artistURI,nil,^(NSDictionary *value){assert(NSThread.isMainThread && !fetched);assert([value[@"release_count"]intValue]==1 && [section(value,@"Albums")[@"releases"][0][@"name"]isEqual:@"Ready"]);assert([value[@"observation_releases"]count]==3);previews++;},^(NSDictionary *value,NSString *error){assert(!error && previews==1 && [value[@"release_count"]intValue]==2);BOOL ready=NO,preferred=NO;for(NSDictionary *row in section(value,@"Albums")[@"releases"]){ready|=[row[@"name"]isEqual:@"Ready"];preferred|=[row[@"name"]isEqual:@"Preferred"];assert(![row[@"name"]isEqual:@"Alternate"]);}assert(ready&&preferred);fetched=YES;});waitFor(^BOOL{return fetched;});
+    SAPFetchArtistMetadataProgressively(artistURI,nil,^(NSDictionary *value){assert(NSThread.isMainThread && !fetched);assert([value[@"release_count"]intValue]==1 && [section(value,@"albums")[@"releases"][0][@"name"]isEqual:@"Ready"]);assert([value[@"observation_releases"]count]==3);previews++;},^(NSDictionary *value,NSString *error){assert(!error && previews==1 && [value[@"release_count"]intValue]==2);BOOL ready=NO,preferred=NO;for(NSDictionary *row in section(value,@"albums")[@"releases"]){ready|=[row[@"name"]isEqual:@"Ready"];preferred|=[row[@"name"]isEqual:@"Preferred"];assert(![row[@"name"]isEqual:@"Alternate"]);}assert(ready&&preferred);fetched=YES;});waitFor(^BOOL{return fetched;});
     puts("PASS: progressive catalogs expose ready groups before completion, defer unsettled edition identities, retain full observation scope, and preserve visible identities in the final catalog");
 } return 0; }

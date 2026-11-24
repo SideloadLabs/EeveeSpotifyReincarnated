@@ -12,7 +12,7 @@
 #define DELETE_TRACE(stage,...) do { if([self tracing]) \
  SAPTraceEventAtGeneration("offline_library_delete",stage,self.traceID,(__VA_ARGS__),self.traceGeneration); } while(0)
 
-NSString *const SAPOfflineLibraryDeleteBusyError=@"Download in progress";
+NSString *const SAPOfflineLibraryDeleteBusyError=@"download_in_progress";
 static NSString *const Offline=@"spotify.offline_esperanto.proto.Offline";
 static NSString *const Library=@"spotify.your_library_esperanto.proto.YourLibraryService";
 static NSData *str(unsigned n,NSString *s){return SAPProtoBytes(n,[s dataUsingEncoding:NSUTF8StringEncoding]);}

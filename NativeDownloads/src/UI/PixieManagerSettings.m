@@ -186,7 +186,7 @@ static UITableViewCell *SAPSettingsCell(UITableView *table,NSString *title,NSStr
 static NSString *SAPObservedValue(id value) {
     if(!value||value==NSNull.null)return SAPLocalized(@"unavailable_2");
     if([value isKindOfClass:NSNumber.class])return [value stringValue];
-    return [value isKindOfClass:NSString.class]&&[value length]?SAPLocalizedValue(value):SAPLocalized(@"unavailable_2");
+    return [value isKindOfClass:NSString.class]&&[value length]?SAPLocalized(value):SAPLocalized(@"unavailable_2");
 }
 static UITableViewCell *SAPPlainSettingsCell(NSString *label,NSString *value) {
     UITableViewCell *cell=[[UITableViewCell alloc]initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:nil];
@@ -573,7 +573,7 @@ static id SAPLyricsCatalogObserver;
     [UIView transitionWithView:self.tableView duration:0.25 options:UIViewAnimationOptionTransitionCrossDissolve animations:^{[self refresh];} completion:nil];
 }
 - (void)showError:(NSString *)error {
-    UIAlertController *alert=[UIAlertController alertControllerWithTitle:SAPLocalized(@"lyrics_2") message:SAPLocalizedValue(error) preferredStyle:UIAlertControllerStyleAlert];
+    UIAlertController *alert=[UIAlertController alertControllerWithTitle:SAPLocalized(@"lyrics_2") message:SAPLocalized(error) preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"ok") style:UIAlertActionStyleCancel handler:nil]];[self presentViewController:alert animated:YES completion:nil];
 }
 - (void)downloadExisting {
@@ -668,8 +668,8 @@ static id SAPLyricsCatalogObserver;
     }
     if(section==1) {
         NSDictionary *mode=self.snapshot[@"key_request_mode"];
-        // The adapter reports a fixed English sentence; it is a Localizable.strings key.
-        return [NSString stringWithFormat:SAPLocalized(@"only_change_settings_in_this_menu"),SAPLocalizedValue(mode[@"detail"]?:@"")];
+        // The adapter reports the detail as a translation key.
+        return [NSString stringWithFormat:SAPLocalized(@"only_change_settings_in_this_menu"),SAPLocalized(mode[@"detail"]?:@"")];
     }
     if(section==2)return SAPLocalized(@"export_downloaded_spotify_audio_to_external");
     if(section==3)return SAPLocalized(@"download_lyrics_for_downloaded_songs_and");

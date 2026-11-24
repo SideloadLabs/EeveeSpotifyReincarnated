@@ -92,7 +92,7 @@ static UIBarButtonItem *selectionControl(UITableViewController *page){
  for(UIBarButtonItem *item in page.toolbarItems)if([item.title isEqual:@"Select"])return item;assert(0);return nil;
 }
 static void emit(BOOL active){assert(observer);fixtureActive=active;observer(fixtureSnapshot(active));flushFixtureUI();}
-static NSDictionary *catalog(void){NSMutableArray*sections=[NSMutableArray array];NSArray*titles=@[@"Albums",@"EPs",@"Singles",@"Singles & EPs",@"Compilations",@"Appears on"];
+static NSDictionary *catalog(void){NSMutableArray*sections=[NSMutableArray array];NSArray*titles=@[@"albums",@"eps",@"singles",@"singles_eps",@"compilations",@"appears_on"];
  for(NSUInteger i=0;i<titles.count;i++)[sections addObject:@{@"title":titles[i],@"releases":@[@{@"uri":uri(i+1),@"name":i==0?@"A longer album title that wraps onto multiple lines in the download list":[NSString stringWithFormat:@"Release %lu",(unsigned long)i+1],@"year":@2026,@"category":titles[i],@"type":@(i==5?4:1),@"cover_url":@"https://i.scdn.co/image/0123456789abcdef0123456789abcdef01234567"}]}];return @{@"sections":sections,@"release_count":@6};}
 static void tap(UITableViewController *page,NSUInteger section){[page.tableView.delegate tableView:page.tableView didSelectRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:section]];}
 static void assertPlaylistRowStop(UITableViewController *page,dispatch_block_t done){

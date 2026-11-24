@@ -8,7 +8,7 @@ NSDictionary *SAPParseWritablePlaylistPage(NSData *data,NSString **error){
     if(!fields || !header || SAPProtoNumber(fields,98,0)!=200 || SAPProtoString(fields,99).length){
         if(error)*error=SAPProtoString(fields,99)?:@"Spotify did not return a valid Your Library response.";return nil;
     }
-    if(SAPProtoNumber(header,12,0)){if(error)*error=@"Playlist contents are still loading.";return nil;}
+    if(SAPProtoNumber(header,12,0)){if(error)*error=@"playlist_contents_are_still_loading";return nil;}
     NSMutableArray *entries=[NSMutableArray array];NSMutableSet *seen=[NSMutableSet set];NSUInteger consumed=0;
     for(NSNumber *field in @[@2,@3])for(NSArray *entry in SAPPlaylistMessages(fields,field.unsignedIntValue)){
         consumed++;NSArray *info=SAPProtoFields(SAPProtoData(entry,1)),*extra=SAPProtoFields(SAPProtoData(entry,4));NSString *uri=SAPProtoString(info,3);
@@ -29,7 +29,7 @@ static NSData *contentsRequest(NSString *uri,NSUInteger start){
 NSDictionary *SAPParsePlaylistContents(NSData *data,NSString *uri,NSString **error){
     NSArray *fields=SAPProtoFields(data);if(!SAPPlaylistStatusOK(fields,error))return nil;
     NSArray *response=SAPProtoFields(SAPProtoData(fields,2)),*playlist=SAPProtoFields(SAPProtoData(response,2)),*metadata=SAPProtoFields(SAPProtoData(playlist,1));
-    if(SAPProtoNumber(response,6,0) || ([SAPProtoString(metadata,1)isEqual:uri] && !SAPProtoNumber(metadata,17,0))){if(error)*error=@"Playlist contents are still loading.";return nil;}
+    if(SAPProtoNumber(response,6,0) || ([SAPProtoString(metadata,1)isEqual:uri] && !SAPProtoNumber(metadata,17,0))){if(error)*error=@"playlist_contents_are_still_loading";return nil;}
     if(!SAPIsPlaylistURI(uri) || ![SAPProtoString(metadata,1)isEqual:uri]){
         if(error)*error=@"Spotify did not return a loaded playlist with the expected identity.";return nil;
     }
@@ -74,12 +74,12 @@ NSDictionary *SAPParsePlaylistContents(NSData *data,NSString *uri,NSString **err
     dispatch_block_t cancel=SAPCallReadOnlyServiceCancellable(service,method,request,^(NSData *data,NSString *failure){
         if(self.finished || epoch!=self.epoch)return;self.cancelRead=nil;NSString *error=failure;NSDictionary *page=failure?nil:(self.uri?SAPParsePlaylistContents(data,self.uri,&error):SAPParseWritablePlaylistPage(data,&error));
         if(!page){
-            if([error isEqual:@"Playlist contents are still loading."] && self.loadingAttempts<5){NSUInteger attempt=++self.loadingAttempts;self.retry=SAPScheduleDeadline(dispatch_get_main_queue(),MIN(3,attempt)*.5,^{self.retry=nil;if(!self.finished && self.epoch==epoch)[self next];});return;}
+            if([error isEqual:@"playlist_contents_are_still_loading"] && self.loadingAttempts<5){NSUInteger attempt=++self.loadingAttempts;self.retry=SAPScheduleDeadline(dispatch_get_main_queue(),MIN(3,attempt)*.5,^{self.retry=nil;if(!self.finished && self.epoch==epoch)[self next];});return;}
             [self finish:nil error:error?:@"Spotify did not return the playlist data."];return;
         }self.loadingAttempts=0;
         if(self.uri){
             if(!self.firstPage)self.firstPage=page;
-            else if(![self.firstPage[@"total"]isEqual:page[@"total"]] || ![self.firstPage[@"revision"]isEqual:page[@"revision"]]){[self finish:nil error:@"The playlist changed while being read. Retry to use its current contents."];return;}
+            else if(![self.firstPage[@"total"]isEqual:page[@"total"]] || ![self.firstPage[@"revision"]isEqual:page[@"revision"]]){[self finish:nil error:@"the_playlist_changed_while_being_read"];return;}
             [self.items addObjectsFromArray:page[@"items"]];self.offset=self.initialOffset+self.items.count;
             if(self.offset>[page[@"total"]unsignedIntegerValue]){[self finish:nil error:@"Spotify returned inconsistent playlist counts."];return;}
             if(self.offset==[page[@"total"]unsignedIntegerValue]){NSMutableDictionary *result=[self.firstPage mutableCopy];result[@"items"]=[self.items copy];[self finish:result error:nil];return;}

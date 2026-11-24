@@ -166,7 +166,7 @@ static NSDictionary *trackMetadata(NSData *data,NSString *uri) {
         if(!uri.length && [self.artworkCache[album?:@""]isKindOfClass:NSString.class])uri=self.artworkCache[album];
         id cached=uri.length?self.artworkCache[uri]:NSNull.null;
         if(!cached) {
-            [self status:@"Preparing cover artwork…"];
+            [self status:@"preparing_cover_artwork"];
             self.cancelArtwork=SAPLoadExportArtwork(uri,^(NSDictionary *art){
                 if(self.finished)return;self.cancelArtwork=nil;self.artworkCache[uri]=art?:(id)NSNull.null;
                 SAP_TRACE("export","cover_artwork_resolved",0,@{@"image_uri":uri,@"received":@(art!=nil),@"jpeg_bytes":@([art[@"jpeg"]length])});
@@ -563,7 +563,7 @@ static NSDictionary *trackMetadata(NSData *data,NSString *uri) {
         NSMutableArray *files=[NSMutableArray array];NSMutableIndexSet *reused=[NSMutableIndexSet indexSet];NSString *failure=nil;NSUInteger number=0;BOOL cacheFailed=NO;NSDictionary *cacheEvidence=nil,*failedTrack=nil;
         dispatch_group_t conversions=dispatch_group_create();dispatch_semaphore_t window=dispatch_semaphore_create(SAPM4AConversionParallelLimit);
         NSProgress *conversionCancel=[NSProgress progressWithTotalUnitCount:1];__block NSString *conversionError=nil;
-        for(NSDictionary *track in self.resolved){if(atomic_load(&self->ended)){failure=@"Audio export cancelled.";break;}++number;
+        for(NSDictionary *track in self.resolved){if(atomic_load(&self->ended)){failure=@"audio_export_cancelled";break;}++number;
             NSURL *existing=SAPExportLibraryExisting(root,track,self.format?:@"ogg");
             if(existing&&SAPExportValidExistingAudio(existing,track,self.format?:@"ogg",^BOOL{return atomic_load(&self->ended);})) {
                 SAPAttachExportArtwork(existing,SAPExportShareMetadata(track,existing));
@@ -585,7 +585,7 @@ static NSDictionary *trackMetadata(NSData *data,NSString *uri) {
                 dispatch_async(dispatch_get_main_queue(),^{[self status:[NSString stringWithFormat:SAPLocalized(@"converting_to_m4a"),(unsigned long)itemNumber,(unsigned long)self.resolved.count]];});
                 SAPQueueM4AConversion(url,output,track,track[@"export_artwork"],^BOOL{return atomic_load(&self->ended)||conversionCancel.cancelled;},^(SAPM4AExportStatus code){
                     SAP_TRACE("export","m4a_conversion_finished",0,(@{@"track_uri":track[@"uri"]?:@"",@"status":@(code),@"target_bitrate_kbps":@320,@"encoder_limits_respected":@YES,@"audio_reencoded":@YES,@"parallel_limit":@(SAPM4AConversionParallelLimit)}));
-                    if(code!=SAPM4AExportOK){@synchronized(conversionCancel){if(!conversionError)conversionError=code==SAPM4AExportCancelled?@"Audio export cancelled.":[NSString stringWithFormat:SAPLocalized(@"m4a_conversion_failed_code_no_files"),(unsigned)code];}[conversionCancel cancel];}
+                    if(code!=SAPM4AExportOK){@synchronized(conversionCancel){if(!conversionError)conversionError=code==SAPM4AExportCancelled?@"audio_export_cancelled":[NSString stringWithFormat:SAPLocalized(@"m4a_conversion_failed_code_no_files"),(unsigned)code];}[conversionCancel cancel];}
                     dispatch_semaphore_signal(window);dispatch_group_leave(conversions);
                 });
                 url=output;
@@ -594,12 +594,12 @@ static NSDictionary *trackMetadata(NSData *data,NSString *uri) {
         if(failure)[conversionCancel cancel];
         dispatch_group_wait(conversions,DISPATCH_TIME_FOREVER);
         if(!failure)failure=conversionError;
-        if(atomic_load(&self->ended))failure=@"Audio export cancelled.";
+        if(atomic_load(&self->ended))failure=@"audio_export_cancelled";
         BOOL audioFailed=cacheFailed;
         if(!failure&&!self.shareOnly) {
             NSMutableArray *published=[NSMutableArray array];
             for(NSUInteger i=0;i<files.count;i++) {
-                if(atomic_load(&self->ended)){failure=@"Audio export cancelled.";break;}
+                if(atomic_load(&self->ended)){failure=@"audio_export_cancelled";break;}
                 NSURL *file=[reused containsIndex:i]?files[i]:SAPExportLibraryPublish(files[i],root,self.resolved[i],&failure);
                 if(!file)break;
                 SAPAttachExportArtwork(file,SAPExportShareMetadata(self.resolved[i],file));
@@ -646,7 +646,7 @@ static void SAPStartAudioExportWithOptions(NSString *uri,NSString *name,BOOL sha
         return;
     }
     cleanupWaits=0;
-    if(atomic_exchange(&exporting,true)){if(completion)completion(nil,@"Another export is already running.");return;}
+    if(atomic_exchange(&exporting,true)){if(completion)completion(nil,@"another_export_is_already_running");return;}
     SAP_TRACE("export","audio_export_requested",0,@{@"album":@(album),@"native_download_preparation":@YES,@"direct_cache_write_requested":@NO});
     SAPExportJob *job=[SAPExportJob new];activeJob=job;job.completion=completion;job.progress=progress;job.confirmRefresh=confirmRefresh;job.targetURI=uri;job.resolved=[NSMutableArray array];job.name=name?:@"Track";job.format=format?:SAPAudioExportFormat();job.deferM4AConversion=deferConversion;job.shareOnly=shareOnly;
     if(!uri){[job finish:nil error:SAPLocalized(@"start_a_music_track_on_this")];return;}
@@ -672,7 +672,7 @@ void SAPClearAudioExports(void (^completion)(BOOL,NSString *)) {
     dispatch_async(exportWorkQueue(),^{@autoreleasepool{NSString *error=nil;BOOL ok=SAPExportLibraryClear(exportLibraryRoot(),&error);dispatch_async(dispatch_get_main_queue(),^{if(completion)completion(ok,error);});}});
 }
 void SAPCancelAudioExport(void) {
-    void (^cancel)(void)=^{SAPExportJob *job=activeJob;if(job&&!job.finished)[job finish:nil error:@"Audio export cancelled."];};
+    void (^cancel)(void)=^{SAPExportJob *job=activeJob;if(job&&!job.finished)[job finish:nil error:@"audio_export_cancelled"];};
     if(NSThread.isMainThread)cancel();else dispatch_async(dispatch_get_main_queue(),cancel);
 }
 NSDictionary *SAPTrackExportReport(void){NSMutableDictionary *report=[SAPExportKeyStoreReport() mutableCopy];[report addEntriesFromDictionary:@{@"native_cache_mapping":SAPNativeCacheMapReport(),@"cache_storage_contexts":SAPCacheStorageKeyReport(),@"cache_container_reader":@"validated native header and complete block table before audio validation",@"native_boundaries":SAPExportObservationReport(),@"active":@(atomic_load(&exporting)),@"download_monitor":@"album contexts or individual track items; two complete samples required",@"no_start_timeout_seconds":@30,@"artwork":@"embedded JPEG front cover: M4A iTunes metadata or Ogg METADATA_BLOCK_PICTURE; up to 640 pixels",@"supported_audio":@"complete Ogg Vorbis; optional M4A conversion",@"export_format":SAPAudioExportFormat(),@"cache_index":SAPExportCacheIndexReport(),@"key_vault":SAPExportKeyVaultReport(),@"key_storage":@"bounded process cache and device-only Keychain, scoped to installation and native storage namespace; never logged or shared",@"media_decode":@"bounded candidate list (key/IV/counter/skip); full Ogg validation decides",@"export_directory":@"Documents/Pixie Exports",@"process_id":@(NSProcessInfo.processInfo.processIdentifier),@"cipher_caller_diagnostics":@"bounded scalar caller/length observations while Diagnostics is enabled; no media key is read by this diagnostic",@"runtime_verified":@NO}];return report;}

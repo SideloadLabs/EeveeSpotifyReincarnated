@@ -166,8 +166,8 @@ NSDictionary *SAPKeyRequestModeReport(void) {
              @"restore_zero_supported":@(restoreZero),@"runtime_selection_supported":@(restoreZero),
              @"restart_required":@NO,
              @"compatibility_check":SAPDownloadCompatibilityReport(),
-             @"detail":restoreZero?@"The verified selector returned 1. Restoring mode 0 is available. Download authorization is separate.":
-                 (kind==0?@"Mode 0 is verified in the executable. This status does not confirm download authorization.":kind==1?@"Mode 1 is verified in the executable. This status does not confirm download authorization.":kind==2&&symbolMatches?@"Only restoring a confirmed mode 1 to mode 0 is allowed. A saved preference alone is not confirmation.":@"The installed request mode cannot be verified. Changes are disabled.")};
+             @"detail":restoreZero?@"the_verified_selector_returned_1_restoring":
+                 (kind==0?@"mode_0_is_verified_in_the":kind==1?@"mode_1_is_verified_in_the":kind==2&&symbolMatches?@"only_restoring_a_confirmed_mode_1":@"the_installed_request_mode_cannot_be")};
 }
 void SAPSetKeyRequestMode(NSInteger mode,void (^completion)(BOOL,NSString *)) {
     if(!NSThread.isMainThread){dispatch_async(dispatch_get_main_queue(),^{SAPSetKeyRequestMode(mode,completion);});return;}

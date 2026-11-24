@@ -57,7 +57,7 @@ static NSString *imageURL(NSArray *album,unsigned individualField){
 static void applyAlbum(NSMutableDictionary *row,NSArray *album){
  NSString *name=SAPProtoString(album,2);if(name.length)row[@"album_name"]=name;
  NSString *identity=uriFromGID(SAPProtoData(album,1),@"album");if(identity)row[@"album_uri"]=identity;
- uint64_t type=SAPProtoNumber(album,4,0);row[@"category"]=type==4?@"EPs":type==2?@"Singles":type==3?@"Compilations":@"Albums";
+ uint64_t type=SAPProtoNumber(album,4,0);row[@"category"]=type==4?@"eps":type==2?@"singles":type==3?@"compilations":@"albums";
  int64_t year=SAPProtoSInt(SAPProtoFields(SAPProtoData(album,6)),1,0);row[@"year"]=@(year>=0 && year<=9999?year:0);
  NSString *cover=imageURL(album,9);if(cover.length)row[@"cover_url"]=cover;
 }
@@ -163,7 +163,7 @@ void SAPOfflineLibraryStoreFlushForTesting(void) {dispatch_sync(snapshotQueue(),
  NSMutableArray *waiting=self.metadataWaiters[uri];if(waiting){[waiting addObject:[reply copy]];return;}
  self.metadataWaiters[uri]=[NSMutableArray arrayWithObject:[reply copy]];
  [self read:MetadataService method:@"GetEntity" payload:SAPProtoBytes(1,[uri dataUsingEncoding:NSUTF8StringEncoding]) reply:^(NSData *data,NSString *error){
-  NSDictionary *entry=error?@{@"error":error}:data?@{@"data":data}:@{@"error":@"Metadata unavailable"};self.metadataCache[uri]=entry;
+  NSDictionary *entry=error?@{@"error":error}:data?@{@"data":data}:@{@"error":@"metadata_unavailable"};self.metadataCache[uri]=entry;
   NSArray *callbacks=[self.metadataWaiters[uri]copy];[self.metadataWaiters removeObjectForKey:uri];
   for(void(^callback)(NSData *,NSString *) in callbacks)if(![self isStopped])callback(entry[@"data"],entry[@"error"]);
  }];
@@ -182,15 +182,15 @@ void SAPOfflineLibraryStoreFlushForTesting(void) {dispatch_sync(snapshotQueue(),
  // No device, URI list or item filter => request the complete local context set.
  [self read:OfflineService method:@"GetContexts" payload:SAPProtoBytes(1,SAPProtoInteger(1,1)) reply:^(NSData *data,NSString *error){
   NSArray *fields=SAPProtoFields(data),*contexts=messages(fields,1);NSUInteger itemCount=0;
-  if(error || !fields || !contexts || SAPProtoNumber(fields,2,0)){[self finish:error?:@"Native offline context enumeration failed" rows:nil];return;}
+  if(error || !fields || !contexts || SAPProtoNumber(fields,2,0)){[self finish:error?:@"native_offline_context_enumeration_failed" rows:nil];return;}
   for(NSArray *info in contexts){
    NSArray *context=SAPProtoFields(SAPProtoData(info,1)),*items=messages(info,2);
-   if(!context || !items){[self finish:@"Malformed native offline context" rows:nil];return;}
+   if(!context || !items){[self finish:@"malformed_native_offline_context" rows:nil];return;}
    NSString *contextURI=SAPProtoString(context,1);
-   if(!contextURI.length){[self finish:@"Native offline context identity missing" rows:nil];return;}
+   if(!contextURI.length){[self finish:@"native_offline_context_identity_missing" rows:nil];return;}
    if(validURI(contextURI,@"track"))[self.candidates addObject:contextURI];
    for(NSArray *item in items){itemCount++;NSString *uri=SAPProtoString(item,1);
-    if(!uri.length || ([uri hasPrefix:@"spotify:track:"] && !validURI(uri,@"track"))){[self finish:@"Malformed native offline item identity" rows:nil];return;}
+    if(!uri.length || ([uri hasPrefix:@"spotify:track:"] && !validURI(uri,@"track"))){[self finish:@"malformed_native_offline_item_identity" rows:nil];return;}
     if(validURI(uri,@"track") && SAPProtoNumber(item,2,0)==3)[self.candidates addObject:uri];
    }
   }
@@ -209,12 +209,12 @@ void SAPOfflineLibraryStoreFlushForTesting(void) {dispatch_sync(snapshotQueue(),
  NSMutableData *payload=NSMutableData.data;for(NSString *uri in batch)[payload appendData:SAPProtoBytes(1,[uri dataUsingEncoding:NSUTF8StringEncoding])];
  [self read:OfflineService method:@"GetItems" payload:payload reply:^(NSData *data,NSString *error){
   NSArray *fields=SAPProtoFields(data),*items=messages(fields,1);NSMutableDictionary *states=NSMutableDictionary.dictionary;
-  if(error || !fields || !items){[self finish:error?:@"Native offline item validation failed" rows:nil];return;}
+  if(error || !fields || !items){[self finish:error?:@"native_offline_item_validation_failed" rows:nil];return;}
   for(NSArray *item in items){NSString *uri=SAPProtoString(item,1);uint64_t state=SAPProtoNumber(item,2,0);
-   if(![batch containsObject:uri] || (states[uri] && [states[uri]unsignedLongLongValue]!=state)){[self finish:@"Native offline item validation returned inconsistent identities" rows:nil];return;}
+   if(![batch containsObject:uri] || (states[uri] && [states[uri]unsignedLongLongValue]!=state)){[self finish:@"native_offline_item_validation_returned_inconsistent" rows:nil];return;}
    states[uri]=@(state);
   }
-  if(states.count!=batch.count){[self finish:@"Native offline item validation omitted requested tracks" rows:nil];return;}
+  if(states.count!=batch.count){[self finish:@"native_offline_item_validation_omitted_requested" rows:nil];return;}
   for(NSString *uri in batch)if([states[uri]unsignedLongLongValue]==3)[self.downloaded addObject:uri];
   self.validationOffset+=count;[self validateNext];
  }];
@@ -226,7 +226,7 @@ void SAPOfflineLibraryStoreFlushForTesting(void) {dispatch_sync(snapshotQueue(),
   NSDictionary *previous=self.previousRows[uri];
   if(previous){self.rows[uri]=previous;if(self.progress)self.progress(self.rows.count,self.downloaded.count);continue;}
   self.metadataActive++;
-  NSMutableDictionary *row=[@{@"uri":uri,@"name":uri,@"artist_name":@"Unknown artist",@"artist_uri":@"",@"album_name":@"Unknown album",@"album_uri":@"",@"category":@"Albums",@"year":@0,@"disc":@0,@"number":@0,@"cover_url":@"",@"duration_ms":@0,@"metadata_complete":@NO,@"artist_cover_url":@"",@"artist_image_uri":@""}mutableCopy];
+  NSMutableDictionary *row=[@{@"uri":uri,@"name":uri,@"artist_name":@"Unknown artist",@"artist_uri":@"",@"album_name":@"Unknown album",@"album_uri":@"",@"category":@"albums",@"year":@0,@"disc":@0,@"number":@0,@"cover_url":@"",@"duration_ms":@0,@"metadata_complete":@NO,@"artist_cover_url":@"",@"artist_image_uri":@""}mutableCopy];
   [self metadata:uri reply:^(NSData *data,NSString *error){
    NSArray *track=entity(data,4,uri,@"track");
    if(error || !track){[self finishMetadata:row error:error?:@"Track metadata unavailable or identity mismatch"];return;}

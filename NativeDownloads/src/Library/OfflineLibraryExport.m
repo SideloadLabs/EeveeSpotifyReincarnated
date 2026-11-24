@@ -129,7 +129,7 @@ static NSMapTable<NSProgress *,SAPOfflineLibraryExportJob *> *activeJobs;
     SAPExportAudioURIForBatch(track[@"uri"],self.format,^(NSString *message){[self report:message uri:track[@"uri"] phase:@"preparing"];},^(NSArray<NSURL *> *files,NSString *error){
         self.ownsCurrentExport=NO;if(self.finished)return;
         if(self.operation.cancelled){[self cancel];return;}
-        if([error isEqual:@"Another export is already running."]){[self finish:nil error:error];return;}
+        if([error isEqual:@"another_export_is_already_running"]){[self finish:nil error:error];return;}
         NSURL *file=files.count==1?files.firstObject:nil;
         NSDictionary *resolved=SAPAttachedExportArtwork(file)[@"encoding_metadata"];
         NSDictionary *encodingTrack=track;

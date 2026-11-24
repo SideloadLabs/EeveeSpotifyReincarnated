@@ -37,7 +37,7 @@ static int exportContinue(void *context) {
 }
 static BOOL exportWasCancelled(BOOL (^cancelled)(void),NSString **failure) {
     if(!cancelled || !cancelled())return NO;
-    if(failure)*failure=@"Audio export cancelled.";return YES;
+    if(failure)*failure=@"audio_export_cancelled";return YES;
 }
 static BOOL transformCancellable(FILE *input,FILE *output,const uint8_t *key,BOOL (^cancelled)(void)) {
     static const uint8_t iv[]={0x72,0xe0,0x67,0xfb,0xdd,0xcb,0xcf,0x77,0xeb,0xe8,0xbc,0x64,0x3f,0x63,0x0d,0x93};

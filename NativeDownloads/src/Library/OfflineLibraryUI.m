@@ -16,7 +16,7 @@
 #import "PixiePageController.h"
 #import <QuartzCore/QuartzCore.h>
 
-static NSString * const SAPOfflineUnknownArtist = @"Unknown artist";
+static NSString * const SAPOfflineUnknownArtist = @"unknown_artist";
 static NSString * const SAPOfflineUnknownAlbum = @"Unknown album";
 static NSString *SAPOfflineString(id value, NSString *fallback) {
     return [value isKindOfClass:NSString.class] && [value length] ? value : fallback;
@@ -218,7 +218,7 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
 }
 - (void)showMessage:(NSString *)title detail:(NSString *)detail {
     if(self.dismissed || !self.navigation.topViewController.viewIfLoaded.window)return;
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:title message:detail ? SAPLocalizedValue(detail) : nil preferredStyle:UIAlertControllerStyleAlert];
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:title message:detail ? SAPLocalized(detail) : nil preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"ok") style:UIAlertActionStyleDefault handler:nil]];
     [self.navigation.topViewController presentViewController:alert animated:YES completion:nil];
 }
@@ -227,7 +227,7 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
 - (void)showDeleted:(NSString *)title detail:(NSString *)detail offerCacheClear:(BOOL)offer {
     if(!offer){[self showMessage:title detail:detail];return;}
     if(self.dismissed || !self.navigation.topViewController.viewIfLoaded.window)return;
-    UIAlertController *alert=[UIAlertController alertControllerWithTitle:title message:detail ? SAPLocalizedValue(detail) : nil preferredStyle:UIAlertControllerStyleAlert];
+    UIAlertController *alert=[UIAlertController alertControllerWithTitle:title message:detail ? SAPLocalized(detail) : nil preferredStyle:UIAlertControllerStyleAlert];
     __weak typeof(self) weakSelf=self;
     [alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"not_now") style:UIAlertActionStyleCancel handler:nil]];
     [alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"clear_spotify_cache") style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action){[weakSelf clearSpotifyCache];}]];
@@ -309,7 +309,7 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
         for(NSDictionary *failure in [self.pendingFailures subarrayWithRange:NSMakeRange(0,MIN((NSUInteger)5,self.pendingFailures.count))])
             [names addObject:SAPOfflineString(failure[@"name"],SAPOfflineString(failure[@"uri"],SAPLocalized(@"track")))];
         NSString *detail=[NSString stringWithFormat:SAPLocalized(@"item_s_could_not_be_exported"),(unsigned long)self.pendingFailures.count,[names componentsJoinedByString:@", "],self.pendingFailures.count>5?@", …":@""];
-        UIAlertController *summary=[UIAlertController alertControllerWithTitle:SAPLocalized(@"partial_export") message:detail ? SAPLocalizedValue(detail) : nil preferredStyle:UIAlertControllerStyleAlert];__weak UIAlertController *weakSummary=summary;
+        UIAlertController *summary=[UIAlertController alertControllerWithTitle:SAPLocalized(@"partial_export") message:detail ? SAPLocalized(detail) : nil preferredStyle:UIAlertControllerStyleAlert];__weak UIAlertController *weakSummary=summary;
         [summary addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"continue") style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *a){
             dispatch_block_t deliver=^{self.pendingFailures=nil;[self deliverPackage:package save:self.pendingSave];};
             if(weakSummary.presentingViewController)[weakSummary dismissViewControllerAnimated:YES completion:deliver];else deliver();
@@ -387,11 +387,11 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
     NSMutableDictionary<NSString *, NSMutableArray *> *groups = NSMutableDictionary.dictionary;
     for (NSDictionary *row in tracks) { NSString *key = SAPOfflineArtistKey(row); if (!groups[key]) groups[key] = NSMutableArray.array; [groups[key] addObject:row]; }
     NSMutableArray *result = NSMutableArray.array;
-    for (NSString *key in [[groups allKeys] sortedArrayUsingComparator:^NSComparisonResult(NSString *a, NSString *b) { return [SAPOfflineString(groups[a].firstObject[@"artist_name"], SAPLocalizedValue(SAPOfflineUnknownArtist)) localizedCaseInsensitiveCompare:SAPOfflineString(groups[b].firstObject[@"artist_name"], SAPLocalizedValue(SAPOfflineUnknownArtist))]; }]) {
+    for (NSString *key in [[groups allKeys] sortedArrayUsingComparator:^NSComparisonResult(NSString *a, NSString *b) { return [SAPOfflineString(groups[a].firstObject[@"artist_name"], SAPLocalized(SAPOfflineUnknownArtist)) localizedCaseInsensitiveCompare:SAPOfflineString(groups[b].firstObject[@"artist_name"], SAPLocalized(SAPOfflineUnknownArtist))]; }]) {
         NSDictionary *first = groups[key].firstObject;
         NSString *artistCover = @"";
         for (NSDictionary *row in groups[key]) { NSString *candidate = SAPOfflineString(row[@"artist_cover_url"], @""); if (candidate.length) { artistCover = candidate; break; } }
-        [result addObject:@{@"key":key,@"name":SAPOfflineString(first[@"artist_name"], SAPLocalizedValue(SAPOfflineUnknownArtist)),@"artist_cover_url":artistCover,@"tracks":[groups[key] copy]}];
+        [result addObject:@{@"key":key,@"name":SAPOfflineString(first[@"artist_name"], SAPLocalized(SAPOfflineUnknownArtist)),@"artist_cover_url":artistCover,@"tracks":[groups[key] copy]}];
     }
     return result;
 }
@@ -399,11 +399,11 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
     NSMutableDictionary<NSString *, NSMutableDictionary<NSString *, NSMutableArray *> *> *categories = NSMutableDictionary.dictionary;
     NSMutableDictionary<NSString *, NSMutableDictionary *> *releaseByKey = NSMutableDictionary.dictionary;
     for (NSDictionary *row in self.scope) {
-        NSString *category = SAPOfflineString(row[@"category"], @"Albums"), *key = SAPOfflineReleaseKey(row);
+        NSString *category = SAPOfflineString(row[@"category"], @"albums"), *key = SAPOfflineReleaseKey(row);
         if (!categories[category]) categories[category] = NSMutableDictionary.dictionary;
         if (!categories[category][key]) {
             categories[category][key] = NSMutableArray.array;
-            releaseByKey[key] = [@{@"key":key,@"name":SAPOfflineString(row[@"album_name"], SAPLocalizedValue(SAPOfflineUnknownAlbum)),@"cover_url":SAPOfflineString(row[@"cover_url"], @""),@"tracks":categories[category][key]} mutableCopy];
+            releaseByKey[key] = [@{@"key":key,@"name":SAPOfflineString(row[@"album_name"], SAPLocalized(SAPOfflineUnknownAlbum)),@"cover_url":SAPOfflineString(row[@"cover_url"], @""),@"tracks":categories[category][key]} mutableCopy];
         }
         [categories[category][key] addObject:row];
     }
@@ -421,7 +421,7 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
         }
     }
     NSDictionary *categoryGroups = [categories copy];
-    NSArray *preferred = @[@"Albums", @"EPs", @"Singles", @"Compilations"];
+    NSArray *preferred = @[@"albums", @"eps", @"singles", @"compilations"];
     NSMutableArray *categoryNames = NSMutableArray.array;
     for (NSString *category in preferred) if (categoryGroups[category]) [categoryNames addObject:category];
     NSMutableSet *other = [NSMutableSet setWithArray:categoryGroups.allKeys]; [other minusSet:[NSSet setWithArray:categoryNames]];
@@ -430,7 +430,7 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
     for (NSString *category in categoryNames) {
         NSMutableArray *releases = NSMutableArray.array;
         for (NSString *key in [categoryGroups[category] keysSortedByValueUsingComparator:^NSComparisonResult(NSArray *a, NSArray *b) {
-            return [SAPOfflineString(a.firstObject[@"album_name"], SAPLocalizedValue(SAPOfflineUnknownAlbum)) localizedCaseInsensitiveCompare:SAPOfflineString(b.firstObject[@"album_name"], SAPLocalizedValue(SAPOfflineUnknownAlbum))];
+            return [SAPOfflineString(a.firstObject[@"album_name"], SAPLocalized(SAPOfflineUnknownAlbum)) localizedCaseInsensitiveCompare:SAPOfflineString(b.firstObject[@"album_name"], SAPLocalized(SAPOfflineUnknownAlbum))];
         }]) [releases addObject:releaseByKey[key]];
         [sections addObject:@{@"category":category,@"releases":[releases copy]}];
     }
@@ -800,7 +800,7 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
     if([header isKindOfClass:SAPArtistCategoryHeader.class])[self applyCatalogProgress:header];
 }
 - (void)configureHeader:(SAPArtistCategoryHeader *)header section:(NSInteger)section {
-    NSString *title=self.level==0?SAPLocalized(@"artists"):self.level==1?SAPLocalizedValue(self.releaseSections[section][@"category"]):SAPLocalized(@"tracks_5");
+    NSString *title=self.level==0?SAPLocalized(@"artists"):self.level==1?SAPLocalized(self.releaseSections[section][@"category"]):SAPLocalized(@"tracks_5");
     header.categoryTitle.text=[NSString stringWithFormat:@"%@ (%ld)",title,(long)[self tableView:self.tableView numberOfRowsInSection:section]];
     [self applyCatalogProgress:header];header.selectionButton.hidden=!self.state.selecting;header.selectionButton.tag=section;
     NSArray *rows=[self rowsInSection:section];header.selectionButton.selected=rows.count>0 && SAPOfflineLibrarySelection(rows,self.state.selectedURIs,YES).count==rows.count;

@@ -26,14 +26,14 @@ int main(int argc, char **argv) {
         NSString *progress = [NSString stringWithFormat:SAPLocalized(@"downloading_lyrics"), 3UL, 12UL];
         assert([progress isEqualToString:
                 (russian ? @"Скачивание текстов · 3 / 12" : @"Downloading lyrics · 3 / 12")]);
-        // Key request mode details come from the adapter in English.
-        NSString *mode = @"Mode 0 is verified in the executable. This status does not confirm download authorization.";
-        assert([SAPLocalizedValue(mode) isEqualToString:
-                (russian ? @"Режим 0 подтверждён в исполняемом файле. Это не подтверждает разрешение на загрузку." : mode)]);
-        assert([SAPLocalizedValue(@"Singles & EPs") isEqualToString:(russian ? @"Синглы и мини-альбомы" : @"Singles & EPs")]);
-        // A value already translated, or one without a translation, is shown as it is.
-        assert([SAPLocalizedValue(@"Some provider error") isEqualToString:@"Some provider error"]);
+        // Pixie keeps categories, mode details and errors as keys and translates them when shown.
+        assert([SAPLocalized(@"mode_0_is_verified_in_the") isEqualToString:(russian
+                ? @"Режим 0 подтверждён в исполняемом файле. Это не подтверждает разрешение на загрузку."
+                : @"Mode 0 is verified in the executable. This status does not confirm download authorization.")]);
+        assert([SAPLocalized(@"singles_eps") isEqualToString:(russian ? @"Синглы и мини-альбомы" : @"Singles & EPs")]);
+        // A message that is not a key (already translated, or a provider's text) is shown as it is.
+        assert([SAPLocalized(@"Some provider error") isEqualToString:@"Some provider error"]);
         assert([SAPLocalized(@"unknown_translation_key") isEqualToString:@"unknown_translation_key"]);
-        puts("Pixie language, formatting, values and missing-key fallback passed");
+        puts("Pixie language, formatting, keys as data and missing-key fallback passed");
     }
 }

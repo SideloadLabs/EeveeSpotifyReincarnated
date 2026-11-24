@@ -16,7 +16,7 @@ NSString *SAPAudioExportFormat(void) { return format; }
 void SAPCancelAudioExport(void) { cancelled++; active = 0; }
 void SAPExportAudioURI(NSString *uri,void (^progress)(NSString *),void (^completion)(NSArray *,NSString *)) {
     [calls addObject:uri];
-    if ([scenario isEqual:@"busy"]) { completion(nil,@"Another export is already running."); return; }
+    if ([scenario isEqual:@"busy"]) { completion(nil,@"another_export_is_already_running"); return; }
     active++; maximum=MAX(maximum,active);
     if ([scenario isEqual:@"cancel"]) { held=[completion copy]; return; }
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -62,7 +62,7 @@ static void testFormat(void) {
 static void testBusy(void) {
     reset(@"busy");
     operation=SAPExportOfflineLibrarySelection(@[row(@"a"),row(@"b")],YES,nil,^(NSURL *url,NSArray *failures,NSString *error){
-        assert(!url && [error containsString:@"already running"]); assert(calls.count==1 && !cancelled && !packaged); testFormat();
+        assert(!url && [error isEqual:@"another_export_is_already_running"]); assert(calls.count==1 && !cancelled && !packaged); testFormat();
     });
 }
 int main(void) { @autoreleasepool {

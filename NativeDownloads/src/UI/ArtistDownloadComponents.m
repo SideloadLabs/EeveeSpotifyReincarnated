@@ -46,7 +46,7 @@ UIImage *SAPArtistArtworkPlaceholder(void) {
 
 NSString *SAPArtistReleaseCategoryTitle(NSDictionary *release) {
     NSString *category=release[@"category"];
-    if(![category isEqualToString:@"Appears on"])return category ? SAPLocalizedValue(category) : nil;
+    if(![category isEqualToString:@"appears_on"])return category ? SAPLocalized(category) : nil;
     NSString *type;
     switch([release[@"type"]unsignedIntegerValue]) {
         case 1:type=SAPLocalized(@"album");break;

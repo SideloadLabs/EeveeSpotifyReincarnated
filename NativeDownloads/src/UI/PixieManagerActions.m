@@ -59,7 +59,7 @@ static void SAPPresent(UIViewController *modal) {
 }
 
 static void SAPMessage(NSString *message) {
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:SAPLocalized(@"pixie_download_manager") message:message ? SAPLocalizedValue(message) : nil preferredStyle:UIAlertControllerStyleAlert];
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:SAPLocalized(@"pixie_download_manager") message:message ? SAPLocalized(message) : nil preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"ok") style:UIAlertActionStyleCancel handler:^(UIAlertAction *action){[NSNotificationCenter.defaultCenter postNotificationName:@"SAPDownloadSettingsChanged" object:nil];}]];
     SAPPresent(alert);
 }
@@ -69,7 +69,7 @@ static void SAPDownloadMessage(NSString *message) {
     if (UIApplication.sharedApplication.applicationState != UIApplicationStateActive) return;
     UIAlertController *current = SAPDownloadAlert;
     if (current && !current.isBeingDismissed) { current.message = message; return; }
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:SAPLocalized(@"download_current_track") message:message ? SAPLocalizedValue(message) : nil preferredStyle:UIAlertControllerStyleAlert];
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:SAPLocalized(@"download_current_track") message:message ? SAPLocalized(message) : nil preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"ok") style:UIAlertActionStyleCancel handler:^(UIAlertAction *action){[NSNotificationCenter.defaultCenter postNotificationName:@"SAPDownloadSettingsChanged" object:nil];}]];
     SAPDownloadAlert = alert;
     SAPPresent(alert);
@@ -167,7 +167,7 @@ static void SAPShare(NSURL *url) {
             __weak UIAlertController *exportProgress=progress;
             SAPExportCurrentAudioWithKeyRefresh(action==SAPSettingsExportAlbumAudio,^(NSString *text){
                 UIAlertController *progress=exportProgress;
-                if(progress.presentingViewController && !progress.isBeingDismissed)progress.message=SAPLocalizedValue(text);
+                if(progress.presentingViewController && !progress.isBeingDismissed)progress.message=SAPLocalized(text);
             },^(NSUInteger count,void (^decide)(BOOL)){
                 UIAlertController *progress=exportProgress;
                 void (^ask)(void)=^{
@@ -183,7 +183,7 @@ static void SAPShare(NSURL *url) {
                 };
                 if(progress.presentingViewController){[progress dismissViewControllerAnimated:YES completion:ask];}else ask();
             },^(NSArray<NSURL *> *files,NSString *error){
-                BOOL cancelled=[error isEqualToString:@"Audio export cancelled."];
+                BOOL cancelled=[error isEqualToString:@"audio_export_cancelled"];
                 void (^show)(void)=^{if(cancelled)return;if(files.count){SAPPrepareAudioExportShareItems(files,action==SAPSettingsExportAlbumAudio,^(NSArray *items,NSString *shareError){if(items.count)SAPShareItems(items);else SAPMessage(shareError?:SAPLocalized(@"could_not_prepare_the_album_folder"));});}else SAPMessage(error?:SAPLocalized(@"no_audio_files_were_exported"));};
                 UIAlertController *progress=exportProgress;
                 if(progress.presentingViewController){if(SAPDownloadAlert==progress)SAPDownloadAlert=nil;[progress dismissViewControllerAnimated:YES completion:show];}else show();

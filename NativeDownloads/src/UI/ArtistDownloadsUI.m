@@ -158,7 +158,7 @@ static void SAPAfterDialogDismissal(UIAlertController *dialog,dispatch_block_t c
     // Retain the visible order. Newly resolved rows append within their
     // category instead of inserting a newer date above an existing row.
     NSMutableArray *merged=[NSMutableArray array];
-    for(NSString *title in @[@"Albums",@"EPs",@"Singles",@"Singles & EPs",@"Compilations",@"Appears on"]){
+    for(NSString *title in @[@"albums",@"eps",@"singles",@"singles_eps",@"compilations",@"appears_on"]){
         NSArray *existing=nil,*incoming=nil;for(NSDictionary *group in old[@"sections"])if([group[@"title"]isEqual:title])existing=group[@"releases"];for(NSDictionary *group in next[@"sections"])if([group[@"title"]isEqual:title])incoming=group[@"releases"];
         NSMutableArray *rows=[NSMutableArray arrayWithArray:existing?:@[]];NSMutableSet *seen=[NSMutableSet set];for(NSDictionary *row in rows)[seen addObject:row[@"uri"]];for(NSDictionary *row in incoming)if(![seen containsObject:row[@"uri"]]){[rows addObject:row];[seen addObject:row[@"uri"]];}
         if(rows.count)[merged addObject:@{@"title":title,@"releases":rows}];
@@ -261,7 +261,7 @@ static void SAPAfterDialogDismissal(UIAlertController *dialog,dispatch_block_t c
 }
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)table {return self.sections.count;}
 - (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section {return [self.sections[section][@"releases"]count];}
-- (NSString *)categoryTitleForSection:(NSUInteger)section {NSDictionary *group=self.sections[section];return [NSString stringWithFormat:@"%@ (%lu)",SAPLocalizedValue(group[@"title"]),(unsigned long)[group[@"releases"]count]];}
+- (NSString *)categoryTitleForSection:(NSUInteger)section {NSDictionary *group=self.sections[section];return [NSString stringWithFormat:@"%@ (%lu)",SAPLocalized(group[@"title"]),(unsigned long)[group[@"releases"]count]];}
 - (void)updateLoadingHeader {
     if(!self.sections.count)return;SAPArtistCategoryHeader *header=(id)[self.tableView headerViewForSection:0];if(!header)return;
     BOOL visible=self.loading && self.allReleases.count>0;header.catalogProgressLabel.hidden=!visible;header.catalogProgressLabel.text=visible?[NSString stringWithFormat:SAPLocalized(@"loading"),(unsigned long)self.loadCompleted,(unsigned long)self.loadTotal]:nil;
@@ -272,7 +272,7 @@ static void SAPAfterDialogDismissal(UIAlertController *dialog,dispatch_block_t c
     UIButton *button=header.selectionButton;button.tag=section;button.hidden=!self.selecting;
     BOOL all=YES,any=NO;for(NSDictionary *release in group[@"releases"]){BOOL selected=[self.selectedReleaseURIs containsObject:release[@"uri"]];all&=selected;any|=selected;}button.selected=all;
     [button setImage:[UIImage systemImageNamed:any&&!all?@"minus.circle":@"circle" withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:20.4 weight:UIImageSymbolWeightRegular]] forState:UIControlStateNormal];
-    button.accessibilityLabel=[NSString stringWithFormat:self.loading?SAPLocalized(@"select_loaded"):SAPLocalized(@"select"),SAPLocalizedValue(group[@"title"])];
+    button.accessibilityLabel=[NSString stringWithFormat:self.loading?SAPLocalized(@"select_loaded"):SAPLocalized(@"select"),SAPLocalized(group[@"title"])];
     button.accessibilityValue=button.selected?SAPLocalized(@"selected"):SAPLocalized(@"not_selected");
     button.accessibilityTraits=UIAccessibilityTraitButton|(button.selected?UIAccessibilityTraitSelected:0);
     [button removeTarget:self action:@selector(toggleCategory:) forControlEvents:UIControlEventTouchUpInside];

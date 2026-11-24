@@ -66,7 +66,7 @@ static NSArray *fetch(NSString **failure){__block BOOL done=NO;__block NSArray *
 int main(void){@autoreleasepool{
  NSString *error=nil;reset(0,260);NSArray *rows=fetch(&error);assert(!error && rows.count==258 && contextCalls==1 && batches==3 && maximum<=4);
  assert(metadataCalls==260 && artistCalls==1 && [rows[0][@"artist_cover_url"]hasPrefix:@"https://i.scdn.co/image/02"] && [rows[0][@"artist_image_uri"]hasPrefix:@"spotify:image:02"]);
- NSMutableSet *seen=NSMutableSet.set;for(NSDictionary *r in rows){assert(![seen containsObject:r[@"uri"]]);[seen addObject:r[@"uri"]];assert([r[@"artist_name"]isEqual:@"Artist"] && [r[@"album_name"]isEqual:@"Album"] && [r[@"category"]isEqual:@"Albums"] && [r[@"year"]intValue]==2026 && [r[@"duration_ms"]intValue]==180000 && [r[@"disc"]intValue]==1 && [r[@"number"]intValue]==1 && [r[@"cover_url"]hasPrefix:@"https://i.scdn.co/image/"]);}
+ NSMutableSet *seen=NSMutableSet.set;for(NSDictionary *r in rows){assert(![seen containsObject:r[@"uri"]]);[seen addObject:r[@"uri"]];assert([r[@"artist_name"]isEqual:@"Artist"] && [r[@"album_name"]isEqual:@"Album"] && [r[@"category"]isEqual:@"albums"] && [r[@"year"]intValue]==2026 && [r[@"duration_ms"]intValue]==180000 && [r[@"disc"]intValue]==1 && [r[@"number"]intValue]==1 && [r[@"cover_url"]hasPrefix:@"https://i.scdn.co/image/"]);}
  assert(![seen containsObject:uri(2,@"track")] && ![seen containsObject:uri(3,@"track")]);
  puts("PASS: all stock contexts, item state3, URI dedup, native request filters, bounded batches and four metadata reads");
  metadataCalls=artistCalls=contextCalls=batches=0;
@@ -150,7 +150,7 @@ int main(void){@autoreleasepool{
  // Damaged files are ignored; invalid rows are dropped individually.
  NSString *file=[dir stringByAppendingPathComponent:@"offline-catalog.plist"];
  [@"not a plist" writeToFile:file atomically:YES encoding:NSUTF8StringEncoding error:nil];SAPOfflineLibraryStoreResetForTesting(dir);assert(!SAPOfflineLibraryCachedTracks());
- NSDictionary *good=@{@"uri":uri(1,@"track"),@"name":@"A",@"artist_name":@"B",@"album_name":@"C",@"category":@"Albums",@"year":@2026};
+ NSDictionary *good=@{@"uri":uri(1,@"track"),@"name":@"A",@"artist_name":@"B",@"album_name":@"C",@"category":@"albums",@"year":@2026};
  NSDictionary *mixed=@{@"version":@1,@"rows":@[good,good,@{@"uri":@"spotify:track:bad",@"name":@"x"},@{@"uri":uri(2,@"track"),@"name":@[@"nested"]},@"junk",@{@"uri":uri(3,@"track")}]};
  [mixed writeToFile:file atomically:YES];SAPOfflineLibraryStoreResetForTesting(dir);
  assert(SAPOfflineLibraryCachedTracks().count==1 && [SAPOfflineLibraryCachedTracks().firstObject isEqual:good]);
