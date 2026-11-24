@@ -48,17 +48,16 @@ enum LyricsDownloadHTTP {
                 guard let transport = error as? URLError, isTransient(transport) else { throw error }
                 guard attempt < 2 else { throw LyricsDownloadTransportError(underlying: transport) }
                 attempt += 1
-                let deadline = ProcessInfo.processInfo.systemUptime + Double(attempt) * 0.5
-                while ProcessInfo.processInfo.systemUptime < deadline {
-                    if isCancelled() { throw URLError(.cancelled) }
-                    Thread.sleep(forTimeInterval: 0.05)
-                }
+                try LyricsRequestGate.shared.sleep(until: LyricsRequestGate.uptime + Double(attempt) * 0.5,
+                                                   isCancelled: isCancelled)
             }
         }
     }
     private static func isTransient(_ error: URLError) -> Bool {
         switch error.code {
-        case .cancelled, .networkConnectionLost, .timedOut,
+        // Not a timeout: a provider that did not answer in time is asked again tomorrow
+        // rather than holding the one-at-a-time queue for several more deadlines.
+        case .cancelled, .networkConnectionLost,
              .cannotConnectToHost, .cannotFindHost, .dnsLookupFailed: return true
         default: return false
         }
@@ -102,12 +101,7 @@ enum LyricsDownloadHTTP {
             LyricsRequestGate.shared.playbackFinished(task.response as? HTTPURLResponse, request: task.originalRequest)
             return
         }
-        while completion.wait(timeout: .now() + .milliseconds(100)) != .success {
-            if context.isCancelled() {
-                task.cancel()
-                throw URLError(.cancelled)
-            }
-        }
+        try LyricsRequestGate.shared.waitForRequest(task, finished: completion, isCancelled: context.isCancelled)
         guard task.error == nil, let request = task.originalRequest else { return }
         try validate(task.response, request: request, accepting: statuses)
     }

@@ -247,7 +247,7 @@ func savePlaybackLyrics(trackId: String, dto: LyricsDto, source: LyricsSource) {
 
 private let petitDownloadRepository = PetitLyricsRepository()
 
-private func downloadRepository(_ source: LyricsSource, options: LyricsOptions) -> LyricsRepository? {
+private func downloadRepository(_ source: LyricsSource) -> LyricsRepository? {
     switch source {
     case .genius: return GeniusLyricsRepository.shared
     case .lrclib: return LrclibLyricsRepository.shared
@@ -274,7 +274,7 @@ func downloadProviderLyrics(trackId: String, metadata: (title: String, artist: S
         !isCancelled() && store.isCurrent(revision, trackId: trackId) && UserDefaults.offlineLyricsEnabled
             && UserDefaults.lyricsSource == source && UserDefaults.lyricsOptions.downloadOptions == options
     }
-    guard let repository = downloadRepository(source, options: options), stillWanted() else { throw URLError(.cancelled) }
+    guard let repository = downloadRepository(source), stillWanted() else { throw URLError(.cancelled) }
     // URI-only requests (download queue, Spotify's plugin): local catalog first,
     // then Spotify's native track service, then the Web API with the captured token.
     var title = metadata?.title ?? "", artist = metadata?.artist ?? ""

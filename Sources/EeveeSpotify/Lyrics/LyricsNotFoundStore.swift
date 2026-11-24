@@ -6,31 +6,13 @@ import Foundation
 /// - tracks whose last attempt failed temporarily (network, HTTP 429/5xx), and a
 ///   provider that refused access (key rejected): both wait a day.
 /// Explicit downloads (the library button, a new album) still ask.
-/// Legacy entries could include HTTP 429, so invalidate them once; the saved lyric
-/// files are unaffected.
 final class LyricsNotFoundStore {
     static let shared = LyricsNotFoundStore(defaults: UserDefaults.container)
     static let retryDelay: TimeInterval = 24 * 60 * 60
     private static let sources = [0, 1, 3, 5]
     private let defaults: UserDefaults
     private let lock = NSLock()
-    private let schemaKey = "EeveeLyricsProviderNotFoundSchema"
-    init(defaults: UserDefaults) {
-        self.defaults = defaults
-        let schema = defaults.integer(forKey: schemaKey)
-        if schema < 3 {
-            // Retry Genius misses now that ID lookup is available. Older Spicy
-            // misses may also include responses where lyrics were still queued.
-            for source in schema == 2 ? [0, 5] : [0, 1, 3, 5] {
-                defaults.removeObject(forKey: key(source))
-            }
-        }
-        if schema < 4 {
-            // LRCLIB used to turn transport and decoding errors into permanent misses.
-            defaults.removeObject(forKey: key(1))
-            defaults.set(4, forKey: schemaKey)
-        }
-    }
+    init(defaults: UserDefaults) { self.defaults = defaults }
     private func key(_ source: Int) -> String { "EeveeLyricsProviderNotFound-\(source)" }
     private func retryKey(_ source: Int) -> String { "EeveeLyricsProviderRetryAfter-\(source)" }
     private func refusedKey(_ source: Int) -> String { "EeveeLyricsProviderRefusedUntil-\(source)" }
@@ -53,13 +35,13 @@ final class LyricsNotFoundStore {
     func record(_ id: String, source: Int) {
         lock.lock(); defer { lock.unlock() }
         var ids = Set(defaults.stringArray(forKey: key(source)) ?? [])
-        if ids.insert(id).inserted { defaults.set(ids.sorted(), forKey: key(source)) }
+        if ids.insert(id).inserted { defaults.set(Array(ids), forKey: key(source)) }
         removeRetry(id, source: source)
     }
     func succeeded(_ id: String, source: Int) {
         lock.lock(); defer { lock.unlock() }
         var ids = Set(defaults.stringArray(forKey: key(source)) ?? [])
-        if ids.remove(id) != nil { defaults.set(ids.sorted(), forKey: key(source)) }
+        if ids.remove(id) != nil { defaults.set(Array(ids), forKey: key(source)) }
         removeRetry(id, source: source)
         defaults.removeObject(forKey: refusedKey(source))
     }
@@ -117,7 +99,7 @@ final class LyricsNotFoundStore {
         guard !removed.isEmpty else { return }
         for source in Self.sources {
             let misses = Set(defaults.stringArray(forKey: key(source)) ?? [])
-            if !misses.isDisjoint(with: removed) { defaults.set(misses.subtracting(removed).sorted(), forKey: key(source)) }
+            if !misses.isDisjoint(with: removed) { defaults.set(Array(misses.subtracting(removed)), forKey: key(source)) }
             let values = retries(source)
             let kept = values.filter { !removed.contains($0.key) }
             if kept.count != values.count { defaults.set(kept, forKey: retryKey(source)) }

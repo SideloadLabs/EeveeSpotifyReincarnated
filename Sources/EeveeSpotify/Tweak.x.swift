@@ -222,8 +222,6 @@ struct EeveeSpotify: Tweak {
             return
         }
 
-        RetiredLyricsSession.install()
-
         // Local-only premium force; independent of patching, so premium UI survives everything else being off.
         activateEeveePremiumForce()
 

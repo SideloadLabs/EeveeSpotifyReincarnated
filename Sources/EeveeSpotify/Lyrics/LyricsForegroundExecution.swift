@@ -164,9 +164,12 @@ final class LyricsForegroundExecution {
         throw URLError(.cancelled)
     }
 
+    /// Downloads may no longer be wanted: every waiting request checks again now,
+    /// including those paced by the request gate and HTTP requests in flight.
     func recheckWaitingRequests() {
         condition.lock()
         condition.broadcast()
         condition.unlock()
+        LyricsRequestGate.shared.wake()
     }
 }

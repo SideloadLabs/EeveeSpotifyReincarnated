@@ -13,18 +13,24 @@ final class NativeOfflineLyrics {
     private var observer: NSObjectProtocol?
     private var database: NativeOfflineLyricsDatabase?
     private var codec: Codec?
-    private var enabled = false
-    /// Track IDs whose provider lyrics are projected into the native table. Read from
-    /// any thread (track metadata hook); written on `queue` by reconcile.
-    private let withLyricsLock = NSLock()
+    private var started = false
+    /// Guards `isEnabled` and `withLyrics`: read from any thread (track metadata hook,
+    /// the downloader), written on `queue`.
+    private let lock = NSLock()
+    private var isEnabled = false
+    private var enabled: Bool {
+        get { lock.lock(); defer { lock.unlock() }; return isEnabled }
+        set { lock.lock(); isEnabled = newValue; lock.unlock() }
+    }
+    /// Track IDs whose provider lyrics are projected into the native table.
     private var withLyrics = Set<String>()
     func hasProviderLyrics(trackId: String) -> Bool {
-        withLyricsLock.lock(); defer { withLyricsLock.unlock() }
+        lock.lock(); defer { lock.unlock() }
         return withLyrics.contains(trackId)
     }
     /// Cheap check for the track metadata hook, which Spotify calls very often.
     var hasAnyProviderLyrics: Bool {
-        withLyricsLock.lock(); defer { withLyricsLock.unlock() }
+        lock.lock(); defer { lock.unlock() }
         return !withLyrics.isEmpty
     }
     /// Downloaded tracks with no lyrics row of their own: Spotify's offline-lyrics
@@ -33,14 +39,14 @@ final class NativeOfflineLyrics {
     /// plugin keeps such a track Waiting offline until a lyrics row exists, so we
     /// keep an empty row for it (only where no row exists; real lyrics always win).
     private static let noLyricsKey = "EeveeNativeOfflineNoLyricsTracks"
-    private var noLyrics = Set(UserDefaults.standard.stringArray(forKey: NativeOfflineLyrics.noLyricsKey) ?? [])
-    private func saveNoLyrics() { UserDefaults.standard.set(Array(noLyrics).sorted(), forKey: Self.noLyricsKey) }
+    private var noLyrics = Set(UserDefaults.container.stringArray(forKey: NativeOfflineLyrics.noLyricsKey) ?? [])
+    private func saveNoLyrics() { UserDefaults.container.set(Array(noLyrics).sorted(), forKey: Self.noLyricsKey) }
 
     /// Markers protect the audio queue; they are not definitive provider misses.
     /// The downloader filters genuine misses and explicitly deleted lyrics.
     static func placeholderTrackIdsForRetry() -> [String] {
         guard shared.enabled else { return [] }
-        return UserDefaults.standard.stringArray(forKey: noLyricsKey) ?? []
+        return UserDefaults.container.stringArray(forKey: noLyricsKey) ?? []
     }
 
     /// Called when Spotify's offline-lyrics plugin got a non-2xx answer for `trackId`
@@ -97,28 +103,30 @@ final class NativeOfflineLyrics {
         writeDebugLog("[Lyrics][NativeOffline] \(active ? "active" : "disabled") on Spotify \(Self.spotifyIdentity): \(reason)")
     }
 
+    /// Called once, at launch. The checks run on `queue`: opening the database can wait
+    /// for Spotify's lock, which launch must not.
     func start() {
-        guard observer == nil, !enabled else { return }
-        // 1. Spotify's own Codable model, sync types and colors must round-trip.
-        do { codec = try Codec() }
-        catch { publish(active: false, reason: "native lyrics model is different: \(error)"); return }
-        // Validate storage before publishing locally saved lyrics to the viewer.
-        var failure: Error?
-        queue.sync {
-            do { _ = try openDatabase() } catch { failure = error }
+        guard !started else { return }
+        started = true
+        queue.async { [self] in
+            // 1. Spotify's own Codable model, sync types and colors must round-trip.
+            do { codec = try Codec() }
+            catch { publish(active: false, reason: "native lyrics model is different: \(error)"); return }
+            // Validate storage before publishing locally saved lyrics to the viewer.
+            do { _ = try openDatabase() }
+            catch {
+                codec = nil
+                publish(active: false, reason: "native lyrics database is different or unavailable: \(error)")
+                return
+            }
+            enabled = true
+            observer = NotificationCenter.default.addObserver(forName: .eeveeOfflineLyricsFilesChanged,
+                object: nil, queue: nil) { [weak self] note in
+                self?.scheduleReconcile(note.userInfo?["tracks"] as? [String])
+            }
+            publish(active: true, reason: "native projection verified; Spotify controls its download configuration")
+            reconcile(nil)
         }
-        if let failure {
-            codec = nil
-            publish(active: false, reason: "native lyrics database is different or unavailable: \(failure)")
-            return
-        }
-        enabled = true
-        observer = NotificationCenter.default.addObserver(forName: .eeveeOfflineLyricsFilesChanged,
-            object: nil, queue: nil) { [weak self] note in
-            self?.scheduleReconcile(note.userInfo?["tracks"] as? [String])
-        }
-        publish(active: true, reason: "native projection verified; Spotify controls its download configuration")
-        reconcileAll()
     }
     /// Opens (once) and verifies the native database. Runs on `queue`.
     private func openDatabase() throws -> NativeOfflineLyricsDatabase {
@@ -209,10 +217,10 @@ final class NativeOfflineLyrics {
             let written = try database.update(changes)
             let empties = try database.ensurePlaceholders(placeholders)
             // Advertise a text to the native UI only after its SQLite commit.
-            withLyricsLock.lock()
+            lock.lock()
             if requested == nil { withLyrics = have }
             else { withLyrics.subtract(ids); withLyrics.formUnion(have) }
-            withLyricsLock.unlock()
+            lock.unlock()
             removedDownloads.subtract(ids)
             if requested == nil { allDownloadsRemoved = false }
             let encoded = changes.filter { $0.data != nil }.count

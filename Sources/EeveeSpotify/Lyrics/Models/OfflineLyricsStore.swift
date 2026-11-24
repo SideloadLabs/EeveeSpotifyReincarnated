@@ -69,6 +69,10 @@ final class OfflineLyricsStore {
     private var fileIndex: FileIndex?
     private var optionIndex: [String: LyricsOptions] = [:]
     private var missingFiles = Set<String>()
+    /// Removed files not deleted yet: read as missing. A save of the same file keeps it.
+    private var pendingDeletion = Set<String>()
+    /// Removing a large download deletes thousands of files; its caller (main) does not wait.
+    private let deletionQueue = DispatchQueue(label: "EeveeSpotify.OfflineLyrics.deletion", qos: .utility)
 
     private func changed(_ ids: [String]? = nil) {
         // Observers may read the store, so dispatch after releasing its lock.
@@ -110,7 +114,7 @@ final class OfflineLyricsStore {
     }
 
     private func readEntry(_ url: URL) -> Entry? {
-        guard let data = try? Data(contentsOf: url),
+        guard !pendingDeletion.contains(url.lastPathComponent), let data = try? Data(contentsOf: url),
               let entry = try? JSONDecoder().decode(Entry.self, from: data),
               entry.version == 1, isUsable(entry) else { return nil }
         return entry
@@ -184,6 +188,7 @@ final class OfflineLyricsStore {
                           romanized: romanized, fallbackReason: fallbackReason)
         let encoded = try JSONEncoder().encode(entry)
         try encoded.write(to: url, options: .atomic)
+        pendingDeletion.remove(url.lastPathComponent)
         fileIndex?.put(url.lastPathComponent, id: trackId, bytes: encoded.count)
         optionIndex[url.lastPathComponent] = options
         missingFiles.remove(url.lastPathComponent)
@@ -281,7 +286,7 @@ final class OfflineLyricsStore {
     private func lyricFiles() -> [(url: URL, id: String)] {
         let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
         return files.compactMap { file in
-            guard file.pathExtension == "json", let dash = file.deletingPathExtension().lastPathComponent.firstIndex(of: "-") else { return nil }
+            guard file.pathExtension == "json", !pendingDeletion.contains(file.lastPathComponent), let dash = file.deletingPathExtension().lastPathComponent.firstIndex(of: "-") else { return nil }
             let stem = file.deletingPathExtension().lastPathComponent
             guard Int(stem[..<dash]) != nil else { return nil }
             let id = String(stem[stem.index(after: dash)...])
@@ -320,13 +325,26 @@ final class OfflineLyricsStore {
             index.names(of: ids).map { (url: directory.appendingPathComponent($0, isDirectory: false), id: "") }
         } ?? lyricFiles().filter { ids.contains($0.id) }
         for file in files {
-            do {
-                do { try FileManager.default.removeItem(at: file.url) }
-                catch CocoaError.fileNoSuchFile {}
-                fileIndex?.remove(file.url.lastPathComponent)
-                optionIndex[file.url.lastPathComponent] = nil
-                missingFiles.insert(file.url.lastPathComponent)
-            } catch { failure = error }
+            let name = file.url.lastPathComponent
+            pendingDeletion.insert(name)
+            fileIndex?.remove(name)
+            optionIndex[name] = nil
+            missingFiles.insert(name)
+        }
+        if !files.isEmpty {
+            deletionQueue.async { [self] in
+                for file in files {
+                    let name = file.url.lastPathComponent
+                    lock.lock()
+                    // A file that cannot be deleted stays hidden until a save replaces it.
+                    if pendingDeletion.contains(name) {
+                        do { try FileManager.default.removeItem(at: file.url); pendingDeletion.remove(name) }
+                        catch CocoaError.fileNoSuchFile { pendingDeletion.remove(name) }
+                        catch {}
+                    }
+                    lock.unlock()
+                }
+            }
         }
         loadContexts()
         for key in Array(contexts!.keys) {
@@ -347,6 +365,7 @@ final class OfflineLyricsStore {
         fileIndex = nil
         optionIndex = [:]
         missingFiles = []
+        pendingDeletion = []
         if FileManager.default.fileExists(atPath: directory.path) {
             try FileManager.default.removeItem(at: directory)
         }

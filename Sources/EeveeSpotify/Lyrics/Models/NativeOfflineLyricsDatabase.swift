@@ -12,6 +12,9 @@ final class NativeOfflineLyricsDatabase {
     }
     /// Journal mode reported by SQLite after the WAL request ("wal" when it applied).
     let journalMode: String
+    /// Prepared statements by SQL text, reused: a launch reconcile checks every downloaded
+    /// track. Used from one queue only (NativeOfflineLyrics), like the connection.
+    private var statements: [String: OpaquePointer] = [:]
 
     private static func pragmaText(_ connection: OpaquePointer, _ sql: String) -> String? {
         var statement: OpaquePointer?
@@ -40,23 +43,22 @@ final class NativeOfflineLyricsDatabase {
         // while committing) read as "no lyrics". In WAL mode readers never block on a
         // writer. The mode is persistent and applies to Spotify's connection too.
         journalMode = Self.pragmaText(connection, "PRAGMA journal_mode=WAL") ?? "unknown"
+        // A throw below still runs deinit, which closes the connection.
+        try execute("CREATE TABLE IF NOT EXISTS lyrics_entities (track_uri TEXT NOT NULL PRIMARY KEY, entity_data BLOB NOT NULL)")
+        // Preparing this also checks the native column names before any row changes.
+        // Another Spotify version may use another layout: refuse instead of writing.
         do {
-            try execute("CREATE TABLE IF NOT EXISTS lyrics_entities (track_uri TEXT NOT NULL PRIMARY KEY, entity_data BLOB NOT NULL)")
-            // Preparing this also checks the native column names before any row changes.
-            // Another Spotify version may use another layout: refuse instead of writing.
-            do {
-                let schema = try prepare("SELECT track_uri, entity_data FROM lyrics_entities LIMIT 0")
-                sqlite3_finalize(schema)
-            } catch {
-                throw Failure(message: "lyrics_entities has another layout: \(error)")
-            }
-            try execute("CREATE TABLE IF NOT EXISTS eevee_lyrics_projection_v1 (track_uri TEXT NOT NULL PRIMARY KEY, original BLOB, injected BLOB NOT NULL)")
-            // Digest of the saved text and format an injected row was built from. Lets a
-            // launch skip re-encoding rows whose input did not change.
-            if !(try hasColumn("eevee_lyrics_projection_v1", "source_digest")) {
-                try execute("ALTER TABLE eevee_lyrics_projection_v1 ADD COLUMN source_digest TEXT")
-            }
-        } catch { sqlite3_close(db); throw error }
+            let schema = try prepare("SELECT track_uri, entity_data FROM lyrics_entities LIMIT 0")
+            sqlite3_finalize(schema)
+        } catch {
+            throw Failure(message: "lyrics_entities has another layout: \(error)")
+        }
+        try execute("CREATE TABLE IF NOT EXISTS eevee_lyrics_projection_v1 (track_uri TEXT NOT NULL PRIMARY KEY, original BLOB, injected BLOB NOT NULL)")
+        // Digest of the saved text and format an injected row was built from. Lets a
+        // launch skip re-encoding rows whose input did not change.
+        if !(try hasColumn("eevee_lyrics_projection_v1", "source_digest")) {
+            try execute("ALTER TABLE eevee_lyrics_projection_v1 ADD COLUMN source_digest TEXT")
+        }
     }
     private func hasColumn(_ table: String, _ column: String) throws -> Bool {
         let statement = try prepare("PRAGMA table_info(\(table))")
@@ -66,13 +68,37 @@ final class NativeOfflineLyricsDatabase {
         }
         return false
     }
-    deinit { sqlite3_close(db) }
+    deinit {
+        for statement in statements.values { sqlite3_finalize(statement) }
+        sqlite3_close(db)
+    }
     private func prepare(_ sql: String) throws -> OpaquePointer {
         var statement: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK, let statement else {
             throw Failure(message: String(cString: sqlite3_errmsg(db)))
         }
         return statement
+    }
+    /// Runs `body` with the cached statement for `sql`, reset and unbound afterwards.
+    private func withStatement<T>(_ sql: String, _ body: (OpaquePointer) throws -> T) throws -> T {
+        let statement: OpaquePointer
+        if let cached = statements[sql] { statement = cached }
+        else { statement = try prepare(sql); statements[sql] = statement }
+        defer { sqlite3_reset(statement); sqlite3_clear_bindings(statement) }
+        return try body(statement)
+    }
+    /// Whether a one-row query finds a row whose first column is true. `uri` is bound to
+    /// the last parameter, `bindings` binds the others.
+    private func exists(_ sql: String, _ uri: String, bindings: (OpaquePointer) -> Void = { _ in }) throws -> Bool {
+        try withStatement(sql) { statement in
+            bindings(statement)
+            bind(uri, to: statement, at: sqlite3_bind_parameter_count(statement))
+            switch sqlite3_step(statement) {
+            case SQLITE_ROW: return sqlite3_column_int(statement, 0) == 1
+            case SQLITE_DONE: return false
+            default: throw Failure(message: String(cString: sqlite3_errmsg(db)))
+            }
+        }
     }
     private func execute(_ sql: String) throws {
         guard sqlite3_exec(db, sql, nil, nil, nil) == SQLITE_OK else {
@@ -104,40 +130,44 @@ final class NativeOfflineLyricsDatabase {
         catch { try? execute("ROLLBACK"); throw error }
     }
     private func row(_ uri: String) throws -> Data? {
-        let statement = try prepare("SELECT entity_data FROM lyrics_entities WHERE track_uri = ?")
-        defer { sqlite3_finalize(statement) }
-        bind(uri, to: statement, at: 1)
-        switch sqlite3_step(statement) {
-        case SQLITE_ROW: return blob(statement, 0)
-        case SQLITE_DONE: return nil
-        default: throw Failure(message: String(cString: sqlite3_errmsg(db)))
+        try withStatement("SELECT entity_data FROM lyrics_entities WHERE track_uri = ?") { statement in
+            bind(uri, to: statement, at: 1)
+            switch sqlite3_step(statement) {
+            case SQLITE_ROW: return blob(statement, 0)
+            case SQLITE_DONE: return nil
+            default: throw Failure(message: String(cString: sqlite3_errmsg(db)))
+            }
         }
     }
     private func ownership(_ uri: String) throws -> (original: Data?, injected: Data, digest: String?)? {
-        let statement = try prepare("SELECT original, injected, source_digest FROM eevee_lyrics_projection_v1 WHERE track_uri = ?")
-        defer { sqlite3_finalize(statement) }
-        bind(uri, to: statement, at: 1)
-        switch sqlite3_step(statement) {
-        case SQLITE_ROW:
-            let digest = sqlite3_column_text(statement, 2).map { String(cString: $0) }
-            return (blob(statement, 0), blob(statement, 1) ?? Data(), digest)
-        case SQLITE_DONE: return nil
-        default: throw Failure(message: String(cString: sqlite3_errmsg(db)))
+        try withStatement("SELECT original, injected, source_digest FROM eevee_lyrics_projection_v1 WHERE track_uri = ?") { statement in
+            bind(uri, to: statement, at: 1)
+            switch sqlite3_step(statement) {
+            case SQLITE_ROW:
+                let digest = sqlite3_column_text(statement, 2).map { String(cString: $0) }
+                return (blob(statement, 0), blob(statement, 1) ?? Data(), digest)
+            case SQLITE_DONE: return nil
+            default: throw Failure(message: String(cString: sqlite3_errmsg(db)))
+            }
         }
     }
-    /// Read-only: is our row for `uri` still in place and built from `digest`?
+    /// Read-only: is our row for `uri` still in place and built from `digest`? One query,
+    /// compared inside SQLite: a launch asks this for every downloaded track.
     func isProjected(_ uri: String, digest: String) throws -> Bool {
-        guard let owned = try ownership(uri), owned.digest == digest else { return false }
-        return try row(uri) == owned.injected
+        try exists("""
+            SELECT p.source_digest = ? AND CAST(e.entity_data AS BLOB) = p.injected
+            FROM eevee_lyrics_projection_v1 p JOIN lyrics_entities e ON e.track_uri = p.track_uri
+            WHERE p.track_uri = ?
+            """, uri) { self.bind(digest, to: $0, at: 1) }
     }
     private func write(_ uri: String, _ data: Data?) throws {
-        let statement = try prepare(data == nil
+        try withStatement(data == nil
             ? "DELETE FROM lyrics_entities WHERE track_uri = ?"
-            : "INSERT OR REPLACE INTO lyrics_entities (track_uri, entity_data) VALUES (?, ?)")
-        defer { sqlite3_finalize(statement) }
-        bind(uri, to: statement, at: 1)
-        if let data { bind(data, to: statement, at: 2) }
-        try finish(statement)
+            : "INSERT OR REPLACE INTO lyrics_entities (track_uri, entity_data) VALUES (?, ?)") { statement in
+            bind(uri, to: statement, at: 1)
+            if let data { bind(data, to: statement, at: 2) }
+            try finish(statement)
+        }
     }
     /// Read-only check: would `apply` change anything? Takes no write lock.
     /// A nil `digest` leaves the stored digest out of the comparison.
@@ -154,21 +184,21 @@ final class NativeOfflineLyricsDatabase {
         if let data {
             if owned?.injected == data && current == data && (digest == nil || owned?.digest == digest) { return }
             let original = owned != nil && current == owned?.injected ? owned?.original : current
-            let statement = try prepare("INSERT OR REPLACE INTO eevee_lyrics_projection_v1 (track_uri, original, injected, source_digest) VALUES (?, ?, ?, ?)")
-            defer { sqlite3_finalize(statement) }
-            bind(uri, to: statement, at: 1)
-            bind(original, to: statement, at: 2)
-            bind(data, to: statement, at: 3)
-            if let digest = digest ?? owned?.digest { bind(digest, to: statement, at: 4) } else { sqlite3_bind_null(statement, 4) }
-            try finish(statement)
+            try withStatement("INSERT OR REPLACE INTO eevee_lyrics_projection_v1 (track_uri, original, injected, source_digest) VALUES (?, ?, ?, ?)") { statement in
+                bind(uri, to: statement, at: 1)
+                bind(original, to: statement, at: 2)
+                bind(data, to: statement, at: 3)
+                if let digest = digest ?? owned?.digest { bind(digest, to: statement, at: 4) } else { sqlite3_bind_null(statement, 4) }
+                try finish(statement)
+            }
             if current != data { try write(uri, data) }
         } else if let owned {
             // A newer write by Spotify must survive cleanup/provider changes.
             if current == owned.injected { try write(uri, owned.original) }
-            let statement = try prepare("DELETE FROM eevee_lyrics_projection_v1 WHERE track_uri = ?")
-            defer { sqlite3_finalize(statement) }
-            bind(uri, to: statement, at: 1)
-            try finish(statement)
+            try withStatement("DELETE FROM eevee_lyrics_projection_v1 WHERE track_uri = ?") { statement in
+                bind(uri, to: statement, at: 1)
+                try finish(statement)
+            }
         }
     }
     /// Returns whether anything was written. An unchanged row causes no write at all.
@@ -202,11 +232,11 @@ final class NativeOfflineLyricsDatabase {
     private func applyPlaceholder(_ uri: String, _ data: Data) throws {
         guard try placeholderNeeded(uri, data) else { return }
         if let owned = try ownership(uri), owned.original != nil { try apply(uri, nil, nil); return }
-        let statement = try prepare("INSERT OR REPLACE INTO eevee_lyrics_projection_v1 (track_uri, original, injected) VALUES (?, NULL, ?)")
-        defer { sqlite3_finalize(statement) }
-        bind(uri, to: statement, at: 1)
-        bind(data, to: statement, at: 2)
-        try finish(statement)
+        try withStatement("INSERT OR REPLACE INTO eevee_lyrics_projection_v1 (track_uri, original, injected) VALUES (?, NULL, ?)") { statement in
+            bind(uri, to: statement, at: 1)
+            bind(data, to: statement, at: 2)
+            try finish(statement)
+        }
         try write(uri, data)
     }
     @discardableResult
@@ -217,24 +247,27 @@ final class NativeOfflineLyricsDatabase {
         return pending.count
     }
     /// Read-only: does Spotify's table have a row for `uri` (ours or Spotify's)?
-    func hasRow(_ uri: String) throws -> Bool { try row(uri) != nil }
+    func hasRow(_ uri: String) throws -> Bool {
+        try exists("SELECT 1 FROM lyrics_entities WHERE track_uri = ?", uri)
+    }
     /// Read-only: is the current row ours with no Spotify original behind it? Removing
     /// such a row would leave the track with no row at all.
     func ownsWithoutOriginal(_ uri: String) throws -> Bool {
-        guard let owned = try ownership(uri) else { return false }
-        guard owned.original == nil else { return false }
-        return try row(uri) == owned.injected
+        try exists("""
+            SELECT 1 FROM eevee_lyrics_projection_v1 p JOIN lyrics_entities e ON e.track_uri = p.track_uri
+            WHERE p.original IS NULL AND CAST(e.entity_data AS BLOB) = p.injected AND p.track_uri = ?
+            """, uri)
     }
     func ownedTrackURIs() throws -> [String] {
-        let statement = try prepare("SELECT track_uri FROM eevee_lyrics_projection_v1")
-        defer { sqlite3_finalize(statement) }
-        var result: [String] = []
-        while true {
-            switch sqlite3_step(statement) {
-            case SQLITE_ROW:
-                if let text = sqlite3_column_text(statement, 0) { result.append(String(cString: text)) }
-            case SQLITE_DONE: return result
-            default: throw Failure(message: String(cString: sqlite3_errmsg(db)))
+        try withStatement("SELECT track_uri FROM eevee_lyrics_projection_v1") { statement in
+            var result: [String] = []
+            while true {
+                switch sqlite3_step(statement) {
+                case SQLITE_ROW:
+                    if let text = sqlite3_column_text(statement, 0) { result.append(String(cString: text)) }
+                case SQLITE_DONE: return result
+                default: throw Failure(message: String(cString: sqlite3_errmsg(db)))
+                }
             }
         }
     }

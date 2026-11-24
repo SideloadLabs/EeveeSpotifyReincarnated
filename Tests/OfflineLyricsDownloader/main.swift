@@ -19,7 +19,7 @@ struct CheckpointFixture: Encodable {
     let options: LyricsOptions
     let ids: [String]
     let recheckCatalog: Bool
-    var rateLimitRetryIds: [String]? = nil
+    var rateLimitRetryIds: [String] = []
 }
 enum LyricsSource: Int {
     case spicy = 5, genius = 0, petit = 3

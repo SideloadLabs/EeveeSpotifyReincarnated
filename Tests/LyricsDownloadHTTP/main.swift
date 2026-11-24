@@ -101,4 +101,59 @@ do {
 check(group.wait(timeout: .now()+5) == .success, "cooldown never resumed")
 starts.sort()
 check(starts[0] >= blockedAt+0.9 && starts[1]-starts[0] >= 0.4, "waiters burst together after a 429")
-print("Background HTTP: typed 429, server failures, transport retry, real cancellation, scope isolation and paced cooldown resume passed")
+// Nothing polls for cancellation: wake() stops a paced wait and an HTTP request in flight.
+let wakeGate = LyricsRequestGate()
+let wakeLock = NSLock()
+var unwanted = false
+func isUnwanted() -> Bool { wakeLock.lock(); defer { wakeLock.unlock() }; return unwanted }
+let blockedRequest = URLRequest(url: URL(string: "https://blocked.example/lyrics")!)
+do { try wakeGate.check(HTTPURLResponse(url: blockedRequest.url!, statusCode: 429, httpVersion: nil,
+                                        headerFields: ["Retry-After": "60"]), request: blockedRequest) }
+catch is LyricsRequestLimitError {}
+let finished = DispatchSemaphore(value: 0)
+let inFlight = URLSession.shared.dataTask(with: URLRequest(url: URL(string: "https://in-flight.example/lyrics")!)) { _, _, _ in
+    finished.signal()
+}
+let stops = DispatchGroup()
+var stopped429 = false, stoppedHTTP = false
+stops.enter()
+DispatchQueue.global().async {
+    do { try wakeGate.wait(for: blockedRequest, isCancelled: isUnwanted) }
+    catch let error as URLError where error.code == .cancelled { stopped429 = true }
+    catch {}
+    stops.leave()
+}
+stops.enter()
+DispatchQueue.global().async {
+    do { try wakeGate.waitForRequest(inFlight, finished: finished, isCancelled: isUnwanted) }
+    catch let error as URLError where error.code == .cancelled { stoppedHTTP = true }
+    catch {}
+    stops.leave()
+}
+Thread.sleep(forTimeInterval: 0.2)
+wakeLock.lock(); unwanted = true; wakeLock.unlock()
+let wokenAt = ProcessInfo.processInfo.systemUptime
+wakeGate.wake()
+check(stops.wait(timeout: .now() + 3) == .success, "wake() did not stop a waiting download")
+check(stopped429 && stoppedHTTP && ProcessInfo.processInfo.systemUptime - wokenAt < 2,
+      "an unwanted download kept waiting for its 429 cooldown or its HTTP request")
+check([.canceling, .completed].contains(inFlight.state), "wake() did not cancel the unwanted HTTP request")
+// A provider that does not answer holds a download at most requestTimeout, and is not asked again.
+let deadlineGate = LyricsRequestGate()
+deadlineGate.requestTimeout = 0.3
+let silentDone = DispatchSemaphore(value: 0)
+let silent = URLSession.shared.dataTask(with: URLRequest(url: URL(string: "https://silent.example/lyrics")!)) { _, _, _ in
+    silentDone.signal()
+}
+let deadlineStart = ProcessInfo.processInfo.systemUptime
+do {
+    try deadlineGate.waitForRequest(silent, finished: silentDone, isCancelled: { false })
+    fatalError("a silent provider was waited for without a deadline")
+} catch let error as URLError {
+    check(error.code == .timedOut && ProcessInfo.processInfo.systemUptime - deadlineStart < 2, "the request deadline did not end the wait")
+}
+var timeoutAttempts = 0
+do {
+    try LyricsDownloadHTTP.perform(isCancelled: { false }) { timeoutAttempts += 1; throw URLError(.timedOut) }
+} catch let error as URLError { check(error.code == .timedOut && timeoutAttempts == 1, "a timed-out request was retried") }
+print("Background HTTP: typed 429, server failures, transport retry, real cancellation, scope isolation, paced cooldown resume, wake and deadline passed")

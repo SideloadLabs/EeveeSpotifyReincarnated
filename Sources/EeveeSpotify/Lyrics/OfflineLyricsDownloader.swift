@@ -20,7 +20,7 @@ final class EeveeOfflineLyricsDownloader: NSObject {
         let source: LyricsSource
         let options: LyricsOptions
         let row: [String: String]
-        var callbacks: [(String) -> Void] = []
+        var callbacks: [(JobStatus) -> Void] = []
         var nativeCallbacks: [(Result<Lyrics, Error>) -> Void] = []
         var refresh: RefreshProgress?
         var operation: Operation?
@@ -29,7 +29,8 @@ final class EeveeOfflineLyricsDownloader: NSObject {
         let metadataTimeout: TimeInterval
         let queuedAt = Date()
 
-        var key: String { "\(source.rawValue):\(id)" }
+        var key: String { Self.key(source: source, id: id) }
+        static func key(source: LyricsSource, id: String) -> String { "\(source.rawValue):\(id)" }
 
         init(id: String, revision: OfflineLyricsStore.Revision, source: LyricsSource, options: LyricsOptions,
              row: [String: String], priority: Operation.QueuePriority, metadataTimeout: TimeInterval) {
@@ -54,27 +55,43 @@ final class EeveeOfflineLyricsDownloader: NSObject {
     private struct ProviderRefusedError: Error, CustomStringConvertible {
         var description: String { "lyrics provider rejected access; not asked again until tomorrow" }
     }
+    /// How a job ended. The raw values are the progress keys Pixie's settings page reads.
+    private enum JobStatus: String, CaseIterable {
+        case saved, skipped, notFound = "not_found", failed, cancelled
+    }
+    /// Visible progress of a batch: Missing (the library button) or a provider refresh.
+    private struct Progress {
+        let isRefresh: Bool
+        var total: Int
+        var completed = 0
+        var counts: [JobStatus: Int] = [:]
+
+        var isDone: Bool { completed >= total }
+        mutating func count(_ status: JobStatus) {
+            completed += 1
+            counts[status, default: 0] += 1
+        }
+        var snapshot: [String: Any] {
+            var result: [String: Any] = ["active": true, "completed": completed, "total": total]
+            for status in JobStatus.allCases { result[status.rawValue] = counts[status, default: 0] }
+            if isRefresh { result["kind"] = "refresh" }
+            return result
+        }
+        var summary: String {
+            JobStatus.allCases.map { "\($0.rawValue)=\(counts[$0, default: 0])" }.joined(separator: " ")
+        }
+    }
+    /// A provider refresh's progress, shared by its jobs.
     private final class RefreshProgress {
         let source: LyricsSource
         let options: LyricsOptions
-        var total = 0
-        var completed = 0
-        var counts: [String: Int] = [:]
+        var progress = Progress(isRefresh: true, total: 0)
 
         init(source: LyricsSource, options: LyricsOptions) { self.source = source; self.options = options }
-
-        var snapshot: [String: Any] {
-            var result: [String: Any] = counts.mapValues { $0 as Any }
-            result["active"] = true
-            result["kind"] = "refresh"
-            result["completed"] = completed
-            result["total"] = total
-            return result
-        }
     }
     let foreground = LyricsForegroundExecution()
     private var observers: [NSObjectProtocol] = []
-    // Main-queue state. At most two tracks overlap; every host is still rate-limited.
+    // Main-queue state. One track loads at a time; every host is still rate-limited.
     private var pending: [String: Job] = [:]
     private var rateLimitedJobs: [String: Job] = [:]
     private var removalTokens: [String: String] = [:]
@@ -96,9 +113,19 @@ final class EeveeOfflineLyricsDownloader: NSObject {
               file["version"] as? Int == 1, let rows = file["rows"] as? [[String: Any]] else { return nil }
         return Set(rows.compactMap { ($0["uri"] as? String).flatMap(trackId) })
     }
+    private var knownLibraryWriteScheduled = false
+    /// The whole list is written at most once a second (every completed track changes it)
+    /// and when Spotify leaves the screen. A launch reads Spotify's library again anyway.
     private func persistKnownLibrary() {
+        guard !knownLibraryWriteScheduled else { return }
+        knownLibraryWriteScheduled = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.writeKnownLibrary() }
+    }
+    private func writeKnownLibrary() {
+        guard knownLibraryWriteScheduled else { return }
+        knownLibraryWriteScheduled = false
         UserDefaults.container.set(knownDownloadedIds == nil, forKey: "PixieLyricsCatalogDirty")
-        if let ids = knownDownloadedIds { UserDefaults.container.set(ids.sorted(), forKey: "PixieLyricsKnownDownloadIds") }
+        if let ids = knownDownloadedIds { UserDefaults.container.set(Array(ids), forKey: "PixieLyricsKnownDownloadIds") }
         else { UserDefaults.container.removeObject(forKey: "PixieLyricsKnownDownloadIds") }
     }
     private var knownDownloadedIds: Set<String>? = EeveeOfflineLyricsDownloader.loadKnownLibrary()
@@ -106,7 +133,8 @@ final class EeveeOfflineLyricsDownloader: NSObject {
     private var scanCompleted = 0
     private var scanTotal = 0
     private var batchID: UUID?
-    private var batch: [String: Any] = [:]
+    /// The Missing button's batch, while it runs.
+    private var batch: Progress?
     private var refreshProgress: RefreshProgress?
     private var refreshGeneration: UInt64 = 0
     private var explicitRefresh: UUID?
@@ -115,7 +143,7 @@ final class EeveeOfflineLyricsDownloader: NSObject {
         let options: LyricsOptions
         let ids: [String]
         let recheckCatalog: Bool
-        let rateLimitRetryIds: [String]?
+        let rateLimitRetryIds: [String]
     }
     private static let checkpointKey = "PixieLyricsPendingQueue"
     private var lastCheckpoint: QueueCheckpoint?
@@ -155,7 +183,10 @@ final class EeveeOfflineLyricsDownloader: NSObject {
             return
         }
         guard observers.isEmpty else { return }
-        foreground.enteredBackground = { [weak self] in self?.flushCheckpoint() }
+        foreground.enteredBackground = { [weak self] in
+            self?.flushCheckpoint()
+            self?.writeKnownLibrary()
+        }
         foreground.hasWork = { [weak self] in self?.hasLyricsWork ?? false }
         foreground.isPlaying = { KaraokePlaybackTracker.shared.isPlaying() }
         foreground.backgroundTimeEnded = { [weak self] playing in
@@ -192,7 +223,6 @@ final class EeveeOfflineLyricsDownloader: NSObject {
         }
         foreground.observe()
         worker.isSuspended = !foreground.isActive
-        _ = LyricsNotFoundStore.shared // invalidate old HTTP-429 "not found" entries once
         observers.append(NotificationCenter.default.addObserver(
             forName: Notification.Name("EeveeOfflineLyricsRequested"), object: nil, queue: .main
         ) { [weak self] note in
@@ -213,8 +243,10 @@ final class EeveeOfflineLyricsDownloader: NSObject {
             let ids = current.compactMap(Self.trackId)
             for id in ids { self.requestedAt[id] = max(issued, self.requestedAt[id] ?? .distantPast) }
             // Requested is not downloaded yet: the library count grows on each audio completion.
-            do { try OfflineLyricsStore.shared.remember(context: context, trackIds: ids) }
-            catch { writeDebugLog("[Lyrics] could not save download membership: \(error)") }
+            self.statisticsQueue.async {
+                do { try OfflineLyricsStore.shared.remember(context: context, trackIds: ids) }
+                catch { writeDebugLog("[Lyrics] could not save download membership: \(error)") }
+            }
             self.enqueue(current.map { ["uri": $0] })
         })
         observers.append(NotificationCenter.default.addObserver(
@@ -292,7 +324,7 @@ final class EeveeOfflineLyricsDownloader: NSObject {
             let scanning = scanningLibrary || explicitRefresh != nil
             let checkpoint = UserDefaults.offlineLyricsEnabled && source.isReplacingLyrics && (scanning || !ids.isEmpty)
                 ? QueueCheckpoint(source: source.rawValue, options: options, ids: ids, recheckCatalog: scanning,
-                                  rateLimitRetryIds: retries.isEmpty ? nil : retries) : nil
+                                  rateLimitRetryIds: retries) : nil
             if checkpoint != lastCheckpoint {
                 let defaults = UserDefaults.container
                 if let checkpoint, let data = try? PropertyListEncoder().encode(checkpoint) {
@@ -574,25 +606,25 @@ final class EeveeOfflineLyricsDownloader: NSObject {
     private func enqueue(_ rows: [[String: String]], allowPreviouslyDeleted: Bool = true,
                          priority: Operation.QueuePriority = .normal, tracksRefresh: Bool = false,
                          rateLimitRetryIds: Set<String> = [],
-                         completion: ((String) -> Void)? = nil) {
+                         completion: ((JobStatus) -> Void)? = nil) {
         flushRemovals()
         defer { scheduleRateLimitRetriesIfReady(); changed() }
         let source = UserDefaults.lyricsSource
         let options = UserDefaults.lyricsOptions.downloadOptions
         guard source.isReplacingLyrics, UserDefaults.offlineLyricsEnabled else {
-            for _ in rows { completion?("cancelled") }
+            for _ in rows { completion?(.cancelled) }
             return
         }
         let ids = rows.compactMap { $0["uri"].flatMap(Self.trackId) }
         do { if allowPreviouslyDeleted { try OfflineLyricsStore.shared.allowDownloads(trackIds: ids) } }
         catch {
             writeDebugLog("[Lyrics] could not prepare redownload: \(error)")
-            for _ in rows { completion?("failed") }
+            for _ in rows { completion?(.failed) }
             return
         }
         for row in rows {
             guard let uri = row["uri"], let id = Self.trackId(uri) else {
-                completion?("failed")
+                completion?(.failed)
                 continue
             }
             submit(id: id, row: row, source: source, options: options, priority: priority,
@@ -627,9 +659,9 @@ final class EeveeOfflineLyricsDownloader: NSObject {
     private func submit(id: String, row: [String: String], source: LyricsSource, options: LyricsOptions,
                         priority: Operation.QueuePriority, metadataTimeout: TimeInterval, tracksRefresh: Bool = false,
                         isRateLimitRetry: Bool = false,
-                        completion: ((String) -> Void)? = nil, nativeCompletion: ((Result<Lyrics, Error>) -> Void)? = nil) {
+                        completion: ((JobStatus) -> Void)? = nil, nativeCompletion: ((Result<Lyrics, Error>) -> Void)? = nil) {
         let revision = OfflineLyricsStore.shared.revision(trackId: id)
-        let key = "\(source.rawValue):\(id)"
+        let key = Job.key(source: source, id: id)
         let previous = pending[key]
         if let job = previous, job.revision == revision, job.options == options {
             if tracksRefresh { trackRefresh(job) }
@@ -668,7 +700,7 @@ final class EeveeOfflineLyricsDownloader: NSObject {
         }
         guard let group = refreshProgress, job.refresh !== group else { return }
         job.refresh = group
-        group.total += 1
+        group.progress.total += 1
     }
 
     private func schedule(_ job: Job, key: String) {
@@ -752,29 +784,30 @@ final class EeveeOfflineLyricsDownloader: NSObject {
                     foreground.connectionFailed()
                     continue
                 }
-                if error is LyricsRequestLimitError { return .failed(error) }
-                writeDebugLog("[Lyrics] offline lyrics unavailable for \(id): \(error)")
+                // A 429 is logged where its retry is decided (finishAttempt).
+                if !(error is LyricsRequestLimitError) {
+                    writeDebugLog("[Lyrics] offline lyrics unavailable for \(id): \(error)")
+                }
                 return .failed(error)
             }
         }
     }
 
     private func deliver(_ outcome: Outcome, to job: Job) {
-        let status: String
+        let status: JobStatus
         let result: Result<Lyrics, Error>
         switch outcome {
-        case .saved(let lyrics): (status, result) = ("saved", .success(lyrics))
-        case .skipped(let lyrics): (status, result) = ("skipped", .success(lyrics))
+        case .saved(let lyrics): (status, result) = (.saved, .success(lyrics))
+        case .skipped(let lyrics): (status, result) = (.skipped, .success(lyrics))
         case .failed(let error):
-            if case LyricsError.noSuchSong = error { status = "not_found" }
-            else { status = "failed" }
+            if case LyricsError.noSuchSong = error { status = .notFound }
+            else { status = .failed }
             result = .failure(error)
-        case .cancelled: (status, result) = ("cancelled", .failure(URLError(.cancelled)))
+        case .cancelled: (status, result) = (.cancelled, .failure(URLError(.cancelled)))
         }
         if let group = job.refresh, group === refreshProgress {
-            group.completed += 1
-            group.counts[status, default: 0] += 1
-            if group.completed >= group.total { refreshProgress = nil }
+            group.progress.count(status)
+            if group.progress.isDone { refreshProgress = nil }
         }
         for callback in job.callbacks { callback(status) }
         for callback in job.nativeCallbacks { callback(result) }
@@ -799,10 +832,7 @@ final class EeveeOfflineLyricsDownloader: NSObject {
         pending.removeAll()
         rateLimitedJobs.removeAll()
         batchID = nil
-        if batch["active"] as? Bool == true {
-            batch["cancelled"] = (batch["total"] as? Int ?? 0) - (batch["completed"] as? Int ?? 0)
-        }
-        batch = [:]
+        batch = nil
         refreshProgress = nil
         scanningLibrary = false
         manualScanStarted = nil
@@ -877,7 +907,7 @@ final class EeveeOfflineLyricsDownloader: NSObject {
         let downloader = shared
         downloader.flushRemovals()
         downloader.refreshStatisticsIfNeeded()
-        let visibleBatch = downloader.batch.isEmpty ? downloader.refreshProgress?.snapshot ?? [:] : downloader.batch
+        let visibleBatch = downloader.batch?.snapshot ?? downloader.refreshProgress?.progress.snapshot ?? [:]
         return ["library_known": downloader.knownDownloadedIds != nil, "library_total": downloader.knownDownloadedIds?.count ?? 0, "library_missing": downloader.missingIds.count,
                 "all_saved": downloader.statisticsReady && downloader.knownDownloadedIds != nil && downloader.missingIds.isEmpty,
                 "statistics_loading": !downloader.statisticsReady,
@@ -988,9 +1018,9 @@ final class EeveeOfflineLyricsDownloader: NSObject {
     private func startBatch(_ needed: [[String: String]], catalog: [[String: String]], token: UUID) {
         flushRemovals()
         guard !needed.isEmpty else {
-            batchID = nil; batch = [:]; scheduleRateLimitRetriesIfReady(); changed(); return
+            batchID = nil; batch = nil; scheduleRateLimitRetriesIfReady(); changed(); return
         }
-        batch = ["active": true, "total": needed.count, "completed": 0, "saved": 0, "skipped": 0, "failed": 0, "not_found": 0, "cancelled": 0]
+        batch = Progress(isRefresh: false, total: needed.count)
         var albums: [String: [String]] = [:]
         for row in catalog {
             if let album = row["album_uri"], let uri = row["uri"], let id = Self.trackId(uri) { albums[album, default: []].append(id) }
@@ -1000,17 +1030,15 @@ final class EeveeOfflineLyricsDownloader: NSObject {
             do { try OfflineLyricsStore.shared.remember(contexts: contexts) }
             catch { writeDebugLog("[Lyrics] could not save album membership: \(error)") }
         }
-        enqueue(needed) { result in
-            guard self.batchID == token else { return }
-            self.batch[result] = (self.batch[result] as? Int ?? 0) + 1
-            let completed = (self.batch["completed"] as? Int ?? 0) + 1
-            self.batch["completed"] = completed
-            if completed == needed.count {
-                let counts = ["saved", "skipped", "not_found", "failed", "cancelled"]
-                    .map { "\($0)=\(self.batch[$0] as? Int ?? 0)" }.joined(separator: " ")
-                writeDebugLog("[Lyrics] Missing completed \(completed)/\(needed.count): \(counts)")
+        enqueue(needed) { status in
+            guard self.batchID == token, var progress = self.batch else { return }
+            progress.count(status)
+            if progress.isDone {
+                writeDebugLog("[Lyrics] Missing completed \(progress.completed)/\(progress.total): \(progress.summary)")
                 self.batchID = nil
-                self.batch = [:]
+                self.batch = nil
+            } else {
+                self.batch = progress
             }
         }
     }

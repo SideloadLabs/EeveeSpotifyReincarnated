@@ -13,6 +13,7 @@ let options = LyricsOptions(romanization: false, lrclibUrl: "https://example.tes
 let store = OfflineLyricsStore(directory: folder)
 let track = "0123456789ABCDEFGHIJKL"
 let payload = Data([1, 2, 3, 4])
+let replacementPayload = Data([5, 6, 7, 8])
 try store.save(trackId: track, source: 5, options: options, data: payload)
 // Reopen from disk, with no in-memory entries or network access.
 let reopened = OfflineLyricsStore(directory: folder)
@@ -90,6 +91,23 @@ check(afterRemoval.files == afterReplacement.files - 2 && afterRemoval.tracks ==
 check(store.entry(trackId: track, source: 1, options: options) == nil, "alternate provider survived removal")
 check(store.missingTrackIds([track], source: 5, options: options) == [track], "deleted lyrics still disabled the download button")
 check(store.entry(trackId: "track0", source: 5, options: options) != nil, "unrelated song was removed")
+// Removed files are deleted in the background: until then they read as missing,
+// and a file saved again meanwhile is kept.
+let deferredFolder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+defer { try? FileManager.default.removeItem(at: deferredFolder) }
+let deferred = OfflineLyricsStore(directory: deferredFolder)
+try deferred.save(trackId: "gone", source: 5, options: options, data: payload)
+try deferred.save(trackId: "back", source: 5, options: options, data: payload)
+try deferred.remove(trackIds: ["gone", "back"])
+check(deferred.entry(trackId: "gone", source: 5, options: options) == nil, "a removed file was read before its deletion")
+check(!deferred.savedTrackIds().contains("gone"), "a removed file was still listed")
+try deferred.allowDownloads(trackIds: ["back"])
+check(try deferred.save(trackId: "back", source: 5, options: options, data: replacementPayload), "a re-download was not saved")
+let gonePath = deferredFolder.appendingPathComponent("5-gone.json").path
+for _ in 0..<200 where FileManager.default.fileExists(atPath: gonePath) { Thread.sleep(forTimeInterval: 0.01) }
+check(!FileManager.default.fileExists(atPath: gonePath), "a removed file was never deleted")
+check(OfflineLyricsStore(directory: deferredFolder).entry(trackId: "back", source: 5, options: options)?.data == replacementPayload,
+      "the background deletion removed a file saved again")
 check(!store.isCurrent(oldRevision, trackId: track), "deletion did not invalidate old work")
 let staleSave = try store.save(trackId: track, source: 5, options: options, data: payload, revision: oldRevision)
 check(!staleSave, "in-flight download resurrected deleted lyrics")
