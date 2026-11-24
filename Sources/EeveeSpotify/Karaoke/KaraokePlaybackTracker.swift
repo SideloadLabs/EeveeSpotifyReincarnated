@@ -112,8 +112,7 @@ final class KaraokePlaybackTracker {
             // Offline, the new song's saved lyrics fill the custom lyrics button and the
             // lyrics header (no-op online).
             if let trackId = self.observedTrackId, trackId != previousObservedTrackId {
-                publishSavedKaraokeLyrics(trackId: trackId)
-                publishSavedLyricsState(trackId: trackId)
+                publishSavedLyrics(trackId: trackId)
             }
         }
     }

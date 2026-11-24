@@ -68,21 +68,28 @@ private extension LyricsError {
     init(failure error: Error) { self = error as? LyricsError ?? .unknownError }
 }
 
-/// The selected provider's error from upstream's last fetch, with its song. After a Genius
-/// fallback upstream throws Genius's error, while its header names this one.
+/// The selected provider's error from upstream's fetch of a song. After a Genius fallback
+/// upstream throws Genius's error, while its header names this one. Kept per song, since a
+/// prefetch can fetch another song meanwhile; a few songs at most.
 final class SelectedProviderFailure {
     static let shared = SelectedProviderFailure()
     private let lock = NSLock()
-    private var last: (trackId: String, error: LyricsError)?
+    private var errors: [(trackId: String, error: LyricsError)] = []
 
     func record(trackId: String, error: LyricsError?) {
         lock.lock(); defer { lock.unlock() }
-        last = error.map { (trackId, $0) }
+        errors.removeAll { $0.trackId == trackId }
+        guard let error else { return }
+        errors.append((trackId, error))
+        if errors.count > 8 { errors.removeFirst() }
     }
 
-    func error(trackId: String) -> LyricsError? {
+    /// The song's recorded error, forgotten: each request for the song records its own.
+    @discardableResult
+    func take(trackId: String) -> LyricsError? {
         lock.lock(); defer { lock.unlock() }
-        return last?.trackId == trackId ? last?.error : nil
+        guard let index = errors.firstIndex(where: { $0.trackId == trackId }) else { return nil }
+        return errors.remove(at: index).error
     }
 }
 
@@ -96,19 +103,6 @@ func applySavedLyricsState(_ entry: OfflineLyricsStore.Entry, failure: Error? = 
     state.isEmpty = (try? Lyrics(serializedBytes: entry.data))?.data.lines.isEmpty ?? false
     state.loadedSuccessfully = true
     lyricsState = state
-}
-
-/// Offline, Spotify shows the playing song's saved lyrics from its own database without
-/// asking Eevee, so the header gets that text's state when the song changes (no-op online).
-func publishSavedLyricsState(trackId: String) {
-    guard EeveeOfflineLyricsDownloader.shared.foreground.isOffline else { return }
-    DispatchQueue.global(qos: .utility).async {
-        if let entry = savedOfflineLyricsEntry(trackId: trackId, allowOtherProvider: true) {
-            applySavedLyricsState(entry)
-        } else {
-            lyricsState = LyricsLoadingState()
-        }
-    }
 }
 
 /// Colors used whenever there is no server response to take them from.
@@ -131,9 +125,14 @@ func savedOfflineLyricsEntry(trackId: String, allowOtherProvider: Bool) -> Offli
     if let entry = store.entry(trackId: trackId, source: source.rawValue, options: UserDefaults.lyricsOptions) {
         return entry
     }
-    guard allowOtherProvider else { return nil }
+    return allowOtherProvider ? otherProviderLyricsEntry(trackId: trackId, source: source) : nil
+}
+
+/// The newest text saved with a provider other than `source`.
+private func otherProviderLyricsEntry(trackId: String, source: LyricsSource) -> OfflineLyricsStore.Entry? {
+    guard source.isReplacingLyrics else { return nil }
     let others = LyricsSource.allCases.filter { $0 != source && $0.isReplacingLyrics }.map(\.rawValue)
-    return store.fallbackEntry(trackId: trackId, sources: others)
+    return OfflineLyricsStore.shared.fallbackEntry(trackId: trackId, sources: others)
 }
 
 /// Online, the selected provider's saved lyrics answer Spotify as the provider's own answer
@@ -169,19 +168,30 @@ private func cachedOfflineEntry(trackId: String, offline: Bool) -> (entry: Offli
     return (entry, lyrics)
 }
 
-/// The custom lyrics view learns a track's lyrics only from a fetch, and offline there is
-/// none: Spotify's native view reads its own offline database without asking Eevee.
-/// Offline only, when the playing track changes or the network goes away, the selected
-/// provider's saved lyrics fill the view. Online the fetch does it, as before.
-func publishSavedKaraokeLyrics(trackId: String) {
-    guard EeveeOfflineLyricsDownloader.shared.foreground.isOffline,
-          UserDefaults.karaokeOptions.enabled, UserDefaults.lyricsSource.supportsCustomLyricsView,
-          KaraokeLyricsStore.shared.lyrics(forTrackId: trackId) == nil else { return }
-    DispatchQueue.global(qos: .utility).async {
-        guard let entry = savedOfflineLyricsEntry(trackId: trackId, allowOtherProvider: false),
-              let saved = entry.karaoke,
+/// One at a time, in call order: after fast skipping, the playing song's lyrics are applied last.
+private let savedLyricsQueue = DispatchQueue(label: "EeveeSpotify.SavedLyrics", qos: .utility)
+
+/// The custom lyrics view and the lyrics header learn a track's lyrics only from a fetch,
+/// and offline there is none: Spotify's native view reads its own offline database without
+/// asking Eevee. Offline only, when the playing track changes or the network goes away, the
+/// header gets the saved text's state and the view the selected provider's saved lyrics.
+/// Online the fetch does both, as before.
+func publishSavedLyrics(trackId: String) {
+    guard EeveeOfflineLyricsDownloader.shared.foreground.isOffline else { return }
+    savedLyricsQueue.async {
+        // Back online meanwhile: the provider's answer sets both.
+        guard EeveeOfflineLyricsDownloader.shared.foreground.isOffline else { return }
+        let source = UserDefaults.lyricsSource
+        let selected = savedOfflineLyricsEntry(trackId: trackId, allowOtherProvider: false)
+        if let entry = selected ?? otherProviderLyricsEntry(trackId: trackId, source: source) {
+            applySavedLyricsState(entry)
+        } else {
+            lyricsState = LyricsLoadingState()
+        }
+        guard UserDefaults.karaokeOptions.enabled, source.supportsCustomLyricsView,
+              KaraokeLyricsStore.shared.lyrics(forTrackId: trackId) == nil,
+              let saved = selected?.karaoke,
               let karaoke = try? JSONDecoder().decode(KaraokeLyricsDto.self, from: saved) else { return }
-        guard KaraokeLyricsStore.shared.lyrics(forTrackId: trackId) == nil else { return }
         KaraokeLyricsStore.shared.set(trackId: trackId, lyrics: karaoke)
     }
 }
@@ -380,7 +390,9 @@ func eeveeLyricsData(_ path: String, originalLyrics: Lyrics? = nil, task: URLSes
         }
         // 1. The selected provider's saved lyrics, without asking it again.
         if let saved = savedSelectedProviderLyrics(trackId: trackId, originalLyrics: originalLyrics) { return saved }
-        // 2. The provider online, as upstream does.
+        // 2. The provider online, as upstream does. An error recorded by an earlier request
+        // for this song (another provider, or a fetch that stopped before asking) is not this one's.
+        SelectedProviderFailure.shared.take(trackId: trackId)
         do { return try getLyricsDataForCurrentTrack(path, originalLyrics: originalLyrics) }
         catch {
             // 3. Spotify has no lyrics of its own (its card may be one Eevee added for saved
@@ -392,7 +404,7 @@ func eeveeLyricsData(_ path: String, originalLyrics: Lyrics? = nil, task: URLSes
             applyLyricsColors(&lyrics, originalLyrics: nil)
             // Upstream's header names the selected provider's error; after a Genius fallback
             // `error` is Genius's, so take the one upstream's fetch recorded for this song.
-            applySavedLyricsState(entry, failure: SelectedProviderFailure.shared.error(trackId: trackId) ?? error)
+            applySavedLyricsState(entry, failure: SelectedProviderFailure.shared.take(trackId: trackId) ?? error)
             writeDebugLog("[Lyrics] \(trackId): provider has no lyrics online (\(error)); saved lyrics are shown")
             return try lyrics.serializedData()
         }

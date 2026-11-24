@@ -99,8 +99,7 @@ final class KaraokePlaybackTracker {
     func playerReportedTrackId() -> String? { nil }
     func isPlaying() -> Bool { false }
 }
-func publishSavedKaraokeLyrics(trackId: String) {}
-func publishSavedLyricsState(trackId: String) {}
+func publishSavedLyrics(trackId: String) {}
 func savedDisplayLyrics(_ entry: OfflineLyricsStore.Entry) -> Lyrics? { nil }
 final class NativeOfflineLyrics {
     static let shared = NativeOfflineLyrics()
