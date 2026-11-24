@@ -135,6 +135,9 @@ def fixture_sources(test: Fixture) -> list[Path]:
     if any(p.name=="NativeCacheMap.m" for p in paths):paths.append(source("ExportCacheIndex.m"))
     if any(b'#import "Localization.h"' in p.read_bytes() for p in paths):
         paths.append(source("Localization.m"))
+    # Pixie's strings come from Eevee; without Eevee a fixture gets its English text.
+    if test.name != "localization" and any(p.name == "Localization.m" for p in paths):
+        paths.append(source("eevee_localized_english.m"))
     return list(dict.fromkeys(paths))
 
 

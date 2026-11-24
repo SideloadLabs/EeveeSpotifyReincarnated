@@ -437,19 +437,19 @@ void SAPPrepareNativeOffline(BOOL (^stillRequested)(void),void (^completion)(BOO
     SAPInstallNativeOffline();
     SAPNativePreparation *operation=[SAPNativePreparation new];operation.completion=completion;operation.traceOperation=SAPTraceCurrentOperation();
     id wrapper=nativeWrapper;
-    if(!wrapper) { [operation finish:NO reason:SAPLocalized(@"The native download manager is not available yet. Start playback and try again.") report:nil];return; }
+    if(!wrapper) { [operation finish:NO reason:SAPLocalized(@"the_native_download_manager_is_not") report:nil];return; }
     SEL schedulerSelector=NSSelectorFromString(@"scheduler"),post=NSSelectorFromString(@"postBlock:");
     id scheduler=((id(*)(id,SEL))objc_msgSend)(wrapper,schedulerSelector);
-    if(!scheduler||![scheduler respondsToSelector:post]) { [operation finish:NO reason:SAPLocalized(@"The native download manager queue is unavailable.") report:nil];return; }
+    if(!scheduler||![scheduler respondsToSelector:post]) { [operation finish:NO reason:SAPLocalized(@"the_native_download_manager_queue_is") report:nil];return; }
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW,5*NSEC_PER_SEC),dispatch_get_main_queue(),^{
-        [operation finish:NO reason:SAPLocalized(@"The download manager did not reply within 5 seconds. No download request was sent.") report:nil];
+        [operation finish:NO reason:SAPLocalized(@"the_download_manager_did_not_reply") report:nil];
     });
     ((void(*)(id,SEL,id))objc_msgSend)(scheduler,post,^{
         if(operation.finished)return;
-        if(stillRequested&&!stillRequested()) { [operation finish:NO reason:SAPLocalized(@"Preparation cancelled.") report:nil];return; }
+        if(stillRequested&&!stillRequested()) { [operation finish:NO reason:SAPLocalized(@"preparation_cancelled") report:nil];return; }
         void *manager=NULL;uintptr_t image=0;NSMutableDictionary *before=[NSMutableDictionary dictionary];
         // The app's invalidate method clears wrapper+8. Read it only on its queue.
-        if(!nativeState(wrapper,&manager,&image,before)) { [operation finish:NO reason:SAPLocalized(@"The native manager has shut down, or this Spotify build does not match the verified version.") report:nil];return; }
+        if(!nativeState(wrapper,&manager,&image,before)) { [operation finish:NO reason:SAPLocalized(@"the_native_manager_has_shut_down") report:nil];return; }
         // Use Spotify's 10k track quota, including replacing an elevated value
         // retained from an older Pixie build. Duration and episode policy stay separate.
         const int32_t desiredDurationSeconds=SAPMinimumMusicDurationSeconds, desiredTrackLimit=SAPMinimumTrackLimit;

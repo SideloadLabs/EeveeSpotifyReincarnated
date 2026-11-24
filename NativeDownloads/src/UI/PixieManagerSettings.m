@@ -184,9 +184,9 @@ static UITableViewCell *SAPSettingsCell(UITableView *table,NSString *title,NSStr
 @end
 
 static NSString *SAPObservedValue(id value) {
-    if(!value||value==NSNull.null)return SAPLocalized(@"Unavailable");
+    if(!value||value==NSNull.null)return SAPLocalized(@"unavailable_2");
     if([value isKindOfClass:NSNumber.class])return [value stringValue];
-    return [value isKindOfClass:NSString.class]&&[value length]?SAPLocalized(value):SAPLocalized(@"Unavailable");
+    return [value isKindOfClass:NSString.class]&&[value length]?SAPLocalizedValue(value):SAPLocalized(@"unavailable_2");
 }
 static UITableViewCell *SAPPlainSettingsCell(NSString *label,NSString *value) {
     UITableViewCell *cell=[[UITableViewCell alloc]initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:nil];
@@ -203,7 +203,7 @@ static UITableViewCell *SAPPlainSettingsCell(NSString *label,NSString *value) {
 @property(nonatomic) BOOL checkingCompatibility;
 @end
 @implementation SAPDetailsSettings
-- (void)viewDidLoad {[super viewDidLoad];self.title=SAPLocalized(@"Download status");self.tableView.separatorInset=UIEdgeInsetsMake(0,20,0,20);}
+- (void)viewDidLoad {[super viewDidLoad];self.title=SAPLocalized(@"download_status");self.tableView.separatorInset=UIEdgeInsetsMake(0,20,0,20);}
 - (void)refresh {
     NSUInteger expected=++self.detailsGeneration;__weak typeof(self) weak=self;
     [SAPSettingsActions loadDetails:NO completion:^(NSDictionary *value){
@@ -213,32 +213,32 @@ static UITableViewCell *SAPPlainSettingsCell(NSString *label,NSString *value) {
 - (void)viewWillDisappear:(BOOL)animated {self.detailsGeneration++;[super viewWillDisappear:animated];}
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)table {return 2;}
 - (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section {return section==0?8:7;}
-- (NSString *)tableView:(UITableView *)table titleForHeaderInSection:(NSInteger)section {return @[SAPLocalized(@"Status"),SAPLocalized(@"Offline checks")][section];}
+- (NSString *)tableView:(UITableView *)table titleForHeaderInSection:(NSInteger)section {return @[SAPLocalized(@"status"),SAPLocalized(@"offline_checks")][section];}
 - (NSString *)tableView:(UITableView *)table titleForFooterInSection:(NSInteger)section {
-    if(section==0)return SAPDiagnosticsEnabled()?SAPLocalized(@"Unique tracks by final observed state. This is the retained journal snapshot, not your entire library."):SAPLocalized(@"Diagnostics are off. These are retained observations and may be stale. Enable Diagnostics to collect new download status.");
-    return SAPLocalized(@"Native source: Spotify's in-process offline API. Use Refresh quotas and licenses below for a new explicit check.");
+    if(section==0)return SAPDiagnosticsEnabled()?SAPLocalized(@"unique_tracks_by_final_observed_state"):SAPLocalized(@"diagnostics_are_off_these_are_retained");
+    return SAPLocalized(@"native_source_spotify_s_in_process");
 }
 - (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)index {
     if(index.section==1 && index.row==6) {
-        UITableViewCell *cell=SAPSettingsCell(table,SAPLocalized(@"Refresh quotas and licenses"),self.checkingCompatibility?SAPLocalized(@"Checking Spotify…"):SAPLocalized(@"Read current native quotas and device license status"),@"arrow.clockwise.circle.fill",UIColor.systemOrangeColor,NO);
+        UITableViewCell *cell=SAPSettingsCell(table,SAPLocalized(@"refresh_quotas_and_licenses"),self.checkingCompatibility?SAPLocalized(@"checking_spotify"):SAPLocalized(@"read_current_native_quotas_and_device"),@"arrow.clockwise.circle.fill",UIColor.systemOrangeColor,NO);
         cell.userInteractionEnabled=!self.checkingCompatibility;return cell;
     }
-    if(index.section==1 && index.row==5)return SAPSettingsCell(table,SAPLocalized(@"Check current track"),SAPLocalized(@"Read this track's native offline status"),@"checkmark.circle.fill",UIColor.systemGreenColor,NO);
+    if(index.section==1 && index.row==5)return SAPSettingsCell(table,SAPLocalized(@"check_current_track"),SAPLocalized(@"read_this_track_s_native_offline"),@"checkmark.circle.fill",UIColor.systemGreenColor,NO);
     NSDictionary *report=self.snapshot[@"report"]?:@{};NSString *label,*value;
     if(index.section==0) {
-        NSArray *labels=@[SAPLocalized(@"Downloaded"),SAPLocalized(@"Downloading"),SAPLocalized(@"Waiting"),SAPLocalized(@"Paused"),SAPLocalized(@"Errors"),SAPLocalized(@"Limit reached"),SAPLocalized(@"Not downloaded"),SAPLocalized(@"Expired")];
+        NSArray *labels=@[SAPLocalized(@"downloaded_2"),SAPLocalized(@"downloading_4"),SAPLocalized(@"waiting"),SAPLocalized(@"paused"),SAPLocalized(@"errors"),SAPLocalized(@"limit_reached"),SAPLocalized(@"not_downloaded"),SAPLocalized(@"expired")];
         NSArray *keys=@[@"downloaded",@"downloading",@"waiting",@"awaiting_redownload",@"error",@"waiting_limit_exceeded",@"not_downloaded",@"expired"];
         NSDictionary *counts=report[@"track_journal"][@"state_counts"];
-        label=labels[index.row];value=[counts isKindOfClass:NSDictionary.class]?SAPObservedValue(counts[keys[index.row]]?:@0):SAPLocalized(@"Unavailable");
+        label=labels[index.row];value=[counts isKindOfClass:NSDictionary.class]?SAPObservedValue(counts[keys[index.row]]?:@0):SAPLocalized(@"unavailable_2");
     }else if(index.section==1) {
         NSDictionary *check=report[@"compatibility_check"],*sources=check[@"sources"],*license=sources[@"licenses"];
-        label=@[SAPLocalized(@"Native check"),SAPLocalized(@"Free device slots"),SAPLocalized(@"Offline playback"),SAPLocalized(@"Local track quota"),SAPLocalized(@"Local device read")][index.row];
+        label=@[SAPLocalized(@"native_check"),SAPLocalized(@"free_device_slots_2"),SAPLocalized(@"offline_playback_2"),SAPLocalized(@"local_track_quota"),SAPLocalized(@"local_device_read")][index.row];
         if(index.row==0) {
             NSString *status=check[@"status"];
             double age=NSDate.date.timeIntervalSince1970-[check[@"finished_at"]doubleValue];
-            value=check[@"finished_at"]?[NSString stringWithFormat:@"%@ · %@",SAPObservedValue(status),age>90?SAPLocalized(@"stale"):SAPLocalized(@"recent snapshot")]:SAPObservedValue(status);
+            value=check[@"finished_at"]?[NSString stringWithFormat:@"%@ · %@",SAPObservedValue(status),age>90?SAPLocalized(@"stale"):SAPLocalized(@"recent_snapshot")]:SAPObservedValue(status);
         }else if(index.row==1)value=[license[@"read_status"]isEqual:@"received"]&&license[@"free_licenses"]&&license[@"max_licenses"]?[NSString stringWithFormat:@"%@ / %@",license[@"free_licenses"],license[@"max_licenses"]]:SAPObservedValue(license[@"read_status"]);
-        else if(index.row==2)value=[sources[@"playback"][@"read_status"]isEqual:@"received"]?([sources[@"playback"][@"allowed"]boolValue]?SAPLocalized(@"Allowed"):SAPLocalized(@"Not allowed")):SAPObservedValue(sources[@"playback"][@"read_status"]);
+        else if(index.row==2)value=[sources[@"playback"][@"read_status"]isEqual:@"received"]?([sources[@"playback"][@"allowed"]boolValue]?SAPLocalized(@"allowed_2"):SAPLocalized(@"not_allowed")):SAPObservedValue(sources[@"playback"][@"read_status"]);
         else if(index.row==3)value=sources[@"native"][@"current_tracks"]&&sources[@"native"][@"music_limit"]?[NSString stringWithFormat:@"%@ / %@",sources[@"native"][@"current_tracks"],sources[@"native"][@"music_limit"]]:SAPObservedValue(sources[@"native"][@"read_status"]);
         else value=SAPObservedValue(sources[@"local_device"][@"read_status"]);
     }
@@ -254,8 +254,8 @@ static UITableViewCell *SAPPlainSettingsCell(NSString *label,NSString *value) {
             typeof(self) page=weak;if(!page)return;
             page.checkingCompatibility=NO;[page refresh];
             if(!page.viewIfLoaded.window || page.presentedViewController)return;
-            UIAlertController *status=[UIAlertController alertControllerWithTitle:SAPLocalized(@"Quota and license check") message:SAPDownloadCompatibilityText(result) preferredStyle:UIAlertControllerStyleAlert];
-            [status addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"OK") style:UIAlertActionStyleCancel handler:nil]];
+            UIAlertController *status=[UIAlertController alertControllerWithTitle:SAPLocalized(@"quota_and_license_check") message:SAPDownloadCompatibilityText(result) preferredStyle:UIAlertControllerStyleAlert];
+            [status addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"ok") style:UIAlertActionStyleCancel handler:nil]];
             [page presentViewController:status animated:YES completion:nil];
         }];
     }
@@ -279,7 +279,7 @@ static UITableViewCell *SAPPlainSettingsCell(NSString *label,NSString *value) {
         if([device[@"offline_enabled"]boolValue])[enabled addObject:device];
     self.enabledDevices=enabled;
 }
-- (void)viewDidLoad {[super viewDidLoad];self.title=SAPLocalized(@"Offline devices");self.tableView.separatorInset=UIEdgeInsetsMake(0,20,0,20);}
+- (void)viewDidLoad {[super viewDidLoad];self.title=SAPLocalized(@"offline_devices");self.tableView.separatorInset=UIEdgeInsetsMake(0,20,0,20);}
 - (void)refresh {
     if(self.busy)return;self.busy=YES;self.readError=nil;[self.tableView reloadData];
     NSUInteger expected=++self.refreshGeneration;
@@ -298,54 +298,54 @@ static UITableViewCell *SAPPlainSettingsCell(NSString *label,NSString *value) {
 - (NSString *)tableView:(UITableView *)table titleForHeaderInSection:(NSInteger)section {
     if(section==1) {
         NSDictionary *current=self.currentDevice;
-        if(current)return [NSString stringWithFormat:SAPLocalized(@"%@ (current)"),[current[@"name"]length]?current[@"name"]:SAPLocalized(@"Spotify device")];
-        return SAPLocalized(@"Current device");
+        if(current)return [NSString stringWithFormat:SAPLocalized(@"current_2"),[current[@"name"]length]?current[@"name"]:SAPLocalized(@"spotify_device")];
+        return SAPLocalized(@"current_device");
     }
-    return section==0?SAPLocalized(@"Devices"):SAPLocalized(@"Source checks");
+    return section==0?SAPLocalized(@"devices"):SAPLocalized(@"source_checks");
 }
 - (NSString *)tableView:(UITableView *)table titleForFooterInSection:(NSInteger)section {
     if(section==2) {
-        if(self.busy)return SAPLocalized(@"Refreshing native and direct sources…");
+        if(self.busy)return SAPLocalized(@"refreshing_native_and_direct_sources");
         double age=NSDate.date.timeIntervalSince1970-[self.plan[@"created_at"]doubleValue];
-        if(self.plan&&age>90)return SAPLocalized(@"This snapshot is stale. Refresh before changing registrations.");
-        return self.readError?:self.plan[@"detail"]?:SAPLocalized(@"Native and direct source states agree. Each change is sent once and verified by a fresh read.");
+        if(self.plan&&age>90)return SAPLocalized(@"this_snapshot_is_stale_refresh_before");
+        return self.readError?:self.plan[@"detail"]?:SAPLocalized(@"native_and_direct_source_states_agree");
     }
-    if(section==0)return SAPLocalized(@"Only devices with offline access enabled are shown. Swipe left to disable offline access. Cached tracks on that copy may become unavailable.");
-    return SAPLocalized(@"Play one track online on this device, then refresh if authentication or the local device identity is unavailable.");
+    if(section==0)return SAPLocalized(@"only_devices_with_offline_access_enabled");
+    return SAPLocalized(@"play_one_track_online_on_this");
 }
 - (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)index {
     if(index.section==2) {
-        NSString *value=index.row==0?SAPObservedValue(self.plan[@"native_read_status"]):index.row==1?SAPObservedValue(self.plan[@"direct_read_status"]):self.plan[@"free_licenses"]?[NSString stringWithFormat:@"%@ / %@",self.plan[@"free_licenses"],self.plan[@"max_licenses"]]:SAPLocalized(@"Unavailable");
-        return SAPPlainSettingsCell(@[SAPLocalized(@"Native source"),SAPLocalized(@"Direct source"),[NSString stringWithFormat:SAPLocalized(@"Free / maximum slots (%@)"),self.plan[@"quota_source"]?:@"unavailable"]][index.row],value);
+        NSString *value=index.row==0?SAPObservedValue(self.plan[@"native_read_status"]):index.row==1?SAPObservedValue(self.plan[@"direct_read_status"]):self.plan[@"free_licenses"]?[NSString stringWithFormat:@"%@ / %@",self.plan[@"free_licenses"],self.plan[@"max_licenses"]]:SAPLocalized(@"unavailable_2");
+        return SAPPlainSettingsCell(@[SAPLocalized(@"native_source"),SAPLocalized(@"direct_source"),[NSString stringWithFormat:SAPLocalized(@"free_maximum_slots"),self.plan[@"quota_source"]?:@"unavailable"]][index.row],value);
     }
     if(index.section==1) {
         BOOL enable=self.actionsAllowed&&self.currentDevice&&![self.currentDevice[@"offline_enabled"]boolValue];
-        NSString *title=self.actionsAllowed&&[self.currentDevice[@"offline_enabled"]boolValue]?SAPLocalized(@"Offline enabled on this device"):SAPLocalized(@"Enable offline on this device");
-        UITableViewCell *cell=SAPSettingsCell(table,title,self.busy?SAPLocalized(@"Checking…"):self.actionsAllowed&&[self.currentDevice[@"offline_enabled"]boolValue]?SAPLocalized(@"Offline enabled"):enable?SAPLocalized(@"Uses one available slot"):SAPLocalized(@"Refresh to confirm the current registration"),@"iphone.badge.play",UIColor.systemBlueColor,NO);
+        NSString *title=self.actionsAllowed&&[self.currentDevice[@"offline_enabled"]boolValue]?SAPLocalized(@"offline_enabled_on_this_device"):SAPLocalized(@"enable_offline_on_this_device");
+        UITableViewCell *cell=SAPSettingsCell(table,title,self.busy?SAPLocalized(@"checking"):self.actionsAllowed&&[self.currentDevice[@"offline_enabled"]boolValue]?SAPLocalized(@"offline_enabled"):enable?SAPLocalized(@"uses_one_available_slot"):SAPLocalized(@"refresh_to_confirm_the_current_registration"),@"iphone.badge.play",UIColor.systemBlueColor,NO);
         cell.userInteractionEnabled=enable;cell.selectionStyle=enable?UITableViewCellSelectionStyleDefault:UITableViewCellSelectionStyleNone;return cell;
     }
     if(!self.devices.count) {
         BOOL unavailable=!self.plan||self.readError;
-        return SAPPlainSettingsCell(self.busy?SAPLocalized(@"Offline devices"):unavailable?SAPLocalized(@"Device list unavailable"):SAPLocalized(@"No offline-enabled devices"),
-            self.busy?SAPLocalized(@"Loading…"):unavailable?SAPLocalized(@"Refresh to read the current list"):SAPLocalized(@"No active offline registrations in this snapshot"));
+        return SAPPlainSettingsCell(self.busy?SAPLocalized(@"offline_devices"):unavailable?SAPLocalized(@"device_list_unavailable"):SAPLocalized(@"no_offline_enabled_devices"),
+            self.busy?SAPLocalized(@"loading_2"):unavailable?SAPLocalized(@"refresh_to_read_the_current_list"):SAPLocalized(@"no_active_offline_registrations_in_this"));
     }
     NSDictionary *device=self.devices[index.row];NSString *cache=device[@"cache_id"]?:@"";
     NSString *suffix=[cache substringFromIndex:cache.length>8?cache.length-8:0];
     NSString *identifier=device[@"device_id"]?:@"";NSString *deviceSuffix=[identifier substringFromIndex:identifier.length>8?identifier.length-8:0];
-    NSString *name=[device[@"name"]length]?device[@"name"]:SAPLocalized(@"Spotify device");
-    NSString *subtitle=[device[@"registration_status"]isEqual:@"not_registered"]?SAPLocalized(@"Not registered (not listed)"):[device[@"offline_enabled"]boolValue]?SAPLocalized(@"Offline enabled"):SAPLocalized(@"Offline disabled");
+    NSString *name=[device[@"name"]length]?device[@"name"]:SAPLocalized(@"spotify_device");
+    NSString *subtitle=[device[@"registration_status"]isEqual:@"not_registered"]?SAPLocalized(@"not_registered_not_listed"):[device[@"offline_enabled"]boolValue]?SAPLocalized(@"offline_enabled"):SAPLocalized(@"offline_disabled");
     NSUInteger matchingNames=0,matchingIdentifiers=0;
     for(NSDictionary *candidate in self.devices) {
-        NSString *candidateName=[candidate[@"name"]length]?candidate[@"name"]:SAPLocalized(@"Spotify device");
+        NSString *candidateName=[candidate[@"name"]length]?candidate[@"name"]:SAPLocalized(@"spotify_device");
         if([candidateName isEqual:name]) {
             matchingNames++;if([candidate[@"device_id"]isEqual:identifier])matchingIdentifiers++;
         }
     }
-    if(matchingNames>1)subtitle=[NSString stringWithFormat:SAPLocalized(@"%@ · Device %@"),subtitle,deviceSuffix];
-    if(matchingIdentifiers>1)subtitle=[NSString stringWithFormat:SAPLocalized(@"%@ · Cache %@"),subtitle,suffix];
+    if(matchingNames>1)subtitle=[NSString stringWithFormat:SAPLocalized(@"device"),subtitle,deviceSuffix];
+    if(matchingIdentifiers>1)subtitle=[NSString stringWithFormat:SAPLocalized(@"cache"),subtitle,suffix];
     UITableViewCell *cell=[[UITableViewCell alloc]initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:nil];
     UIListContentConfiguration *content=[UIListContentConfiguration subtitleCellConfiguration];
-    content.text=[device[@"is_current_device"]boolValue]?[name stringByAppendingString:SAPLocalized(@" (current)")]:name;content.secondaryText=subtitle;
+    content.text=[device[@"is_current_device"]boolValue]?[name stringByAppendingString:SAPLocalized(@"current")]:name;content.secondaryText=subtitle;
     content.textProperties.font=[UIFont preferredFontForTextStyle:UIFontTextStyleBody];
     content.secondaryTextProperties.font=[UIFont preferredFontForTextStyle:UIFontTextStyleFootnote];
     content.secondaryTextProperties.color=UIColor.secondaryLabelColor;content.secondaryTextProperties.numberOfLines=0;
@@ -356,32 +356,32 @@ static UITableViewCell *SAPPlainSettingsCell(NSString *label,NSString *value) {
 - (void)showResult:(NSString *)title message:(NSString *)message {
     if(!self.view.window)return;
     UIAlertController *alert=[UIAlertController alertControllerWithTitle:title message:message preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"OK") style:UIAlertActionStyleCancel handler:nil]];[self presentViewController:alert animated:YES completion:nil];
+    [alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"ok") style:UIAlertActionStyleCancel handler:nil]];[self presentViewController:alert animated:YES completion:nil];
 }
 - (void)enableCurrent {
     if(!self.actionsAllowed||!self.currentDevice||[self.currentDevice[@"offline_enabled"]boolValue])return;
     self.busy=YES;[self.tableView reloadData];
     SAPEnableOfflineOnCurrentDevice(^(NSDictionary *result,NSString *error){
-        self.busy=NO;[self refresh];[self showResult:error?SAPLocalized(@"Enable not confirmed"):SAPLocalized(@"Offline registration confirmed") message:error?:SAPLocalized(@"Spotify confirms offline access for this exact device. Audio playback has not been tested.")];
+        self.busy=NO;[self refresh];[self showResult:error?SAPLocalized(@"enable_not_confirmed"):SAPLocalized(@"offline_registration_confirmed") message:error?:SAPLocalized(@"spotify_confirms_offline_access_for_this")];
     });
 }
 - (void)confirmDisable:(NSDictionary *)device {
     if(!self.actionsAllowed)return;
     NSString *cache=device[@"cache_id"],*suffix=[cache substringFromIndex:cache.length>8?cache.length-8:0];
     NSString *identifier=device[@"device_id"];NSString *deviceSuffix=[identifier substringFromIndex:identifier.length>8?identifier.length-8:0];
-    UIAlertController *confirm=[UIAlertController alertControllerWithTitle:SAPLocalized(@"Disable offline access?") message:[NSString stringWithFormat:SAPLocalized(@"%@ · Device %@ · Cache %@\n\nCached tracks on this copy may become unavailable offline. The registration and free slot will be verified after the command."),device[@"name"]?:SAPLocalized(@"Spotify device"),deviceSuffix,suffix] preferredStyle:UIAlertControllerStyleAlert];
-    [confirm addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"Cancel") style:UIAlertActionStyleCancel handler:nil]];
-    [confirm addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"Disable offline access") style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action){
+    UIAlertController *confirm=[UIAlertController alertControllerWithTitle:SAPLocalized(@"disable_offline_access_2") message:[NSString stringWithFormat:SAPLocalized(@"device_cache_cached_tracks_on_this"),device[@"name"]?:SAPLocalized(@"spotify_device"),deviceSuffix,suffix] preferredStyle:UIAlertControllerStyleAlert];
+    [confirm addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"cancel") style:UIAlertActionStyleCancel handler:nil]];
+    [confirm addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"disable_offline_access") style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action){
         if(!self.actionsAllowed)return;self.busy=YES;[self.tableView reloadData];
         SAPDisableOfflineDevice(self.plan[@"id"],device[@"selection_token"],^(NSDictionary *result,NSString *error){
-            self.busy=NO;[self refresh];[self showResult:error?SAPLocalized(@"Disable not confirmed"):SAPLocalized(@"Offline access disabled") message:error?:[NSString stringWithFormat:SAPLocalized(@"Free device slots: %@ / %@."),result[@"free_licenses"],result[@"max_licenses"]]];
+            self.busy=NO;[self refresh];[self showResult:error?SAPLocalized(@"disable_not_confirmed"):SAPLocalized(@"offline_access_disabled") message:error?:[NSString stringWithFormat:SAPLocalized(@"free_device_slots"),result[@"free_licenses"],result[@"max_licenses"]]];
         });
     }]];[self presentViewController:confirm animated:YES completion:nil];
 }
 - (UISwipeActionsConfiguration *)tableView:(UITableView *)table trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)index {
     if(index.section!=0||(NSUInteger)index.row>=self.devices.count||!self.actionsAllowed)return nil;
     NSDictionary *device=self.devices[index.row];if([device[@"synthetic_record"]boolValue]||![device[@"offline_enabled"]boolValue])return nil;
-    UIContextualAction *action=[UIContextualAction contextualActionWithStyle:UIContextualActionStyleDestructive title:SAPLocalized(@"Remove") handler:^(UIContextualAction *action,UIView *view,void (^done)(BOOL)){done(YES);[self confirmDisable:device];}];
+    UIContextualAction *action=[UIContextualAction contextualActionWithStyle:UIContextualActionStyleDestructive title:SAPLocalized(@"remove") handler:^(UIContextualAction *action,UIView *view,void (^done)(BOOL)){done(YES);[self confirmDisable:device];}];
     UISwipeActionsConfiguration *configuration=[UISwipeActionsConfiguration configurationWithActions:@[action]];configuration.performsFirstActionWithFullSwipe=NO;return configuration;
 }
 - (void)tableView:(UITableView *)table didSelectRowAtIndexPath:(NSIndexPath *)index {[table deselectRowAtIndexPath:index animated:YES];if(index.section==1)[self enableCurrent];}
@@ -415,7 +415,7 @@ static id SAPLyricsCatalogObserver;
 @property(nonatomic) BOOL updatingProgressPanel,displayedScan,displayedRefresh;
 @end
 @implementation SAPLyricsSettings
-- (void)viewDidLoad {[super viewDidLoad];self.title=SAPLocalized(@"Lyrics");}
+- (void)viewDidLoad {[super viewDidLoad];self.title=SAPLocalized(@"lyrics_2");}
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];__weak typeof(self) weak=self;
     self.lyricsObserver=[NSNotificationCenter.defaultCenter addObserverForName:@"EeveeOfflineLyricsSettingsChanged" object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note){[weak refresh];}];
@@ -459,7 +459,7 @@ static id SAPLyricsCatalogObserver;
         UIButtonConfiguration *button=[UIButtonConfiguration filledButtonConfiguration];button.buttonSize=UIButtonConfigurationSizeSmall;button.baseForegroundColor=UIColor.whiteColor;button.baseBackgroundColor=UIColor.systemGray4Color;button.cornerStyle=UIButtonConfigurationCornerStyleCapsule;
         button.contentInsets=NSDirectionalEdgeInsetsMake(5,10,5,10);button.titleLineBreakMode=NSLineBreakByTruncatingTail;
         button.titleTextAttributesTransformer=^NSDictionary *(NSDictionary *attributes){NSMutableDictionary *result=[attributes mutableCopy];result[NSFontAttributeName]=[UIFont preferredFontForTextStyle:UIFontTextStyleCaption1];return result;};
-        self.progressAction.configuration=button;[self.progressAction setTitle:SAPLocalized(@"Cancel") forState:UIControlStateNormal];
+        self.progressAction.configuration=button;[self.progressAction setTitle:SAPLocalized(@"cancel") forState:UIControlStateNormal];
         [self.progressAction addTarget:self action:@selector(cancelDownload) forControlEvents:UIControlEventTouchUpInside];
         self.progressAction.titleLabel.numberOfLines=1;self.progressAction.titleLabel.adjustsFontSizeToFitWidth=YES;self.progressAction.titleLabel.minimumScaleFactor=0.6;
         self.progressActionHeight=[self.progressAction.heightAnchor constraintEqualToConstant:30];
@@ -487,11 +487,11 @@ static id SAPLyricsCatalogObserver;
     }
     NSUInteger done=self.scanning?self.scanCompleted:[batch[@"completed"]unsignedIntegerValue];
     NSUInteger total=self.scanning?self.scanTotal:[batch[@"total"]unsignedIntegerValue];
-    NSString *title=refresh?SAPLocalized(@"Updating lyrics · %lu / %lu"):SAPLocalized(@"Downloading lyrics · %lu / %lu");
-    if(self.scanning)title=SAPLocalized(@"Checking downloads · %lu / %lu");
+    NSString *title=refresh?SAPLocalized(@"updating_lyrics"):SAPLocalized(@"downloading_lyrics");
+    if(self.scanning)title=SAPLocalized(@"checking_downloads");
     self.progressTitle.text=[NSString stringWithFormat:title,(unsigned long)done,(unsigned long)total];
-    self.progressDetail.text=self.scanning?SAPLocalized(@"Preparing lyrics download…"):
-        SAPLyricsCountsText([NSString stringWithFormat:SAPLocalized(@"Saved %@ · already saved %@ · failed %@ · not found %@"),
+    self.progressDetail.text=self.scanning?SAPLocalized(@"preparing_lyrics_download"):
+        SAPLyricsCountsText([NSString stringWithFormat:SAPLocalized(@"saved_already_saved_failed_not_found"),
             batch[@"saved"]?:@0,batch[@"skipped"]?:@0,batch[@"failed"]?:@0,batch[@"not_found"]?:@0]);
     float fraction=total?MIN(1,(float)done/total):0;
     BOOL animate=continuing && self.progressBar.window!=nil && fraction>self.progressBar.progress && !UIAccessibilityIsReduceMotionEnabled();
@@ -528,39 +528,39 @@ static id SAPLyricsCatalogObserver;
 - (BOOL)downloadsOn {return [self.lyrics[@"enabled"]boolValue];}
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)table {return [self downloadsOn]?2:1;}
 - (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section {return section==0?([self downloadsOn]?2:1):2;}
-- (NSString *)tableView:(UITableView *)table titleForHeaderInSection:(NSInteger)section {return section==0?SAPLocalized(@"Downloading"):SAPLocalized(@"Saved lyrics");}
+- (NSString *)tableView:(UITableView *)table titleForHeaderInSection:(NSInteger)section {return section==0?SAPLocalized(@"downloading_4"):SAPLocalized(@"saved_lyrics");}
 - (NSString *)tableView:(UITableView *)table titleForFooterInSection:(NSInteger)section {
-    if(section==1)return SAPLocalized(@"Deleting lyrics keeps your music. Removing a downloaded song also removes its saved lyrics.");
-    return [NSString stringWithFormat:SAPLocalized(@"Source: %@. Save lyrics alongside music. Turning this off keeps existing lyrics. Karaoke keeps its own switch. One song loads at a time, with at least 0.5 seconds between requests to each site; the playing song goes first."),self.lyrics[@"source"]?:@"—"];
+    if(section==1)return SAPLocalized(@"deleting_lyrics_keeps_your_music_removing");
+    return [NSString stringWithFormat:SAPLocalized(@"source_save_lyrics_alongside_music_turning"),self.lyrics[@"source"]?:@"—"];
 }
 - (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)index {
     if(index.section==1) {
         if(index.row==0){
             NSUInteger count=[self.lyrics[@"tracks"]unsignedIntegerValue];
-            NSString *format=count==1?SAPLocalized(@"Lyrics for %lu song"):SAPLocalized(@"Lyrics for %lu songs");
+            NSString *format=count==1?SAPLocalized(@"lyrics_for_song"):SAPLocalized(@"lyrics_for_songs");
             NSString *title=[NSString stringWithFormat:format,(unsigned long)count];
             UITableViewCell *cell=SAPSettingsCell(table,title,nil,@"music.note.list",UIColor.systemPurpleColor,NO);
             UILabel *size=[UILabel new];size.text=[NSByteCountFormatter stringFromByteCount:[self.lyrics[@"bytes"]longLongValue] countStyle:NSByteCountFormatterCountStyleFile];
             size.textColor=UIColor.secondaryLabelColor;size.font=[UIFont preferredFontForTextStyle:UIFontTextStyleBody];[size sizeToFit];
             cell.accessoryView=size;cell.selectionStyle=UITableViewCellSelectionStyleNone;return cell;
         }
-        UITableViewCell *cell=SAPSettingsCell(table,SAPLocalized(@"Delete saved lyrics"),nil,@"trash.fill",UIColor.systemRedColor,NO);
+        UITableViewCell *cell=SAPSettingsCell(table,SAPLocalized(@"delete_saved_lyrics"),nil,@"trash.fill",UIColor.systemRedColor,NO);
         cell.userInteractionEnabled=!self.clearing;return cell;
     }
     if(index.row==0) {
-        NSString *title=SAPLocalized(@"Download lyrics");
+        NSString *title=SAPLocalized(@"download_lyrics");
         UITableViewCell *cell=SAPSettingsCell(table,title,nil,@"text.quote",UIColor.systemPurpleColor,NO);
         UISwitch *toggle=[UISwitch new];toggle.on=[self.lyrics[@"enabled"]boolValue];toggle.enabled=SAPLyricsBridge()!=Nil && !self.clearing;toggle.accessibilityLabel=title;
         [toggle addTarget:self action:@selector(enabledChanged:) forControlEvents:UIControlEventValueChanged];cell.accessoryView=toggle;cell.selectionStyle=UITableViewCellSelectionStyleNone;return cell;
     }
     NSString *detail=nil;
-    if(![self.lyrics[@"available"]boolValue])detail=SAPLocalized(@"Choose a lyrics provider in EeveeSpotify settings first");
+    if(![self.lyrics[@"available"]boolValue])detail=SAPLocalized(@"choose_a_lyrics_provider_in_eeveespotify");
     BOOL allSaved=[self.lyrics[@"all_saved"]boolValue];
     BOOL checking=[self.lyrics[@"statistics_loading"]boolValue];
-    if(![self busy] && checking)detail=SAPLocalized(@"Checking saved lyrics…");
+    if(![self busy] && checking)detail=SAPLocalized(@"checking_saved_lyrics");
     else if(![self busy] && [self.lyrics[@"library_known"]boolValue] && !allSaved)
-        detail=[NSString stringWithFormat:SAPLocalized(@"Missing lyrics for %@ songs"),self.lyrics[@"library_missing"]?:@0];
-    NSString *title=allSaved?([self.lyrics[@"library_total"]unsignedIntegerValue]?SAPLocalized(@"All lyrics are downloaded"):SAPLocalized(@"No downloaded songs")):SAPLocalized(@"Download missing lyrics");
+        detail=[NSString stringWithFormat:SAPLocalized(@"missing_lyrics_for_songs"),self.lyrics[@"library_missing"]?:@0];
+    NSString *title=allSaved?([self.lyrics[@"library_total"]unsignedIntegerValue]?SAPLocalized(@"all_lyrics_are_downloaded"):SAPLocalized(@"no_downloaded_songs")):SAPLocalized(@"download_missing_lyrics");
     UITableViewCell *cell=SAPSettingsCell(table,title,detail,allSaved?@"checkmark.circle.fill":@"arrow.down.circle.fill",UIColor.systemGreenColor,NO);
     cell.userInteractionEnabled=[self.lyrics[@"enabled"]boolValue]&&[self.lyrics[@"available"]boolValue]&&![self busy]&&!self.clearing&&!allSaved&&!checking;
     if(!cell.userInteractionEnabled)cell.selectionStyle=UITableViewCellSelectionStyleNone;
@@ -573,8 +573,8 @@ static id SAPLyricsCatalogObserver;
     [UIView transitionWithView:self.tableView duration:0.25 options:UIViewAnimationOptionTransitionCrossDissolve animations:^{[self refresh];} completion:nil];
 }
 - (void)showError:(NSString *)error {
-    UIAlertController *alert=[UIAlertController alertControllerWithTitle:SAPLocalized(@"Lyrics") message:SAPLocalized(error) preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"OK") style:UIAlertActionStyleCancel handler:nil]];[self presentViewController:alert animated:YES completion:nil];
+    UIAlertController *alert=[UIAlertController alertControllerWithTitle:SAPLocalized(@"lyrics_2") message:SAPLocalizedValue(error) preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"ok") style:UIAlertActionStyleCancel handler:nil]];[self presentViewController:alert animated:YES completion:nil];
 }
 - (void)downloadExisting {
     if([self busy] || self.clearing || [self.lyrics[@"all_saved"]boolValue])return;
@@ -592,18 +592,18 @@ static id SAPLyricsCatalogObserver;
     },^(NSArray *tracks,NSString *error){
         typeof(self) self=weak;SAPLyricsCatalogCancel=nil;self.scanning=NO;
         if(![SAPLyricsSnapshot()[@"scan_active"]boolValue]){[self refresh];return;}
-        if(!tracks){Class cls=SAPLyricsBridge();SEL end=NSSelectorFromString(@"endLibraryScan");if([cls respondsToSelector:end])((void(*)(id,SEL))objc_msgSend)(cls,end);[self refresh];[self showError:error?:SAPLocalized(@"Could not verify downloaded songs")];return;}
+        if(!tracks){Class cls=SAPLyricsBridge();SEL end=NSSelectorFromString(@"endLibraryScan");if([cls respondsToSelector:end])((void(*)(id,SEL))objc_msgSend)(cls,end);[self refresh];[self showError:error?:SAPLocalized(@"could_not_verify_downloaded_songs")];return;}
         Class cls=SAPLyricsBridge();SEL selector=NSSelectorFromString(@"downloadForTracks:");
         if([cls respondsToSelector:selector])((void(*)(id,SEL,id))objc_msgSend)(cls,selector,tracks);
         [self refresh];
-        if(!tracks.count)[self showError:SAPLocalized(@"Spotify reported no downloaded songs")];
+        if(!tracks.count)[self showError:SAPLocalized(@"spotify_reported_no_downloaded_songs")];
     });
 }
 - (void)deleteAll {
     if(self.clearing)return;
-    UIAlertController *alert=[UIAlertController alertControllerWithTitle:SAPLocalized(@"Delete all saved lyrics?") message:SAPLocalized(@"Your music stays. Pending lyrics downloads will stop. You can download lyrics again.") preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"Cancel") style:UIAlertActionStyleCancel handler:nil]];
-    [alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"Delete lyrics") style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action){
+    UIAlertController *alert=[UIAlertController alertControllerWithTitle:SAPLocalized(@"delete_all_saved_lyrics") message:SAPLocalized(@"your_music_stays_pending_lyrics_downloads") preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"cancel") style:UIAlertActionStyleCancel handler:nil]];
+    [alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"delete_lyrics") style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action){
         if(SAPLyricsCatalogCancel){SAPLyricsCatalogCancel();SAPLyricsCatalogCancel=nil;self.scanning=NO;}
         self.clearing=YES;[self refresh];Class cls=SAPLyricsBridge();SEL selector=NSSelectorFromString(@"deleteSavedLyricsWithCompletion:");
         if([cls respondsToSelector:selector])((void(*)(id,SEL,id))objc_msgSend)(cls,selector,^(NSString *error){self.clearing=NO;[self refresh];if(error)[self showError:error];});
@@ -624,7 +624,7 @@ static id SAPLyricsCatalogObserver;
 @end
 @implementation SAPDownloadsSettings
 - (void)viewDidLoad {
-    [super viewDidLoad];self.title=SAPLocalized(@"Pixie Download Manager");
+    [super viewDidLoad];self.title=SAPLocalized(@"pixie_download_manager");
     [self updateQualityOffer];
     __weak typeof(self) weak=self;
     self.qualityObserver=[NSNotificationCenter.defaultCenter addObserverForName:SAPNativeDownloadQualityOfferDidChangeNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(__unused NSNotification *note){[weak updateQualityOffer];}];
@@ -656,46 +656,46 @@ static id SAPLyricsCatalogObserver;
 }
 - (NSString *)tableView:(UITableView *)table titleForHeaderInSection:(NSInteger)section {
     if(self.qualityOffer){if(section==0)return nil;section--;}
-    return @[SAPLocalized(@"Download"),SAPLocalized(@"Download compatibility"),SAPLocalized(@"Export"),SAPLocalized(@"Lyrics"),SAPLocalized(@"Diagnostics")][[self topic:section]];
+    return @[SAPLocalized(@"download"),SAPLocalized(@"download_compatibility"),SAPLocalized(@"export"),SAPLocalized(@"lyrics_2"),SAPLocalized(@"diagnostics")][[self topic:section]];
 }
 - (NSString *)tableView:(UITableView *)table titleForFooterInSection:(NSInteger)section {
     if(self.qualityOffer){if(section==0)return nil;section--;}
     section=[self topic:section];
     if(section==0) {
         NSDictionary *startup=self.snapshot[@"jailbreak_bootstrap"];
-        if(startup&&![startup[@"native_patches_ready"]boolValue])return [NSString stringWithFormat:SAPLocalized(@"Pixie could not initialize downloads (%@). Supported Spotify: %@. Detected: %@. Menu and logs remain available."),startup[@"reason"],@SAP_SPOTIFY_VERSION,startup[@"detected_spotify_version"]];
-        return SAPLocalized(@"Downloads stay in Spotify. Audio export creates files you can save to Files or share.");
+        if(startup&&![startup[@"native_patches_ready"]boolValue])return [NSString stringWithFormat:SAPLocalized(@"pixie_could_not_initialize_downloads_supported"),startup[@"reason"],@SAP_SPOTIFY_VERSION,startup[@"detected_spotify_version"]];
+        return SAPLocalized(@"downloads_stay_in_spotify_audio_export");
     }
     if(section==1) {
         NSDictionary *mode=self.snapshot[@"key_request_mode"];
         // The adapter reports a fixed English sentence; it is a Localizable.strings key.
-        return [NSString stringWithFormat:SAPLocalized(@"%@\n\nOnly change settings in this menu if downloads are not working."),SAPLocalized(mode[@"detail"]?:@"")];
+        return [NSString stringWithFormat:SAPLocalized(@"only_change_settings_in_this_menu"),SAPLocalizedValue(mode[@"detail"]?:@"")];
     }
-    if(section==2)return SAPLocalized(@"Export downloaded Spotify audio to external apps or Files from Pixie or Spotify’s Share as file option. Choose a destination in the share sheet. The selected format applies to future exports.");
-    if(section==3)return SAPLocalized(@"Download lyrics for downloaded songs and manage the saved lyrics.");
-    if(section==4)return SAPLocalized(@"Enable Diagnostics for detailed passive events.");
+    if(section==2)return SAPLocalized(@"export_downloaded_spotify_audio_to_external");
+    if(section==3)return SAPLocalized(@"download_lyrics_for_downloaded_songs_and");
+    if(section==4)return SAPLocalized(@"enable_diagnostics_for_detailed_passive_events");
     return nil;
 }
 - (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)index {
     if(self.qualityOffer) {
-        if(index.section==0)return SAPSettingsCell(table,SAPLocalized(@"Download quality is Normal"),SAPLocalized(@"Tap to switch to High in Spotify settings"),@"arrow.up.circle.fill",UIColor.systemGreenColor,YES);
+        if(index.section==0)return SAPSettingsCell(table,SAPLocalized(@"download_quality_is_normal"),SAPLocalized(@"tap_to_switch_to_high_in"),@"arrow.up.circle.fill",UIColor.systemGreenColor,YES);
         index=[NSIndexPath indexPathForRow:index.row inSection:index.section-1];
     }
     index=[NSIndexPath indexPathForRow:index.row inSection:[self topic:index.section]];
     if(index.section==4 && !SAPDiagnosticsEnabled() && index.row>0)index=[NSIndexPath indexPathForRow:index.row+1 inSection:index.section];
     NSString *title,*subtitle=nil,*symbol;UIColor *color;BOOL chevron=NO;
     if(index.section==0) {
-        NSArray *titles=@[[self.snapshot[@"download_active"]boolValue]?SAPLocalized(@"Track download status"):SAPLocalized(@"Download current track"),SAPLocalized(@"Download current track's album"),SAPLocalized(@"Cancel download")];
+        NSArray *titles=@[[self.snapshot[@"download_active"]boolValue]?SAPLocalized(@"track_download_status"):SAPLocalized(@"download_current_track"),SAPLocalized(@"download_current_track_s_album"),SAPLocalized(@"cancel_download")];
         title=titles[index.row];symbol=@[@"arrow.down.circle.fill",@"square.stack.fill",@"xmark.circle.fill"][index.row];
         color=index.row==2?UIColor.systemOrangeColor:UIColor.systemGreenColor;
     }else if(index.section==1) {
         NSDictionary *mode=self.snapshot[@"key_request_mode"];
-        if(index.row==1)return SAPSettingsCell(table,SAPLocalized(@"Offline devices"),SAPLocalized(@"Review registrations and offline access"),@"externaldrive.badge.person.crop",UIColor.systemOrangeColor,YES);
+        if(index.row==1)return SAPSettingsCell(table,SAPLocalized(@"offline_devices"),SAPLocalized(@"review_registrations_and_offline_access"),@"externaldrive.badge.person.crop",UIColor.systemOrangeColor,YES);
         NSInteger configured=[mode[@"configured_mode"]integerValue];
-        title=SAPLocalized(@"Configured request mode");
+        title=SAPLocalized(@"configured_request_mode");
         NSNumber *last=mode[@"last_selector_returned_mode"];
-        subtitle=self.checkingCompatibility?SAPLocalized(@"Checking quotas and licenses…"):([mode[@"configuration_source"]isEqual:@"verified_direct_instruction"]||[mode[@"configuration_source"]isEqual:@"verified_static_trace_argument"])?SAPLocalized(@"Verified fixed argument in the executable"):
-            (last && last.integerValue>=0?[NSString stringWithFormat:SAPLocalized(@"Last selector returned %@ · authorization unconfirmed"),last]:SAPLocalized(@"No selector invocation observed this launch"));
+        subtitle=self.checkingCompatibility?SAPLocalized(@"checking_quotas_and_licenses"):([mode[@"configuration_source"]isEqual:@"verified_direct_instruction"]||[mode[@"configuration_source"]isEqual:@"verified_static_trace_argument"])?SAPLocalized(@"verified_fixed_argument_in_the_executable"):
+            (last && last.integerValue>=0?[NSString stringWithFormat:SAPLocalized(@"last_selector_returned_authorization_unconfirmed"),last]:SAPLocalized(@"no_selector_invocation_observed_this_launch"));
         symbol=@"arrow.triangle.2.circlepath";color=UIColor.systemOrangeColor;chevron=YES;
         UITableViewCell *cell=SAPSettingsCell(table,title,subtitle,symbol,color,chevron);
         UILabel *status=[UILabel new];status.font=[UIFont monospacedDigitSystemFontOfSize:17 weight:UIFontWeightBold];
@@ -707,22 +707,22 @@ static id SAPLyricsCatalogObserver;
         cell.userInteractionEnabled=restore;
         return cell;
     }else if(index.section==2) {
-        if(index.row==1)return SAPSettingsCell(table,SAPLocalized(@"Downloaded tracks"),SAPLocalized(@"Browse Spotify offline music"),@"music.note.list",UIColor.systemGreenColor,YES);
-        UITableViewCell *cell=SAPSettingsCell(table,SAPLocalized(@"Use Ogg format"),nil,@"waveform",UIColor.systemBlueColor,NO);
-        UISwitch *toggle=[UISwitch new];toggle.on=[SAPAudioExportFormat()isEqual:@"ogg"];toggle.accessibilityLabel=SAPLocalized(@"Use Ogg format");
+        if(index.row==1)return SAPSettingsCell(table,SAPLocalized(@"downloaded_tracks"),SAPLocalized(@"browse_spotify_offline_music"),@"music.note.list",UIColor.systemGreenColor,YES);
+        UITableViewCell *cell=SAPSettingsCell(table,SAPLocalized(@"use_ogg_format"),nil,@"waveform",UIColor.systemBlueColor,NO);
+        UISwitch *toggle=[UISwitch new];toggle.on=[SAPAudioExportFormat()isEqual:@"ogg"];toggle.accessibilityLabel=SAPLocalized(@"use_ogg_format");
         [toggle addTarget:self action:@selector(oggFormatChanged:) forControlEvents:UIControlEventValueChanged];cell.accessoryView=toggle;
         cell.selectionStyle=UITableViewCellSelectionStyleNone;return cell;
     }else if(index.section==3) {
-        return SAPSettingsCell(table,SAPLocalized(@"Lyrics downloads"),nil,@"arrow.down.circle.fill",UIColor.systemPurpleColor,YES);
+        return SAPSettingsCell(table,SAPLocalized(@"lyrics_downloads"),nil,@"arrow.down.circle.fill",UIColor.systemPurpleColor,YES);
     }else {
-        title=@[SAPLocalized(@"Diagnostics"),SAPLocalized(@"Download status"),SAPLocalized(@"Send log"),SAPLocalized(@"Reset log")][index.row];
+        title=@[SAPLocalized(@"diagnostics"),SAPLocalized(@"download_status"),SAPLocalized(@"send_log"),SAPLocalized(@"reset_log_2")][index.row];
         symbol=@[@"slider.horizontal.3",@"waveform.path.ecg",@"square.and.arrow.up",@"trash.fill"][index.row];color=index.row==3?UIColor.systemGrayColor:UIColor.systemTealColor;chevron=index.row==1;
-        if(index.row==3)subtitle=SAPLocalized(@"Clear previous logs and start a fresh history");
+        if(index.row==3)subtitle=SAPLocalized(@"clear_previous_logs_and_start_a");
     }
     UITableViewCell *cell=SAPSettingsCell(table,title,subtitle,symbol,color,chevron);
     if(index.section==4 && index.row==0) {
         UISwitch *toggle=[UISwitch new];toggle.on=SAPDiagnosticsEnabled();
-        toggle.accessibilityLabel=SAPLocalized(@"Diagnostics");toggle.accessibilityIdentifier=@"SpotifyDiagnosticsSwitch";
+        toggle.accessibilityLabel=SAPLocalized(@"diagnostics");toggle.accessibilityIdentifier=@"SpotifyDiagnosticsSwitch";
         [toggle addTarget:self action:@selector(diagnosticsChanged:) forControlEvents:UIControlEventValueChanged];cell.accessoryView=toggle;
     }
     return cell;
@@ -738,9 +738,9 @@ static id SAPLyricsCatalogObserver;
 - (void)requestDiagnostics:(BOOL)enabled {
     if(enabled==SAPDiagnosticsEnabled() || self.presentedViewController)return;
     if(!enabled){[self applyDiagnostics:NO];return;}
-    UIAlertController *confirm=[UIAlertController alertControllerWithTitle:SAPLocalized(@"Are you sure?") message:SAPLocalized(@"Enable detailed diagnostics logging?") preferredStyle:UIAlertControllerStyleAlert];
-    [confirm addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"No") style:UIAlertActionStyleCancel handler:nil]];
-    [confirm addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"Yes") style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action){[self applyDiagnostics:YES];}]];
+    UIAlertController *confirm=[UIAlertController alertControllerWithTitle:SAPLocalized(@"are_you_sure") message:SAPLocalized(@"enable_detailed_diagnostics_logging") preferredStyle:UIAlertControllerStyleAlert];
+    [confirm addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"no_2") style:UIAlertActionStyleCancel handler:nil]];
+    [confirm addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"yes_2") style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action){[self applyDiagnostics:YES];}]];
     [self presentViewController:confirm animated:YES completion:nil];
 }
 - (void)diagnosticsChanged:(UISwitch *)toggle {
@@ -748,7 +748,7 @@ static id SAPLyricsCatalogObserver;
 }
 - (void)slotMessage:(NSString *)title message:(NSString *)message {
     UIAlertController *alert=[UIAlertController alertControllerWithTitle:title message:message preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"OK") style:UIAlertActionStyleCancel handler:nil]];
+    [alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"ok") style:UIAlertActionStyleCancel handler:nil]];
     [self presentViewController:alert animated:YES completion:nil];
 }
 - (void)tableView:(UITableView *)table didSelectRowAtIndexPath:(NSIndexPath *)index {
@@ -773,15 +773,15 @@ static id SAPLyricsCatalogObserver;
         if(index.row==1){[self.navigationController pushViewController:[SAPOfflineDevicesSettings new] animated:YES];return;}
         NSDictionary *mode=self.snapshot[@"key_request_mode"];
         if(![mode[@"restore_zero_supported"]boolValue])return;
-        UIAlertController *choice=[UIAlertController alertControllerWithTitle:SAPLocalized(@"Restore mode 0?") message:SAPLocalized(@"The verified selector was observed returning 1. This action only restores mode 0, after a fresh quota and license check. It does not guarantee that downloading will work.") preferredStyle:UIAlertControllerStyleAlert];
-        [choice addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"Restore mode 0") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action){
+        UIAlertController *choice=[UIAlertController alertControllerWithTitle:SAPLocalized(@"restore_mode_0") message:SAPLocalized(@"the_verified_selector_was_observed_returning") preferredStyle:UIAlertControllerStyleAlert];
+        [choice addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"restore_mode_0_2") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action){
             self.checkingCompatibility=YES;[self.tableView reloadData];
             [SAPSettingsActions setKeyRequestMode:0 completion:^(BOOL changed,NSString *reason){
                 self.checkingCompatibility=NO;[self refresh];
-                [self slotMessage:changed?SAPLocalized(@"Mode 0 restored"):SAPLocalized(@"Mode unchanged") message:reason];
+                [self slotMessage:changed?SAPLocalized(@"mode_0_restored"):SAPLocalized(@"mode_unchanged") message:reason];
             }];
         }]];
-        [choice addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"Cancel") style:UIAlertActionStyleCancel handler:nil]];
+        [choice addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"cancel") style:UIAlertActionStyleCancel handler:nil]];
         [self presentViewController:choice animated:YES completion:nil];return;
     }
     if(index.section==4 && index.row==1) {
@@ -819,17 +819,17 @@ static id SAPLyricsCatalogObserver;
 }
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)table {return 1;}
 - (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section {return 1;}
-- (NSString *)tableView:(UITableView *)table titleForHeaderInSection:(NSInteger)section {return SAPLocalized(@"Pixie Download Manager");}
+- (NSString *)tableView:(UITableView *)table titleForHeaderInSection:(NSInteger)section {return SAPLocalized(@"pixie_download_manager");}
 - (void)tableView:(UITableView *)table willDisplayHeaderView:(UIView *)view forSection:(NSInteger)section {
     if([view isKindOfClass:UITableViewHeaderFooterView.class]) {
         UITableViewHeaderFooterView *header=(id)view;
-        header.textLabel.text=SAPLocalized(@"Pixie Download Manager");
+        header.textLabel.text=SAPLocalized(@"pixie_download_manager");
         header.textLabel.font=[UIFont preferredFontForTextStyle:UIFontTextStyleHeadline];
         header.textLabel.textColor=UIColor.secondaryLabelColor;
     }
 }
 - (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)index {
-    return SAPSettingsCell(table,SAPLocalized(@"Manage downloads"),SAPLocalized(@"Current track, mode and download status"),@"arrow.down.circle.fill",UIColor.systemGreenColor,YES);
+    return SAPSettingsCell(table,SAPLocalized(@"manage_downloads_2"),SAPLocalized(@"current_track_mode_and_download_status"),@"arrow.down.circle.fill",UIColor.systemGreenColor,YES);
 }
 - (void)tableView:(UITableView *)table didSelectRowAtIndexPath:(NSIndexPath *)index {
     [table deselectRowAtIndexPath:index animated:YES];

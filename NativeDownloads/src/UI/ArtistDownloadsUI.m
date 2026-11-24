@@ -57,15 +57,15 @@ static void SAPAfterDialogDismissal(UIAlertController *dialog,dispatch_block_t c
 @implementation SAPArtistDownloadsController
 - (instancetype)init {return [super initWithStyle:UITableViewStyleInsetGrouped];}
 - (void)viewDidLoad {
-    [super viewDidLoad];self.title=self.artistName.length?self.artistName:SAPLocalized(@"Artist downloads");
+    [super viewDidLoad];self.title=self.artistName.length?self.artistName:SAPLocalized(@"artist_downloads");
     self.overrideUserInterfaceStyle=UIUserInterfaceStyleDark;self.tableView.backgroundColor=UIColor.clearColor;
     self.tableView.rowHeight=UITableViewAutomaticDimension;self.tableView.estimatedRowHeight=76;
     if(@available(iOS 16.0,*))self.tableView.selfSizingInvalidation=UITableViewSelfSizingInvalidationEnabled;
     self.tableView.sectionHeaderHeight=UITableViewAutomaticDimension;self.tableView.estimatedSectionHeaderHeight=52;
     self.selectedReleaseURIs=[NSMutableSet set];self.artworkCells=[NSHashTable weakObjectsHashTable];
-    self.downloadControl=[[UIBarButtonItem alloc]initWithTitle:SAPLocalized(@"Download selected") style:UIBarButtonItemStylePlain target:self action:@selector(downloadSelected)];
+    self.downloadControl=[[UIBarButtonItem alloc]initWithTitle:SAPLocalized(@"download_selected_2") style:UIBarButtonItemStylePlain target:self action:@selector(downloadSelected)];
     __weak typeof(self) weakStopPage=self;
-    self.stopControl=[[UIBarButtonItem alloc]initWithPrimaryAction:[UIAction actionWithTitle:SAPLocalized(@"Stop") image:nil identifier:@"pixie.artist.downloads.stop" handler:^(UIAction *action){
+    self.stopControl=[[UIBarButtonItem alloc]initWithPrimaryAction:[UIAction actionWithTitle:SAPLocalized(@"stop") image:nil identifier:@"pixie.artist.downloads.stop" handler:^(UIAction *action){
         typeof(self) page=weakStopPage;if(!page)return;
         BOOL senderMatches=action.sender==page.stopControl;
         BOOL visible=page.itemsVisible && page.viewIfLoaded.window!=nil && !page.navigationController.toolbarHidden && [page.toolbarItems containsObject:page.stopControl];
@@ -77,10 +77,10 @@ static void SAPAfterDialogDismissal(UIAlertController *dialog,dispatch_block_t c
         if(!accepted)return;
         SAPStopPlaylistReleaseDownloadsForArtist(page.artistURI,nil);SAPStopArtistDownloadSessionReleasesForArtist(page.artistURI,scope);
     }]];
-    self.cancelControl=[[UIBarButtonItem alloc]initWithTitle:SAPLocalized(@"Cancel") style:UIBarButtonItemStylePlain target:self action:@selector(confirmCancelDownloads)];self.cancelControl.accessibilityLabel=SAPLocalized(@"Cancel downloads");
-    self.continueControl=[[UIBarButtonItem alloc]initWithTitle:SAPLocalized(@"Continue") style:UIBarButtonItemStylePlain target:self action:@selector(continueDownloads)];
-    self.selectControl=[[UIBarButtonItem alloc]initWithTitle:SAPLocalized(@"Select") style:UIBarButtonItemStylePlain target:self action:@selector(toggleSelection)];
-    self.retryControl=[[UIBarButtonItem alloc]initWithTitle:SAPLocalized(@"Retry") style:UIBarButtonItemStylePlain target:self action:@selector(loadCatalog)];self.toolbarSpace=[UIBarButtonItem flexibleSpaceItem];
+    self.cancelControl=[[UIBarButtonItem alloc]initWithTitle:SAPLocalized(@"cancel") style:UIBarButtonItemStylePlain target:self action:@selector(confirmCancelDownloads)];self.cancelControl.accessibilityLabel=SAPLocalized(@"cancel_downloads_2");
+    self.continueControl=[[UIBarButtonItem alloc]initWithTitle:SAPLocalized(@"continue") style:UIBarButtonItemStylePlain target:self action:@selector(continueDownloads)];
+    self.selectControl=[[UIBarButtonItem alloc]initWithTitle:SAPLocalized(@"select_3") style:UIBarButtonItemStylePlain target:self action:@selector(toggleSelection)];
+    self.retryControl=[[UIBarButtonItem alloc]initWithTitle:SAPLocalized(@"retry") style:UIBarButtonItemStylePlain target:self action:@selector(loadCatalog)];self.toolbarSpace=[UIBarButtonItem flexibleSpaceItem];
     self.loadingLabel=[UILabel new];self.loadingLabel.numberOfLines=0;self.loadingLabel.textAlignment=NSTextAlignmentCenter;self.loadingLabel.textColor=UIColor.secondaryLabelColor;
     self.loadingLabel.font=[UIFont preferredFontForTextStyle:UIFontTextStyleBody];self.loadingLabel.adjustsFontForContentSizeCategory=YES;
     self.loadingContainer=[UIView new];self.loadingSpinner=[[UIActivityIndicatorView alloc]initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];self.loadingSpinner.color=UIColor.whiteColor;self.loadingSpinner.hidesWhenStopped=YES;
@@ -90,7 +90,7 @@ static void SAPAfterDialogDismissal(UIAlertController *dialog,dispatch_block_t c
     self.footerContainer=[UIView new];[self.footerContainer addSubview:self.footerLabel];
     [self.navigationController setToolbarHidden:NO animated:NO];
     UIBarButtonItem *back=[[UIBarButtonItem alloc]initWithImage:[UIImage systemImageNamed:@"xmark"] style:UIBarButtonItemStylePlain target:self action:@selector(close)];
-    back.tintColor=UIColor.whiteColor;back.accessibilityLabel=SAPLocalized(@"Back");self.navigationItem.leftBarButtonItem=back;
+    back.tintColor=UIColor.whiteColor;back.accessibilityLabel=SAPLocalized(@"back");self.navigationItem.leftBarButtonItem=back;
     __weak typeof(self) weak=self;
     self.foregroundObserver=[NSNotificationCenter.defaultCenter addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(__unused NSNotification *note){typeof(self) page=weak;if(page.itemsVisible && page.viewIfLoaded.window){[page detachItems];[page attachItems];if(page.sessionObservation)[page.sessionObservation refresh];else[page bindSession];}}];
     [self loadCatalog];
@@ -106,14 +106,14 @@ static void SAPAfterDialogDismissal(UIAlertController *dialog,dispatch_block_t c
         if(!items)return native;NSMutableDictionary *live=[native mutableCopy];
         for(NSString *key in @[@"progress",@"downloaded_tracks",@"total_tracks",@"known_tracks",@"playlist_download",@"playlist_uri",@"playlist_name"])if(items[key])live[key]=items[key];return live;
     }
-    for(NSDictionary *job in [self.playlistSnapshot[@"jobs"]reverseObjectEnumerator])if([job[@"active"]boolValue] && ([job[@"queued"]boolValue] || ![job[@"submitted"]boolValue]) && [job[@"release_uris"]containsObject:uri])return @{@"state":@"partial",@"phase":[job[@"queued"]boolValue]?@"queued":@"preparing",@"active":@YES,@"progress":@0,@"playlist_name":job[@"playlist_name"]?:SAPLocalized(@"Playlist"),@"playlist_download":@YES,@"download_source":@"playlist"};
+    for(NSDictionary *job in [self.playlistSnapshot[@"jobs"]reverseObjectEnumerator])if([job[@"active"]boolValue] && ([job[@"queued"]boolValue] || ![job[@"submitted"]boolValue]) && [job[@"release_uris"]containsObject:uri])return @{@"state":@"partial",@"phase":[job[@"queued"]boolValue]?@"queued":@"preparing",@"active":@YES,@"progress":@0,@"playlist_name":job[@"playlist_name"]?:SAPLocalized(@"playlist_2"),@"playlist_download":@YES,@"download_source":@"playlist"};
     NSMutableDictionary *live=[(items?:native)mutableCopy];
     if([items[@"state"]isEqual:@"downloaded"]){
         // File availability is not the album's native offline registration.
         BOOL known=[native[@"state"]length] && ![native[@"state"]isEqual:@"unknown"];
         live[@"state"]=[items[@"active"]boolValue]?@"partial":known?@"not_downloaded":@"unknown";
         live[@"phase"]=[items[@"active"]boolValue]?@"registering":known?@"unregistered":@"unverified";
-        if([native[@"phase"]isEqual:@"failed"]){live[@"phase"]=@"failed";live[@"error"]=native[@"error"]?:SAPLocalized(@"Album registration failed.");}
+        if([native[@"phase"]isEqual:@"failed"]){live[@"phase"]=@"failed";live[@"error"]=native[@"error"]?:SAPLocalized(@"album_registration_failed");}
     }
     if([native[@"can_continue"]boolValue] || [native[@"stop_pending"]boolValue]){
         for(NSString *key in @[@"can_continue",@"stop_pending",@"stopped_visual"])if(native[key])live[key]=native[key];
@@ -190,7 +190,7 @@ static void SAPAfterDialogDismissal(UIAlertController *dialog,dispatch_block_t c
     if(self.loading)return;[self detach];self.loading=YES;self.loadError=nil;self.loadProgress=nil;self.loadCompleted=self.loadTotal=0;self.catalog=nil;self.catalogReleases=@[];self.pendingCatalog=nil;[self.selectedReleaseURIs removeAllObjects];
     NSUInteger generation=++self.loadGeneration;[self.tableView reloadData];[self updateControls];__weak typeof(self) weak=self;
     SAP_JOURNAL_ACTION(@"artist_catalog_requested",@{@"artist_uri":self.artistURI?:@""});
-    self.cancelCatalog=SAPFetchArtistMetadataProgressively(self.artistURI,^(NSUInteger completed,NSUInteger total){typeof(self) page=weak;if(!page || generation!=page.loadGeneration)return;page.loadCompleted=completed;page.loadTotal=total;page.loadProgress=total?[NSString stringWithFormat:SAPLocalized(@"Reading release details… %lu / %lu"),(unsigned long)completed,(unsigned long)total]:nil;[page updateControls];},^(NSDictionary *catalog){typeof(self) page=weak;if(!page || generation!=page.loadGeneration)return;page.pendingCatalog=catalog;[page applyPendingCatalog];},^(NSDictionary *catalog,NSString *error){typeof(self) page=weak;if(!page || generation!=page.loadGeneration)return;page.cancelCatalog=nil;page.loading=NO;page.loadError=error;page.pendingCatalog=catalog?:@{};[page applyPendingCatalog];[page updateControls];SAP_JOURNAL_ACTION(@"artist_catalog_result",@{@"artist_uri":page.artistURI?:@"",@"release_count":catalog[@"release_count"]?:@0,@"error":error?:@""});});
+    self.cancelCatalog=SAPFetchArtistMetadataProgressively(self.artistURI,^(NSUInteger completed,NSUInteger total){typeof(self) page=weak;if(!page || generation!=page.loadGeneration)return;page.loadCompleted=completed;page.loadTotal=total;page.loadProgress=total?[NSString stringWithFormat:SAPLocalized(@"reading_release_details"),(unsigned long)completed,(unsigned long)total]:nil;[page updateControls];},^(NSDictionary *catalog){typeof(self) page=weak;if(!page || generation!=page.loadGeneration)return;page.pendingCatalog=catalog;[page applyPendingCatalog];},^(NSDictionary *catalog,NSString *error){typeof(self) page=weak;if(!page || generation!=page.loadGeneration)return;page.cancelCatalog=nil;page.loading=NO;page.loadError=error;page.pendingCatalog=catalog?:@{};[page applyPendingCatalog];[page updateControls];SAP_JOURNAL_ACTION(@"artist_catalog_result",@{@"artist_uri":page.artistURI?:@"",@"release_count":catalog[@"release_count"]?:@0,@"error":error?:@""});});
 }
 - (void)viewWillAppear:(BOOL)animated {[super viewWillAppear:animated];[self updateControls];}
 - (void)viewDidAppear:(BOOL)animated {[super viewDidAppear:animated];self.itemsVisible=YES;[self applyPendingCatalog];[self refreshVisibleStates];[self updateControls];[self attachItems];}
@@ -236,23 +236,23 @@ static void SAPAfterDialogDismissal(UIAlertController *dialog,dispatch_block_t c
     // Older or unavailable producers may omit the summary flag.
     if(!self.sessionSnapshot[@"can_continue"])for(NSDictionary *value in [self.sessionSnapshot[@"album_states"]allValues])if([value[@"can_continue"]boolValue]){resumable=YES;break;}
     if(!self.playlistSnapshot[@"can_continue"])for(NSDictionary *job in self.playlistSnapshot[@"jobs"])if([job[@"can_continue"]boolValue]){resumable=YES;break;}
-    self.selectControl.title=self.selecting?SAPLocalized(@"Cancel"):SAPLocalized(@"Select");self.selectControl.enabled=self.allReleases.count>0;
+    self.selectControl.title=self.selecting?SAPLocalized(@"cancel"):SAPLocalized(@"select_3");self.selectControl.enabled=self.allReleases.count>0;
     BOOL retry=!self.loading && !active && (self.loadError || [self.catalog[@"load_warning"]length]);
     BOOL cancelable=[self.sessionSnapshot[@"can_cancel"]boolValue] || [self.playlistSnapshot[@"can_cancel"]boolValue];
     self.cancelControl.enabled=cancelable;
     NSArray *right=retry?@[self.selectControl,self.retryControl]:@[self.selectControl];if(![self.navigationItem.rightBarButtonItems isEqual:right])self.navigationItem.rightBarButtonItems=right;
-    NSUInteger selected=self.selectedReleaseURIs.count;self.downloadControl.title=[NSString stringWithFormat:SAPLocalized(@"Download selected · %lu"),(unsigned long)selected];self.downloadControl.enabled=selected>0;
+    NSUInteger selected=self.selectedReleaseURIs.count;self.downloadControl.title=[NSString stringWithFormat:SAPLocalized(@"download_selected"),(unsigned long)selected];self.downloadControl.enabled=selected>0;
     NSMutableArray *items=[NSMutableArray array];
     if(self.selecting){if(active)[items addObject:self.stopControl];[items addObjectsFromArray:@[self.toolbarSpace,self.downloadControl]];}
     else {if(cancelable)[items addObject:self.cancelControl];[items addObject:self.toolbarSpace];if(resumable)[items addObject:self.continueControl];if(active)[items addObject:self.stopControl];}
     if(![self.toolbarItems isEqual:items])self.toolbarItems=items;
     if(self.navigationController.topViewController==self)[self.navigationController setToolbarHidden:!active&&!self.selecting&&!resumable&&!cancelable animated:NO];
-    NSString *loading=self.allReleases.count?nil:self.loading?(self.loadProgress?:SAPLocalized(@"Loading releases…")):self.loadError?:SAPLocalized(@"Spotify returned no music releases for this artist.");
+    NSString *loading=self.allReleases.count?nil:self.loading?(self.loadProgress?:SAPLocalized(@"loading_releases")):self.loadError?:SAPLocalized(@"spotify_returned_no_music_releases_for");
     if(![self.loadingLabel.text isEqual:loading])self.loadingLabel.text=loading;
     if(self.loading && !self.allReleases.count){if(!self.loadingSpinner.isAnimating)[self.loadingSpinner startAnimating];}else if(self.loadingSpinner.isAnimating)[self.loadingSpinner stopAnimating];
     UIView *background=loading?self.loadingContainer:nil;if(self.tableView.backgroundView!=background)self.tableView.backgroundView=background;
-    NSString *text=SAPLocalized(@"Tap a release to download it or stop its download. Use Select to choose individual releases or whole categories, then download separately or through a new or existing playlist. Stop pauses downloads associated with this list. Continue resumes stopped work after a fresh Spotify status check. Cancel stops unfinished downloads for this artist. Downloads stay inside Spotify.");
-    if(self.loading)text=[text stringByAppendingString:SAPLocalized(@" More releases are loading. Category selection applies to loaded releases.")];
+    NSString *text=SAPLocalized(@"tap_a_release_to_download_it");
+    if(self.loading)text=[text stringByAppendingString:SAPLocalized(@"more_releases_are_loading_category_selection")];
     if([self.sessionSnapshot[@"error"]length])text=[text stringByAppendingFormat:@"\n%@",self.sessionSnapshot[@"error"]];
     if([self.catalog[@"load_warning"]length])text=[text stringByAppendingFormat:@"\n%@",self.catalog[@"load_warning"]];
     for(NSDictionary *job in self.playlistSnapshot[@"jobs"])if([job[@"error"]length] || ([job[@"active"]boolValue] && ![job[@"context_state"]count]))text=[text stringByAppendingFormat:@"\n%@",job[@"message"]?:job[@"error"]];
@@ -261,19 +261,19 @@ static void SAPAfterDialogDismissal(UIAlertController *dialog,dispatch_block_t c
 }
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)table {return self.sections.count;}
 - (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section {return [self.sections[section][@"releases"]count];}
-- (NSString *)categoryTitleForSection:(NSUInteger)section {NSDictionary *group=self.sections[section];return [NSString stringWithFormat:@"%@ (%lu)",SAPLocalized(group[@"title"]),(unsigned long)[group[@"releases"]count]];}
+- (NSString *)categoryTitleForSection:(NSUInteger)section {NSDictionary *group=self.sections[section];return [NSString stringWithFormat:@"%@ (%lu)",SAPLocalizedValue(group[@"title"]),(unsigned long)[group[@"releases"]count]];}
 - (void)updateLoadingHeader {
     if(!self.sections.count)return;SAPArtistCategoryHeader *header=(id)[self.tableView headerViewForSection:0];if(!header)return;
-    BOOL visible=self.loading && self.allReleases.count>0;header.catalogProgressLabel.hidden=!visible;header.catalogProgressLabel.text=visible?[NSString stringWithFormat:SAPLocalized(@"Loading %lu/%lu"),(unsigned long)self.loadCompleted,(unsigned long)self.loadTotal]:nil;
+    BOOL visible=self.loading && self.allReleases.count>0;header.catalogProgressLabel.hidden=!visible;header.catalogProgressLabel.text=visible?[NSString stringWithFormat:SAPLocalized(@"loading"),(unsigned long)self.loadCompleted,(unsigned long)self.loadTotal]:nil;
 }
 - (void)configureCategoryHeader:(SAPArtistCategoryHeader *)header section:(NSUInteger)section {
     NSDictionary *group=self.sections[section];header.categoryTitle.text=[self categoryTitleForSection:section];
-    BOOL progress=section==0 && self.loading;header.catalogProgressLabel.hidden=!progress;header.catalogProgressLabel.text=progress?[NSString stringWithFormat:SAPLocalized(@"Loading %lu/%lu"),(unsigned long)self.loadCompleted,(unsigned long)self.loadTotal]:nil;
+    BOOL progress=section==0 && self.loading;header.catalogProgressLabel.hidden=!progress;header.catalogProgressLabel.text=progress?[NSString stringWithFormat:SAPLocalized(@"loading"),(unsigned long)self.loadCompleted,(unsigned long)self.loadTotal]:nil;
     UIButton *button=header.selectionButton;button.tag=section;button.hidden=!self.selecting;
     BOOL all=YES,any=NO;for(NSDictionary *release in group[@"releases"]){BOOL selected=[self.selectedReleaseURIs containsObject:release[@"uri"]];all&=selected;any|=selected;}button.selected=all;
     [button setImage:[UIImage systemImageNamed:any&&!all?@"minus.circle":@"circle" withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:20.4 weight:UIImageSymbolWeightRegular]] forState:UIControlStateNormal];
-    button.accessibilityLabel=[NSString stringWithFormat:self.loading?SAPLocalized(@"Select loaded %@"):SAPLocalized(@"Select %@"),SAPLocalized(group[@"title"])];
-    button.accessibilityValue=button.selected?SAPLocalized(@"Selected"):SAPLocalized(@"Not selected");
+    button.accessibilityLabel=[NSString stringWithFormat:self.loading?SAPLocalized(@"select_loaded"):SAPLocalized(@"select"),SAPLocalizedValue(group[@"title"])];
+    button.accessibilityValue=button.selected?SAPLocalized(@"selected"):SAPLocalized(@"not_selected");
     button.accessibilityTraits=UIAccessibilityTraitButton|(button.selected?UIAccessibilityTraitSelected:0);
     [button removeTarget:self action:@selector(toggleCategory:) forControlEvents:UIControlEventTouchUpInside];
     [button addTarget:self action:@selector(toggleCategory:) forControlEvents:UIControlEventTouchUpInside];
@@ -314,30 +314,30 @@ static void SAPAfterDialogDismissal(UIAlertController *dialog,dispatch_block_t c
     NSString *subtitle=[release[@"year"]integerValue]?[NSString stringWithFormat:@"%@ · %@",release[@"year"],category]:category;
     NSDictionary *state=renderState;NSString *kind=state[@"state"];
     BOOL selected=[self.selectedReleaseURIs containsObject:release[@"uri"]];
-    UIView *indicator=self.selecting?SAPArtistStateIcon(selected?@"checkmark.circle.fill":@"circle",selected?UIColor.systemGreenColor:UIColor.secondaryLabelColor,selected?SAPLocalized(@"Selected"):SAPLocalized(@"Not selected")):[(SAPArtistReleaseCell *)cell indicatorForState:state];
+    UIView *indicator=self.selecting?SAPArtistStateIcon(selected?@"checkmark.circle.fill":@"circle",selected?UIColor.systemGreenColor:UIColor.secondaryLabelColor,selected?SAPLocalized(@"selected"):SAPLocalized(@"not_selected")):[(SAPArtistReleaseCell *)cell indicatorForState:state];
     cell.accessibilityTraits=UIAccessibilityTraitButton|(self.selecting&&selected?UIAccessibilityTraitSelected:0);
     NSString *phase=state[@"phase"];
-    if([kind isEqual:@"downloaded"]) {subtitle=[subtitle stringByAppendingString:SAPLocalized(@" · Downloaded")];}
-    else if([state[@"can_continue"]boolValue])subtitle=[subtitle stringByAppendingString:SAPLocalized(@" · Stopped")];
+    if([kind isEqual:@"downloaded"]) {subtitle=[subtitle stringByAppendingString:SAPLocalized(@"downloaded")];}
+    else if([state[@"can_continue"]boolValue])subtitle=[subtitle stringByAppendingString:SAPLocalized(@"stopped")];
     else if([phase isEqual:@"failed"]){}
-    else if([phase isEqual:@"unverified"])subtitle=[subtitle stringByAppendingString:SAPLocalized(@" · Checking album offline status…")];
-    else if([phase isEqual:@"unregistered"])subtitle=[subtitle stringByAppendingString:SAPLocalized(@" · Tracks available; album not downloaded")];
-    else if([phase isEqual:@"registering"])subtitle=[subtitle stringByAppendingString:SAPLocalized(@" · Registering album for offline…")];
-    else if([phase isEqual:@"stopping"] || [state[@"stopping"]boolValue])subtitle=[subtitle stringByAppendingString:SAPLocalized(@" · Stopping…")];
-    else if([phase isEqual:@"queued"])subtitle=[subtitle stringByAppendingString:SAPLocalized(@" · Queued")];
-    else if([phase isEqual:@"preparing"])subtitle=[subtitle stringByAppendingString:SAPLocalized(@" · Preparing…")];
-    else if([phase isEqual:@"waiting"])subtitle=[subtitle stringByAppendingString:SAPLocalized(@" · Waiting for Spotify…")];
+    else if([phase isEqual:@"unverified"])subtitle=[subtitle stringByAppendingString:SAPLocalized(@"checking_album_offline_status")];
+    else if([phase isEqual:@"unregistered"])subtitle=[subtitle stringByAppendingString:SAPLocalized(@"tracks_available_album_not_downloaded")];
+    else if([phase isEqual:@"registering"])subtitle=[subtitle stringByAppendingString:SAPLocalized(@"registering_album_for_offline")];
+    else if([phase isEqual:@"stopping"] || [state[@"stopping"]boolValue])subtitle=[subtitle stringByAppendingString:SAPLocalized(@"stopping_2")];
+    else if([phase isEqual:@"queued"])subtitle=[subtitle stringByAppendingString:SAPLocalized(@"queued")];
+    else if([phase isEqual:@"preparing"])subtitle=[subtitle stringByAppendingString:SAPLocalized(@"preparing")];
+    else if([phase isEqual:@"waiting"])subtitle=[subtitle stringByAppendingString:SAPLocalized(@"waiting_for_spotify")];
     else if([kind isEqual:@"partial"]) {
         NSUInteger done=[state[@"downloaded_tracks"]unsignedIntegerValue],total=[state[@"total_tracks"]unsignedIntegerValue];
         if([phase isEqual:@"downloading"] || (!phase.length && [state[@"active"]boolValue])) {
-            NSString *progress=total?[SAPArtistTrackCounter(done,total) stringByAppendingString:SAPLocalized(@" · Downloading…")]:SAPLocalized(@"Downloading…");
+            NSString *progress=total?[SAPArtistTrackCounter(done,total) stringByAppendingString:SAPLocalized(@"downloading_3")]:SAPLocalized(@"downloading");
             subtitle=[subtitle stringByAppendingFormat:@" · %@",progress];
         } else {
-            NSString *progress=total?[SAPArtistTrackCounter(done,total) stringByAppendingString:SAPLocalized(@" · Partially downloaded")]:SAPLocalized(@"Partially downloaded");
+            NSString *progress=total?[SAPArtistTrackCounter(done,total) stringByAppendingString:SAPLocalized(@"partially_downloaded_2")]:SAPLocalized(@"partially_downloaded");
             subtitle=[subtitle stringByAppendingFormat:@" · %@",progress];
         }
-    } else if([phase isEqual:@"downloading"] || (!phase.length && [state[@"active"]boolValue]))subtitle=[subtitle stringByAppendingString:SAPLocalized(@" · Downloading…")];
-    if([state[@"playlist_download"]boolValue])subtitle=[subtitle stringByAppendingFormat:SAPLocalized(@" · In %@"),state[@"playlist_name"]?:@"playlist"];
+    } else if([phase isEqual:@"downloading"] || (!phase.length && [state[@"active"]boolValue]))subtitle=[subtitle stringByAppendingString:SAPLocalized(@"downloading_3")];
+    if([state[@"playlist_download"]boolValue])subtitle=[subtitle stringByAppendingFormat:SAPLocalized(@"in"),state[@"playlist_name"]?:@"playlist"];
     if([state[@"error"]length])subtitle=[subtitle stringByAppendingFormat:@" · %@",state[@"error"]];
     if(!reuseContent || ![old.secondaryText isEqual:subtitle]){content.secondaryText=subtitle;cell.contentConfiguration=content;}
     cell.accessoryType=UITableViewCellAccessoryNone;
@@ -367,57 +367,57 @@ static void SAPAfterDialogDismissal(UIAlertController *dialog,dispatch_block_t c
     if(!releases.count)return;NSMutableArray *pending=[NSMutableArray array];for(NSDictionary *release in releases){NSString *uri=release[@"uri"];BOOL downloaded=[[self stateFor:uri][@"state"]isEqual:@"downloaded"];if(!downloaded){NSMutableDictionary *owned=[release mutableCopy];owned[@"artist_uri"]=self.artistURI;[pending addObject:owned];}}
     SAP_JOURNAL_ACTION(@"artist_separate_selection_filtered",@{@"selected":@(releases.count),@"already_downloaded":@(releases.count-pending.count),@"remaining":@(pending.count)});
     if(!pending.count){[self finishSelection];[self updateControls];return;}NSString *error=nil;if(SAPAppendArtistDownloadSessionReleases(pending,&error)){[self finishSelection];[self updateControls];return;}
-    UIAlertController *alert=[UIAlertController alertControllerWithTitle:SAPLocalized(@"Could not start download") message:error preferredStyle:UIAlertControllerStyleAlert];[alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"OK") style:UIAlertActionStyleCancel handler:nil]];[self presentViewController:alert animated:YES completion:nil];
+    UIAlertController *alert=[UIAlertController alertControllerWithTitle:SAPLocalized(@"could_not_start_download") message:error preferredStyle:UIAlertControllerStyleAlert];[alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"ok") style:UIAlertActionStyleCancel handler:nil]];[self presentViewController:alert animated:YES completion:nil];
 }
 - (void)tableView:(UITableView *)table didSelectRowAtIndexPath:(NSIndexPath *)path {
     [table deselectRowAtIndexPath:path animated:YES];__weak typeof(self) weakPage=self;dispatch_async(dispatch_get_main_queue(),^{[weakPage applyPendingCatalog];});NSDictionary *release=self.sections[path.section][@"releases"][path.row];NSDictionary *state=[self stateFor:release[@"uri"]];
     if(self.selecting){NSString *uri=release[@"uri"];if([self.selectedReleaseURIs containsObject:uri])[self.selectedReleaseURIs removeObject:uri];else[self.selectedReleaseURIs addObject:uri];[self refreshSelectionViews];return;}
     if([state[@"stopping"]boolValue] || [state[@"state"]isEqual:@"downloaded"])return;
     if([state[@"active"]boolValue] && [state[@"playlist_download"]boolValue]){
-        UIAlertController *alert=[UIAlertController alertControllerWithTitle:SAPLocalized(@"Stop playlist download?") message:[NSString stringWithFormat:SAPLocalized(@"This release is downloading through \"%@\". Other releases in that playlist will also stop."),state[@"playlist_name"]?:SAPLocalized(@"Playlist")] preferredStyle:UIAlertControllerStyleAlert];[alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"Cancel") style:UIAlertActionStyleCancel handler:nil]];[alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"Stop") style:UIAlertActionStyleDestructive handler:^(__unused UIAlertAction *action){if(SAPDiagnosticsEnabled())SAP_JOURNAL_ACTION(@"artist_playlist_row_stop",@{@"artist_uri":self.artistURI?:@"",@"release_uri":release[@"uri"]?:@"",@"caller":@"tableView:didSelectRowAtIndexPath:/Stop UIAlertAction handler",@"action_origin":@"alert_action_handler",@"requested_reason":@"stop_artist_playlist_tasks_containing_release",@"call_stack":NSThread.callStackSymbols});SAPStopPlaylistReleaseDownloadsForArtist(self.artistURI,@[release]);}]];[self presentViewController:alert animated:YES completion:nil];return;
+        UIAlertController *alert=[UIAlertController alertControllerWithTitle:SAPLocalized(@"stop_playlist_download") message:[NSString stringWithFormat:SAPLocalized(@"this_release_is_downloading_through_other"),state[@"playlist_name"]?:SAPLocalized(@"playlist_2")] preferredStyle:UIAlertControllerStyleAlert];[alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"cancel") style:UIAlertActionStyleCancel handler:nil]];[alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"stop") style:UIAlertActionStyleDestructive handler:^(__unused UIAlertAction *action){if(SAPDiagnosticsEnabled())SAP_JOURNAL_ACTION(@"artist_playlist_row_stop",@{@"artist_uri":self.artistURI?:@"",@"release_uri":release[@"uri"]?:@"",@"caller":@"tableView:didSelectRowAtIndexPath:/Stop UIAlertAction handler",@"action_origin":@"alert_action_handler",@"requested_reason":@"stop_artist_playlist_tasks_containing_release",@"call_stack":NSThread.callStackSymbols});SAPStopPlaylistReleaseDownloadsForArtist(self.artistURI,@[release]);}]];[self presentViewController:alert animated:YES completion:nil];return;
     }
     if([state[@"active"]boolValue])SAPStopArtistDownloadSessionRelease(release[@"uri"]);else[self startReleases:@[release]];
 }
 - (void)continueDownloads {
     NSArray *scope=self.catalog[@"observation_releases"]?:self.allReleases;NSString *error=nil;
     if(!SAPContinueArtistDownloads(self.artistURI,scope,&error) || !SAPContinuePlaylistReleaseDownloadsForArtist(self.artistURI,scope,&error)){
-        UIAlertController *alert=[UIAlertController alertControllerWithTitle:SAPLocalized(@"Could not continue") message:error?:SAPLocalized(@"Spotify has not confirmed that the previous operation stopped.") preferredStyle:UIAlertControllerStyleAlert];[alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"OK") style:UIAlertActionStyleDefault handler:nil]];[self presentViewController:alert animated:YES completion:nil];
+        UIAlertController *alert=[UIAlertController alertControllerWithTitle:SAPLocalized(@"could_not_continue") message:error?:SAPLocalized(@"spotify_has_not_confirmed_that_the") preferredStyle:UIAlertControllerStyleAlert];[alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"ok") style:UIAlertActionStyleDefault handler:nil]];[self presentViewController:alert animated:YES completion:nil];
     }
     [self updateControls];
 }
 - (void)confirmCancelDownloads {
-    UIAlertController *alert=[UIAlertController alertControllerWithTitle:SAPLocalized(@"Cancel downloads?") message:SAPLocalized(@"Cancel all unfinished downloads for this artist?") preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"Keep downloading") style:UIAlertActionStyleCancel handler:nil]];__weak typeof(self) weak=self;
-    [alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"Cancel downloads") style:UIAlertActionStyleDestructive handler:^(__unused UIAlertAction *action){typeof(self) page=weak;if(!page)return;SAPCancelPlaylistReleaseDownloadsForArtist(page.artistURI);SAPCancelArtistDownloadSession(page.artistURI);[page requestStateRefresh];}]];
+    UIAlertController *alert=[UIAlertController alertControllerWithTitle:SAPLocalized(@"cancel_downloads") message:SAPLocalized(@"cancel_all_unfinished_downloads_for_this") preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"keep_downloading") style:UIAlertActionStyleCancel handler:nil]];__weak typeof(self) weak=self;
+    [alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"cancel_downloads_2") style:UIAlertActionStyleDestructive handler:^(__unused UIAlertAction *action){typeof(self) page=weak;if(!page)return;SAPCancelPlaylistReleaseDownloadsForArtist(page.artistURI);SAPCancelArtistDownloadSession(page.artistURI);[page requestStateRefresh];}]];
     [self presentViewController:alert animated:YES completion:nil];
 }
-- (void)showError:(NSString *)error {UIAlertController *alert=[UIAlertController alertControllerWithTitle:SAPLocalized(@"Could not start playlist download") message:error preferredStyle:UIAlertControllerStyleAlert];[alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"OK") style:UIAlertActionStyleCancel handler:nil]];[self presentViewController:alert animated:YES completion:nil];}
+- (void)showError:(NSString *)error {UIAlertController *alert=[UIAlertController alertControllerWithTitle:SAPLocalized(@"could_not_start_playlist_download") message:error preferredStyle:UIAlertControllerStyleAlert];[alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"ok") style:UIAlertActionStyleCancel handler:nil]];[self presentViewController:alert animated:YES completion:nil];}
 - (void)startPlaylist:(NSArray *)releases uri:(NSString *)uri name:(NSString *)name {
     NSString *error=nil;if(!SAPStartPlaylistReleaseDownloadForArtist(self.artistURI,releases,uri,name,&error)){[self showError:error];return;}
     [self finishSelection];[self updateControls];[self attachItems];
 }
 - (void)playlistNameChanged:(UITextField *)field {NSString *name=[field.text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];self.nameConfirmation.enabled=name.length>0 && name.length<=200;}
 - (void)newPlaylist:(NSArray *)releases {
-    UIAlertController *alert=[UIAlertController alertControllerWithTitle:SAPLocalized(@"New playlist") message:[NSString stringWithFormat:SAPLocalized(@"Save %lu selected releases to Your Library, add their tracks in release order and download the playlist."),(unsigned long)releases.count] preferredStyle:UIAlertControllerStyleAlert];
-    __weak typeof(self) weak=self;[alert addTextFieldWithConfigurationHandler:^(UITextField *field){field.placeholder=SAPLocalized(@"Playlist name");field.autocapitalizationType=UITextAutocapitalizationTypeSentences;[field addTarget:weak action:@selector(playlistNameChanged:) forControlEvents:UIControlEventEditingChanged];}];
-    __weak UIAlertController *weakAlert=alert;[alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"Cancel") style:UIAlertActionStyleCancel handler:^(__unused UIAlertAction *action){[weak afterDialog:weakAlert perform:nil];}]];
-    UIAlertAction *confirm=[UIAlertAction actionWithTitle:SAPLocalized(@"Create and download") style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action){NSString *name=[weakAlert.textFields.firstObject.text copy];[weak afterDialog:weakAlert perform:^{[weak startPlaylist:releases uri:nil name:name];}];}];confirm.enabled=NO;self.nameConfirmation=confirm;[alert addAction:confirm];[self presentViewController:alert animated:YES completion:nil];
+    UIAlertController *alert=[UIAlertController alertControllerWithTitle:SAPLocalized(@"new_playlist") message:[NSString stringWithFormat:SAPLocalized(@"save_selected_releases_to_your_library"),(unsigned long)releases.count] preferredStyle:UIAlertControllerStyleAlert];
+    __weak typeof(self) weak=self;[alert addTextFieldWithConfigurationHandler:^(UITextField *field){field.placeholder=SAPLocalized(@"playlist_name");field.autocapitalizationType=UITextAutocapitalizationTypeSentences;[field addTarget:weak action:@selector(playlistNameChanged:) forControlEvents:UIControlEventEditingChanged];}];
+    __weak UIAlertController *weakAlert=alert;[alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"cancel") style:UIAlertActionStyleCancel handler:^(__unused UIAlertAction *action){[weak afterDialog:weakAlert perform:nil];}]];
+    UIAlertAction *confirm=[UIAlertAction actionWithTitle:SAPLocalized(@"create_and_download") style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action){NSString *name=[weakAlert.textFields.firstObject.text copy];[weak afterDialog:weakAlert perform:^{[weak startPlaylist:releases uri:nil name:name];}];}];confirm.enabled=NO;self.nameConfirmation=confirm;[alert addAction:confirm];[self presentViewController:alert animated:YES completion:nil];
 }
 - (void)existingPlaylist:(NSArray *)releases {
     SAPPlaylistPickerController *picker=[SAPPlaylistPickerController new];__weak typeof(self) weak=self;
     picker.onChoose=^(NSDictionary *playlist,UIViewController *presenter){
-        UIAlertController *alert=[UIAlertController alertControllerWithTitle:SAPLocalized(@"Add and download?") message:[NSString stringWithFormat:SAPLocalized(@"Add %lu selected releases to \"%@\" and download this playlist? Existing tracks stay in place. Tracks already in the playlist will not be added again."),(unsigned long)releases.count,playlist[@"name"]] preferredStyle:UIAlertControllerStyleAlert];
-        [alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"Cancel") style:UIAlertActionStyleCancel handler:nil]];
-        __weak UIAlertController *weakAlert=alert;[alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"Add and download") style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action){typeof(self) page=weak;if(!page)return;SAPAfterDialogDismissal(weakAlert,^{typeof(self) current=weak;if(!current)return;UINavigationController *navigation=current.navigationController;[navigation popToViewController:current animated:YES];dispatch_block_t start=^{if(navigation.topViewController==current && !SAPArtistDownloadsIsDismissing(navigation))[current startPlaylist:releases uri:playlist[@"uri"] name:playlist[@"name"]];};if(navigation.transitionCoordinator)[navigation.transitionCoordinator animateAlongsideTransition:nil completion:^(__unused id<UIViewControllerTransitionCoordinatorContext> context){start();}];else start();});}]];[presenter presentViewController:alert animated:YES completion:nil];
+        UIAlertController *alert=[UIAlertController alertControllerWithTitle:SAPLocalized(@"add_and_download") message:[NSString stringWithFormat:SAPLocalized(@"add_selected_releases_to_and_download"),(unsigned long)releases.count,playlist[@"name"]] preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"cancel") style:UIAlertActionStyleCancel handler:nil]];
+        __weak UIAlertController *weakAlert=alert;[alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"add_and_download_2") style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action){typeof(self) page=weak;if(!page)return;SAPAfterDialogDismissal(weakAlert,^{typeof(self) current=weak;if(!current)return;UINavigationController *navigation=current.navigationController;[navigation popToViewController:current animated:YES];dispatch_block_t start=^{if(navigation.topViewController==current && !SAPArtistDownloadsIsDismissing(navigation))[current startPlaylist:releases uri:playlist[@"uri"] name:playlist[@"name"]];};if(navigation.transitionCoordinator)[navigation.transitionCoordinator animateAlongsideTransition:nil completion:^(__unused id<UIViewControllerTransitionCoordinatorContext> context){start();}];else start();});}]];[presenter presentViewController:alert animated:YES completion:nil];
     };[self.navigationController pushViewController:picker animated:YES];
 }
 - (void)downloadSelected {
     NSArray *releases=self.selectedReleases;if(!releases.count)return;__weak typeof(self) weak=self;
-    UIAlertController *menu=[UIAlertController alertControllerWithTitle:SAPLocalized(@"Download selected") message:[NSString stringWithFormat:SAPLocalized(@"%lu releases selected"),(unsigned long)releases.count] preferredStyle:UIAlertControllerStyleActionSheet];
-    __weak UIAlertController *weakMenu=menu;[menu addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"Download separately") style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action){[weak afterDialog:weakMenu perform:^{[weak startReleases:releases];}];}]];
-    [menu addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"New playlist") style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action){[weak afterDialog:weakMenu perform:^{[weak newPlaylist:releases];}];}]];
-    [menu addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"Existing playlist") style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action){[weak afterDialog:weakMenu perform:^{[weak existingPlaylist:releases];}];}]];
-    [menu addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"Cancel") style:UIAlertActionStyleCancel handler:^(__unused UIAlertAction *action){[weak afterDialog:weakMenu perform:nil];}]];menu.popoverPresentationController.barButtonItem=self.downloadControl;[self presentViewController:menu animated:YES completion:nil];
+    UIAlertController *menu=[UIAlertController alertControllerWithTitle:SAPLocalized(@"download_selected_2") message:[NSString stringWithFormat:SAPLocalized(@"releases_selected"),(unsigned long)releases.count] preferredStyle:UIAlertControllerStyleActionSheet];
+    __weak UIAlertController *weakMenu=menu;[menu addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"download_separately") style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action){[weak afterDialog:weakMenu perform:^{[weak startReleases:releases];}];}]];
+    [menu addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"new_playlist") style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action){[weak afterDialog:weakMenu perform:^{[weak newPlaylist:releases];}];}]];
+    [menu addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"existing_playlist") style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action){[weak afterDialog:weakMenu perform:^{[weak existingPlaylist:releases];}];}]];
+    [menu addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"cancel") style:UIAlertActionStyleCancel handler:^(__unused UIAlertAction *action){[weak afterDialog:weakMenu perform:nil];}]];menu.popoverPresentationController.barButtonItem=self.downloadControl;[self presentViewController:menu animated:YES completion:nil];
 }
 @end
 @interface SAPArtistDownloadsSheetController : UIViewController

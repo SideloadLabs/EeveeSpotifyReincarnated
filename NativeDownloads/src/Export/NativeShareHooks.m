@@ -104,7 +104,7 @@ static BOOL SAPShareCellMatches(UIView *cell,SAPNativeShareIntent action){
     if(!on){[self cancel];[self restore];self.status.hidden=YES;return;}
     if(self.suspended)return;
     NSDictionary *v=SAPNativeShareRead(self.controller);
-    if(![v[@"uri"]isEqual:self.uri]||v[@"stack"]!=self.stack){[self cancel];[self restore];self.tap.enabled=NO;[self show:SAPLocalized(@"This share item is unavailable.")];return;}
+    if(![v[@"uri"]isEqual:self.uri]||v[@"stack"]!=self.stack){[self cancel];[self restore];self.tap.enabled=NO;[self show:SAPLocalized(@"this_share_item_is_unavailable")];return;}
     if(v[@"onPlatform"]!=self.chat||v[@"offPlatform"]!=self.external){[self restore];self.chat=v[@"onPlatform"];[self.tap.view removeGestureRecognizer:self.tap];self.external=v[@"offPlatform"];[self.external addGestureRecognizer:self.tap];}
     if(!self.busy)[self show:nil];
 }
@@ -120,18 +120,18 @@ static BOOL SAPShareCellMatches(UIView *cell,SAPNativeShareIntent action){
 }
 - (void)failed:(NSString *)error generation:(NSUInteger)generation {
     if(self.generation!=generation)return;
-    [self.filePromise resolveFile:nil error:[NSError errorWithDomain:@"PixieShare" code:2 userInfo:@{NSLocalizedDescriptionKey:error?:SAPLocalized(@"Audio preparation failed.")}]];
-    self.busy=NO;self.exportInFlight=NO;self.ready=NO;[self show:error?:SAPLocalized(@"Audio preparation failed.")];
+    [self.filePromise resolveFile:nil error:[NSError errorWithDomain:@"PixieShare" code:2 userInfo:@{NSLocalizedDescriptionKey:error?:SAPLocalized(@"audio_preparation_failed")}]];
+    self.busy=NO;self.exportInFlight=NO;self.ready=NO;[self show:error?:SAPLocalized(@"audio_preparation_failed")];
     [self clearIntent];self.preparedFiles=nil;self.preparedItems=nil;self.preparedData=nil;
     SAPShareCompletionRelay *relay=self.nativeCompletion;self.nativeCompletion=nil;
-    [relay finish:nil completed:NO items:nil error:[NSError errorWithDomain:@"PixieShare" code:2 userInfo:@{NSLocalizedDescriptionKey:error?:SAPLocalized(@"Audio preparation failed.")}]];
+    [relay finish:nil completed:NO items:nil error:[NSError errorWithDomain:@"PixieShare" code:2 userInfo:@{NSLocalizedDescriptionKey:error?:SAPLocalized(@"audio_preparation_failed")}]];
 }
 - (void)prepare {
     if(!SAPShareShouldPrepare(self.fileModeOn,self.intent,self.busy,self.ready)||![self validate])return;
     self.filePromise=[SAPShareFilePromise new];self.format=SAPAudioExportFormat();
     self.busy=YES;self.exportInFlight=YES;NSUInteger generation=++self.generation;
     NSString *uri=[self.uri copy];BOOL album=[uri hasPrefix:@"spotify:album:"];
-    [self show:[self.uri hasPrefix:@"spotify:album:"]?SAPLocalized(@"Preparing album files… Please wait."):SAPLocalized(@"Preparing track file… Please wait.")];SAPNativeShareTrace(@"prepare",album?@"folder":@"audio");
+    [self show:[self.uri hasPrefix:@"spotify:album:"]?SAPLocalized(@"preparing_album_files_please_wait"):SAPLocalized(@"preparing_track_file_please_wait")];SAPNativeShareTrace(@"prepare",album?@"folder":@"audio");
     __weak SAPNativeShareState *weakSelf=self;
     SAPExportAudioURI(uri,^(NSString *progress){
         dispatch_async(dispatch_get_main_queue(),^{SAPNativeShareState *state=weakSelf;if(state.busy && state.generation==generation&&[progress rangeOfString:@"Preparing cover artwork" options:NSCaseInsensitiveSearch].location==NSNotFound)[state show:progress];});
@@ -144,11 +144,11 @@ static BOOL SAPShareCellMatches(UIView *cell,SAPNativeShareIntent action){
                 BOOL directory=NO;
                 if(![NSFileManager.defaultManager fileExistsAtPath:[file path] isDirectory:&directory] || (!album && directory)){valid=NO;break;}
             }
-            if(error.length || !valid){[state failed:error?:SAPLocalized(@"No audio file is available.") generation:generation];return;}
+            if(error.length || !valid){[state failed:error?:SAPLocalized(@"no_audio_file_is_available") generation:generation];return;}
             state.preparedFiles=files;
             SAPPrepareAudioExportShareItems(files,album,^(NSArray *items,NSString *shareError){
                 SAPNativeShareState *ready=weakSelf;if(!ready || ready.generation!=generation)return;
-                if(!items.count){[ready failed:shareError?:SAPLocalized(@"Could not prepare the audio file.") generation:generation];return;}
+                if(!items.count){[ready failed:shareError?:SAPLocalized(@"could_not_prepare_the_audio_file") generation:generation];return;}
                 ready.preparedItems=items;
                 id item=items.firstObject;
                 NSURL *shared=[item isKindOfClass:NSURL.class]?item:([item conformsToProtocol:@protocol(UIActivityItemSource)]?[item activityViewControllerPlaceholderItem:nil]:nil);
@@ -168,7 +168,7 @@ static BOOL SAPShareCellMatches(UIView *cell,SAPNativeShareIntent action){
                     NSError *readError=nil;NSData *data=[NSData dataWithContentsOfURL:audio options:0 error:&readError];
                     UTType *type=[UTType typeWithFilenameExtension:audio.pathExtension];
                     NSString *identifier=[audio.pathExtension.lowercaseString isEqual:@"m4a"]?UTTypeMPEG4Audio.identifier:type.identifier;
-                    dispatch_async(dispatch_get_main_queue(),^{complete(data,identifier,(!data.length || !identifier.length)?(readError.localizedDescription?:SAPLocalized(@"Could not read the audio file.")):nil);});
+                    dispatch_async(dispatch_get_main_queue(),^{complete(data,identifier,(!data.length || !identifier.length)?(readError.localizedDescription?:SAPLocalized(@"could_not_read_the_audio_file")):nil);});
                 }});
             });
         };
@@ -205,7 +205,7 @@ static BOOL SAPShareCellMatches(UIView *cell,SAPNativeShareIntent action){
 - (void)moreFrom:(UIViewController *)presenter completion:(void(^)(void))completion {
     if(![self allowsFileActions])return;
     presenter=SAPShareAvailablePresenter((id)presenter,(id)self.controller);
-    if(!presenter||!presenter.viewIfLoaded.window){[self cancel];[self show:SAPLocalized(@"Close the open sheet and tap More again.")];return;}
+    if(!presenter||!presenter.viewIfLoaded.window){[self cancel];[self show:SAPLocalized(@"close_the_open_sheet_and_tap")];return;}
     if(!self.ready){[self request:SAPNativeShareMore presenter:self.controller controller:nil animated:YES completion:nil];return;}
     // Open only after the real files and their title/artwork are ready.
     UIActivityViewController *activity=[[UIActivityViewController alloc]initWithActivityItems:self.preparedItems applicationActivities:nil];
@@ -263,19 +263,19 @@ static BOOL SAPShareCellMatches(UIView *cell,SAPNativeShareIntent action){
     [self clearIntent];
     if(intent==SAPNativeShareMore){[self moreFrom:presenter?:self.controller completion:completion];return;}
     if(intent==SAPNativeShareCopy){
-        if(!self.preparedData.length){[self show:SAPLocalized(@"Copying folders is unavailable. Use More to share the album folder.")];return;}
+        if(!self.preparedData.length){[self show:SAPLocalized(@"copying_folders_is_unavailable_use_more")];return;}
         NSData *data=self.preparedData;NSString *type=self.dataType;
         NSItemProvider *provider=[NSItemProvider new];provider.suggestedName=self.filename;
         [provider registerDataRepresentationForTypeIdentifier:type visibility:NSItemProviderRepresentationVisibilityAll loadHandler:^NSProgress *(void (^done)(NSData *,NSError *)){done(data,nil);return nil;}];
         
         [UIPasteboard.generalPasteboard setItemProviders:@[provider] localOnly:NO expirationDate:nil];
         
-        SAPNativeShareTrace(@"payload",type);[self show:SAPLocalized(@"Audio file copied.")];return;
+        SAPNativeShareTrace(@"payload",type);[self show:SAPLocalized(@"audio_file_copied")];return;
     }
-    if(!presenter || !presenter.viewIfLoaded.window || presenter.presentedViewController){[self show:SAPLocalized(@"Reopen the share menu and try again.")];return;}
-    if(!self.preparedData.length || ![MFMessageComposeViewController canSendAttachments] || ![MFMessageComposeViewController isSupportedAttachmentUTI:self.dataType]){[self show:SAPLocalized(@"Messages cannot attach this audio format or an album folder.")];return;}
+    if(!presenter || !presenter.viewIfLoaded.window || presenter.presentedViewController){[self show:SAPLocalized(@"reopen_the_share_menu_and_try")];return;}
+    if(!self.preparedData.length || ![MFMessageComposeViewController canSendAttachments] || ![MFMessageComposeViewController isSupportedAttachmentUTI:self.dataType]){[self show:SAPLocalized(@"messages_cannot_attach_this_audio_format")];return;}
     MFMessageComposeViewController *message=[native isKindOfClass:MFMessageComposeViewController.class]?(id)native:[MFMessageComposeViewController new];
-    if(![message addAttachmentData:self.preparedData typeIdentifier:self.dataType filename:self.filename]){[self show:SAPLocalized(@"Messages could not attach this audio file.")];return;}
+    if(![message addAttachmentData:self.preparedData typeIdentifier:self.dataType filename:self.filename]){[self show:SAPLocalized(@"messages_could_not_attach_this_audio")];return;}
     SAPNativeShareMessageDelegate *delegate=[SAPNativeShareMessageDelegate new];delegate.original=message.messageComposeDelegate;
     objc_setAssociatedObject(message,&SAPNativeShareDelegateKey,delegate,OBJC_ASSOCIATION_RETAIN_NONATOMIC);message.messageComposeDelegate=delegate;
     SAPNativeShareTrace(@"payload",self.dataType);
@@ -301,8 +301,8 @@ static SAPNativeShareState *SAPNativeShareBind(UIViewController *controller){
     NSDictionary *v=SAPNativeShareRead(controller);if(!v)return nil;
     state=[SAPNativeShareState new];state.controller=controller;state.uri=v[@"uri"];state.stack=v[@"stack"];state.chat=v[@"onPlatform"];state.external=v[@"offPlatform"];
     state.tap=[[SAPStockFileTap alloc]initWithTarget:state action:@selector(stockTapped:)];state.tap.owner=state;state.tap.delegate=state;state.tap.cancelsTouchesInView=YES;state.tap.delaysTouchesBegan=YES;[state.external addGestureRecognizer:state.tap];
-    UILabel *title=[UILabel new];title.text=SAPLocalized(@"Share as file");title.font=[UIFont preferredFontForTextStyle:UIFontTextStyleBody];title.textColor=UIColor.labelColor;
-    state.toggle=[UISwitch new];state.toggle.accessibilityLabel=SAPLocalized(@"Share as file");[state.toggle addTarget:state action:@selector(changed:) forControlEvents:UIControlEventValueChanged];
+    UILabel *title=[UILabel new];title.text=SAPLocalized(@"share_as_file");title.font=[UIFont preferredFontForTextStyle:UIFontTextStyleBody];title.textColor=UIColor.labelColor;
+    state.toggle=[UISwitch new];state.toggle.accessibilityLabel=SAPLocalized(@"share_as_file");[state.toggle addTarget:state action:@selector(changed:) forControlEvents:UIControlEventValueChanged];
     UIStackView *heading=[[UIStackView alloc]initWithArrangedSubviews:@[title,state.toggle]];heading.axis=UILayoutConstraintAxisHorizontal;heading.alignment=UIStackViewAlignmentCenter;heading.spacing=12;[title setContentHuggingPriority:UILayoutPriorityDefaultLow forAxis:UILayoutConstraintAxisHorizontal];
     state.status=[UILabel new];state.status.font=[UIFont preferredFontForTextStyle:UIFontTextStyleFootnote];state.status.textColor=UIColor.secondaryLabelColor;state.status.numberOfLines=0;
     state.spinner=[[UIActivityIndicatorView alloc]initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];state.spinner.hidesWhenStopped=YES;

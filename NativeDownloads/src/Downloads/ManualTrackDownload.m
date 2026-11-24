@@ -206,11 +206,11 @@ static void single(NSString *method,NSData *payload,void (^completion)(NSArray *
     call.expected=generation;call.expectedRoute=routeGeneration;[calls addObject:call];invokeSingle(call);
 }
 static NSString *timeoutMessage(void) {
-    if (!sentRequest) return SAPLocalized(@"GetItems did not return the track status within 30 seconds. No download command was sent; the reason for the missing response is unknown.");
-    if (!responseCode) return SAPLocalized(@"Offline.AddDownload did not reply within 30 seconds. The reason is unknown; downloading is not confirmed.");
+    if (!sentRequest) return SAPLocalized(@"getitems_did_not_return_the_track");
+    if (!responseCode) return SAPLocalized(@"offline_adddownload_did_not_reply_within");
     if (streamError.unsignedLongLongValue)
-        return [NSString stringWithFormat:SAPLocalized(@"The download start is not confirmed. The offline core reported %@ (%@). This is a global downloader event; it has been saved in the report."), errorName(streamError.unsignedLongLongValue), streamError];
-    return SAPLocalized(@"The API accepted the command, but the track did not start downloading within 30 seconds. The reason is unknown; a complete track is not confirmed.");
+        return [NSString stringWithFormat:SAPLocalized(@"the_download_start_is_not_confirmed"), errorName(streamError.unsignedLongLongValue), streamError];
+    return SAPLocalized(@"the_api_accepted_the_command_but");
 }
 static void readItem(NSArray *fields) {
     itemFound = NO; nativeState = progress = 0;
@@ -225,13 +225,13 @@ static void queryItem(void) {
     if (polling) return; polling = YES;
     single(@"GetItems", SAPProtoBytes(1, [jobURL.absoluteString dataUsingEncoding:NSUTF8StringEncoding]), ^(NSArray *fields) {
         polling = NO; polls++;
-        if (!fields) { finish(@"invalid_response", SAPLocalized(@"No valid GetItems response. Downloading is not confirmed.")); return; }
+        if (!fields) { finish(@"invalid_response", SAPLocalized(@"no_valid_getitems_response_downloading_is")); return; }
         readItem(fields);
         if(!itemFound || nativeState!=1)errorStateSince=0;
         if (itemFound && nativeState == 3) {
-            phase = @"verifying"; detail = SAPLocalized(@"Spotify reported the track as downloaded. Checking its status again");
+            phase = @"verifying"; detail = SAPLocalized(@"spotify_reported_the_track_as_downloaded");
             if (++consecutiveComplete >= 2) {
-                finish(@"completed", [NSString stringWithFormat:SAPLocalized(@"Spotify twice reported “%@” as downloaded. Offline playback has not been tested. No separate audio file was created."), title]); return;
+                finish(@"completed", [NSString stringWithFormat:SAPLocalized(@"spotify_twice_reported_as_downloaded_offline"), title]); return;
             }
         } else {
             consecutiveComplete = 0;
@@ -243,21 +243,21 @@ static void queryItem(void) {
                 if(!errorStateSince)errorStateSince=now;
                 if(now-errorStateSince<errorSettleSeconds) {
                     phase=@"waiting_error_update";
-                    detail=SAPLocalized(@"The core still reports ERROR. Waiting for the track status to update after the accepted command");
+                    detail=SAPLocalized(@"the_core_still_reports_error_waiting");
                     publish();return;
                 }
                 NSDictionary *nativeError=SAPJournalNativeErrorForURI(jobURL.absoluteString);
                 double since=(commandSentAt>0?commandSentAt:started)+kCFAbsoluteTimeIntervalSince1970;
                 BOOL fresh=[nativeError[@"at"] doubleValue]>=since;
                 if(fresh && ([nativeError[@"code"] integerValue]==7004 || [nativeError[@"name"] isEqual:@"key_denied"] || [nativeError[@"name"] isEqual:@"sync_error_offline_key_failed"])) {
-                    finish(@"failed",SAPLocalized(@"The core reported key_denied / 7004 during this attempt; the track remained in ERROR for 30 seconds. A complete download is not confirmed. A later attempt may still succeed."));return;
+                    finish(@"failed",SAPLocalized(@"the_core_reported_key_denied_7004"));return;
                 }
-                NSString *code = streamError ? [NSString stringWithFormat:SAPLocalized(@" Core event: %@ (%@)."), errorName(streamError.unsignedLongLongValue), streamError] : @"";
-                finish(@"failed", [SAPLocalized(@"The track remained in ERROR for 30 seconds. A complete download is not confirmed; no fresh cause was received for this URI.") stringByAppendingString:code]); return;
+                NSString *code = streamError ? [NSString stringWithFormat:SAPLocalized(@"core_event"), errorName(streamError.unsignedLongLongValue), streamError] : @"";
+                finish(@"failed", [SAPLocalized(@"the_track_remained_in_error_for") stringByAppendingString:code]); return;
             }
-            if (itemFound && nativeState == 5) { phase = @"downloading"; detail = [NSString stringWithFormat:SAPLocalized(@"Spotify is downloading the track (%lu%%)"), (unsigned long)progress]; }
-            else if (itemFound && (nativeState == 4 || nativeState == 6)) { phase = @"queued"; detail = SAPLocalized(@"Track queued in Spotify"); }
-            else if (itemFound && nativeState == 7) { finish(@"failed", SAPLocalized(@"Spotify reported WAITING_LIMIT_EXCEEDED: the download limit was reached.")); return; }
+            if (itemFound && nativeState == 5) { phase = @"downloading"; detail = [NSString stringWithFormat:SAPLocalized(@"spotify_is_downloading_the_track"), (unsigned long)progress]; }
+            else if (itemFound && (nativeState == 4 || nativeState == 6)) { phase = @"queued"; detail = SAPLocalized(@"track_queued_in_spotify"); }
+            else if (itemFound && nativeState == 7) { finish(@"failed", SAPLocalized(@"spotify_reported_waiting_limit_exceeded_the")); return; }
         }
         publish();
     });
@@ -272,7 +272,7 @@ static void check(void) {
         return;
     }
     if (elapsed >= totalTimeoutSeconds) {
-        finish(@"timeout", SAPLocalized(@"Completion was not confirmed within 10 minutes. Monitoring stopped.")); return;
+        finish(@"timeout", SAPLocalized(@"completion_was_not_confirmed_within_10")); return;
     }
     if (elapsed >= startTimeoutSeconds && (!watchItems || !itemFound || nativeState == 0 || nativeState == 2)) {
         finish(@"unconfirmed", timeoutMessage()); return;
@@ -283,12 +283,12 @@ static void addDownload(void) {
     commandSentAt=CFAbsoluteTimeGetCurrent();
     sentRequest = YES; phase = @"requesting"; publish();
     single(@"AddDownload", SAPProtoBytes(2, [jobURL.absoluteString dataUsingEncoding:NSUTF8StringEncoding]), ^(NSArray *fields) {
-        if (!fields) { finish(@"invalid_response", SAPLocalized(@"Invalid Offline.AddDownload response. Downloading is not confirmed.")); return; }
+        if (!fields) { finish(@"invalid_response", SAPLocalized(@"invalid_offline_adddownload_response_downloading_is")); return; }
         responseCode = @(SAPProtoNumber(fields, 1, 0));
         if (responseCode.unsignedLongLongValue) {
-            finish(@"rejected", [NSString stringWithFormat:SAPLocalized(@"Offline.AddDownload returned %@ (%@). This is the actual downloader code; the track has not been marked as downloaded."), errorName(responseCode.unsignedLongLongValue), responseCode]); return;
+            finish(@"rejected", [NSString stringWithFormat:SAPLocalized(@"offline_adddownload_returned_this_is_the"), errorName(responseCode.unsignedLongLongValue), responseCode]); return;
         }
-        watchItems = YES; phase = @"accepted"; detail = SAPLocalized(@"Offline.AddDownload returned SUCCESS. Checking that the track is fully downloaded");
+        watchItems = YES; phase = @"accepted"; detail = SAPLocalized(@"offline_adddownload_returned_success_checking_that");
         publish(); sendMessage(detail); queryItem();
     });
 }
@@ -324,7 +324,7 @@ static void startRequest(void) {
     if (itemFound && (nativeState == 3 || nativeState == 4 || nativeState == 5 || nativeState == 6)) {
         existingDownload = YES; watchItems = YES;
         consecutiveComplete = nativeState == 3 ? 1 : 0;
-        phase = @"checking_existing"; detail = SAPLocalized(@"The track is already downloaded or downloading. Checking its status without sending another command");
+        phase = @"checking_existing"; detail = SAPLocalized(@"the_track_is_already_downloaded_or");
         publish();
     } else addDownload();
 }
@@ -332,10 +332,10 @@ static void selectNextCandidate(void) {
     for (SAPOfflineCall *call in calls) { cancelCallDeadline(call);SAPCancelTransportHandle(call.lifetime); call.lifetime = nil;call.completion=nil; }
     [calls removeAllObjects]; routeGeneration++;
     if (candidateIndex >= jobCandidates.count) {
-        finish(@"transport_unavailable", SAPLocalized(@"No available core transport replied to GetItems. No download command was sent. Details of the tested transports have been saved.")); return;
+        finish(@"transport_unavailable", SAPLocalized(@"no_available_core_transport_replied_to")); return;
     }
     jobTransport = jobCandidates[candidateIndex++]; candidateStarted = CFAbsoluteTimeGetCurrent();
-    phase = @"probing_transport"; detail = SAPLocalized(@"Checking downloader access through GetItems"); publish();
+    phase = @"probing_transport"; detail = SAPLocalized(@"checking_downloader_access_through_getitems"); publish();
     single(@"GetItems", SAPProtoBytes(1, [jobURL.absoluteString dataUsingEncoding:NSUTF8StringEncoding]), ^(NSArray *fields) {
         if (!fields) { selectNextCandidate(); return; }
         routeVerified = YES; SAPRememberTransport(jobTransport, NO, YES); polls++; readItem(fields);
@@ -345,7 +345,7 @@ static void selectNextCandidate(void) {
 void SAPInstallTrackDownloader(void) {
     static dispatch_once_t once;
     dispatch_once(&once, ^{
-        detail=SAPLocalized(@"No download started");
+        detail=SAPLocalized(@"no_download_started");
         SAPInitializeTransportRuntime();
         [NSNotificationCenter.defaultCenter addObserverForName:SAPDiagnosticsDidChangeNotification object:nil queue:nil usingBlock:^(NSNotification *note){
             dispatch_async(SAPTransportWorker(),^{
@@ -374,12 +374,12 @@ void SAPDownloadCurrentTrack(void (^message)(NSString *)) {
     NSCharacterSet *invalid = [NSCharacterSet characterSetWithCharactersInString:@"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"].invertedSet;
     if (identifier.length != 22 || [identifier rangeOfCharacterFromSet:invalid].location != NSNotFound) {
         SAP_JOURNAL_ACTION(@"single_track_rejected",@{@"reason":@"current_track_uri_unavailable"});
-        if (message) message(SAPLocalized(@"Could not identify the current music track. Start it on this iPhone and try again.")); return;
+        if (message) message(SAPLocalized(@"could_not_identify_the_current_music")); return;
     }
     NSArray *available = SAPTransportCandidates(); id currentTransport = available.firstObject; Method method;
     if (!SAPTransportSignature(object_getClass(currentTransport), NSSelectorFromString(@"callSingle:method:payload:onResponse:"), 6, '@', &method)) {
         SAP_JOURNAL_ACTION(@"single_track_rejected",@{@"track_uri":urlString,@"reason":@"spotify_transport_unavailable"});
-        if (message) message(SAPLocalized(@"The Spotify core transport is not available yet. Start playback and try again.")); return;
+        if (message) message(SAPLocalized(@"the_spotify_core_transport_is_not")); return;
     }
     SAP_JOURNAL_ACTION(@"single_track_requested",@{@"track_uri":urlString,@"transport_available":@YES});
     dispatch_async(SAPTransportWorker(), ^{
@@ -392,9 +392,9 @@ void SAPDownloadCurrentTrack(void (^message)(NSString *)) {
         commandSentAt=errorStateSince=0;
         itemFound = polling = sentRequest = watchItems = existingDownload = NO;
         responseCode = offlineAllowed = streamError = nil;
-        phase = @"preparing_native"; detail = SAPLocalized(@"Preparing the native download manager");
+        phase = @"preparing_native"; detail = SAPLocalized(@"preparing_the_native_download_manager");
         started = CFAbsoluteTimeGetCurrent(); notify = [message copy]; publishActivity(YES);
-        sendMessage([NSString stringWithFormat:SAPLocalized(@"Requesting “%@” for Spotify offline storage."), title]);
+        sendMessage([NSString stringWithFormat:SAPLocalized(@"requesting_for_spotify_offline_storage"), title]);
         timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, SAPTransportWorker());
         dispatch_source_set_timer(timer, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(pollSeconds * NSEC_PER_SEC)),
             (uint64_t)(pollSeconds * NSEC_PER_SEC), (uint64_t)(pollSeconds / 10 * NSEC_PER_SEC));
@@ -425,7 +425,7 @@ void SAPDownloadCurrentAlbum(void (^message)(NSString *)) {
         @"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"].invertedSet;
     if (identifier.length != 22 || [identifier rangeOfCharacterFromSet:invalid].location != NSNotFound) {
         SAP_JOURNAL_ACTION(@"album_rejected",@{@"reason":@"current_album_uri_unavailable"});
-        if (message) message(SAPLocalized(@"Could not identify the current track's album. Start the track on this iPhone and try again."));
+        if (message) message(SAPLocalized(@"could_not_identify_the_current_track"));
         return;
     }
     SAP_JOURNAL_ACTION(@"album_requested",@{@"album_uri":albumURI});
@@ -434,14 +434,14 @@ void SAPDownloadCurrentAlbum(void (^message)(NSString *)) {
         if (!ready) { SAP_JOURNAL_ACTION(@"album_preparation_failed",@{@"album_uri":albumURI,@"reason":reason?:@""});albumMessage(reply, reason); return; }
         dispatch_async(SAPTransportWorker(), ^{
             if (albumCall) {
-                albumMessage(reply, SAPLocalized(@"An album download request is already in progress."));
+                albumMessage(reply, SAPLocalized(@"an_album_download_request_is_already"));
                 return;
             }
             id endpoint = SAPTransportCandidates().firstObject;
             SEL selector = NSSelectorFromString(@"callSingle:method:payload:onResponse:");
             Method method;
             if (!SAPTransportSignature(object_getClass(endpoint), selector, 6, '@', &method)) {
-                albumMessage(reply, SAPLocalized(@"The Spotify downloader transport is unavailable. Start playback and try again."));
+                albumMessage(reply, SAPLocalized(@"the_spotify_downloader_transport_is_unavailable"));
                 return;
             }
             SAPAlbumDownloadCall *call = [SAPAlbumDownloadCall new];
@@ -458,14 +458,14 @@ void SAPDownloadCurrentAlbum(void (^message)(NSString *)) {
                     finishAlbumCall(call, NO);
                     if (!fields) {
                         SAP_JOURNAL_ACTION(@"album_add_reply_invalid",@{@"album_uri":albumURI,@"response_bytes":@([response isKindOfClass:NSData.class]?response.length:0)});
-                        albumMessage(reply, SAPLocalized(@"Spotify returned an invalid reply. The album download is unconfirmed."));
+                        albumMessage(reply, SAPLocalized(@"spotify_returned_an_invalid_reply_the"));
                         return;
                     }
                     uint64_t code = SAPProtoNumber(fields, 1, 0);
                     SAP_JOURNAL_ACTION(@"album_add_reply",@{@"album_uri":albumURI,@"result_code":@(code),@"response_bytes":@(response.length)});
                     if (code) {
                         albumMessage(reply, [NSString stringWithFormat:
-                            SAPLocalized(@"Spotify rejected the album download: %@ (%llu)."),
+                            SAPLocalized(@"spotify_rejected_the_album_download"),
                             errorName(code), (unsigned long long)code]);
                         return;
                     }
@@ -484,16 +484,16 @@ void SAPDownloadCurrentAlbum(void (^message)(NSString *)) {
                                     @"returned_uri":returnedURI?:@"",@"state":@(SAPProtoNumber(context,2,0)),
                                     @"read_error":error?:@""});
                                 if (![returnedURI isEqualToString:albumURI]) {
-                                    albumMessage(reply, SAPLocalized(@"Spotify accepted the command, but the album download has not yet been confirmed."));
+                                    albumMessage(reply, SAPLocalized(@"spotify_accepted_the_command_but_the_album"));
                                     return;
                                 }
                                 uint64_t state = SAPProtoNumber(context, 2, 0);
                                 if (state == 3) {
-                                    albumMessage(reply, SAPLocalized(@"The album is already fully downloaded in Spotify."));
+                                    albumMessage(reply, SAPLocalized(@"the_album_is_already_fully_downloaded"));
                                 } else if (state == 2 || state == 4 || state == 5) {
-                                    albumMessage(reply, SAPLocalized(@"The album download has started. Check its progress in Spotify."));
+                                    albumMessage(reply, SAPLocalized(@"the_album_download_has_started_check"));
                                 } else {
-                                    albumMessage(reply, SAPLocalized(@"Spotify accepted the command, but the album is not yet downloading."));
+                                    albumMessage(reply, SAPLocalized(@"spotify_accepted_the_command_but_the"));
                                 }
                             });});
                     });
@@ -506,14 +506,14 @@ void SAPDownloadCurrentAlbum(void (^message)(NSString *)) {
             } @catch (NSException *exception) {
                 SAP_JOURNAL_ACTION(@"album_add_exception",@{@"album_uri":albumURI,@"name":exception.name?:@"unknown"});
                 finishAlbumCall(call, YES);
-                albumMessage(reply, SAPLocalized(@"Spotify did not accept the album download command."));
+                albumMessage(reply, SAPLocalized(@"spotify_did_not_accept_the_album_download"));
                 return;
             }
             call.deadline = SAPScheduleDeadline(SAPTransportWorker(), 30, ^{
                 if (albumCall != call) return;
                 SAP_JOURNAL_ACTION(@"album_add_timeout",@{@"album_uri":albumURI,@"seconds":@30});
                 finishAlbumCall(call, YES);
-                albumMessage(reply, SAPLocalized(@"Spotify did not answer within 30 seconds. The album download is unconfirmed."));
+                albumMessage(reply, SAPLocalized(@"spotify_did_not_answer_within_30"));
             });
         });
     });});
@@ -521,7 +521,7 @@ void SAPDownloadCurrentAlbum(void (^message)(NSString *)) {
 void SAPVerifyCurrentTrack(void (^message)(NSString *)) {
     id value=SAPTransportObject(SAPTransportObject(SAPTransportObject(SAPTransportPlayer(),@"state"),@"track"),@"URI");
     NSString *uri=[value isKindOfClass:NSURL.class]?[value absoluteString]:[value isKindOfClass:NSString.class]?value:nil;
-    if(![uri hasPrefix:@"spotify:track:"]) {SAP_JOURNAL_ACTION(@"verify_track_rejected",@{@"reason":@"current_track_uri_unavailable"});if(message)message(SAPLocalized(@"The current music track is not identified."));return;}
+    if(![uri hasPrefix:@"spotify:track:"]) {SAP_JOURNAL_ACTION(@"verify_track_rejected",@{@"reason":@"current_track_uri_unavailable"});if(message)message(SAPLocalized(@"the_current_music_track_is_not"));return;}
     SAP_JOURNAL_ACTION(@"verify_track_requested",@{@"track_uri":uri});
     if(SAPDiagnosticsEnabled())SAPReadNativeTrackState(uri);
     SAPJournalVerifyTrack(uri,^(NSDictionary *track){
@@ -529,13 +529,13 @@ void SAPVerifyCurrentTrack(void (^message)(NSString *)) {
             @"state_code":track[@"state_code"]?:NSNull.null,@"progress":track[@"progress"]?:NSNull.null});
         if(!message)return;
         if(!track || [track[@"state"] isEqual:@"unseen"]) {
-            message(SAPDiagnosticsEnabled()?SAPLocalized(@"The core did not confirm this track's status. Transports and timeouts were recorded in the log."):SAPLocalized(@"The core did not confirm this track's status. Enable diagnostics for a detailed report."));return;
+            message(SAPDiagnosticsEnabled()?SAPLocalized(@"the_core_did_not_confirm_this"):SAPLocalized(@"the_core_did_not_confirm_this_track"));return;
         }
         if(!SAPDiagnosticsEnabled()) {
-            message([NSString stringWithFormat:SAPLocalized(@"%@\nCore: %@ (%@)\nProgress: %@%%"),uri,track[@"state"],track[@"state_code"],track[@"progress"]?:@0]);return;
+            message([NSString stringWithFormat:SAPLocalized(@"core_progress"),uri,track[@"state"],track[@"state_code"],track[@"progress"]?:@0]);return;
         }
-        message([NSString stringWithFormat:SAPLocalized(@"%@\nCore: %@ (%@)\nRow: %@\nIcon: %@\nObservation data and timestamps were saved in the log."),uri,track[@"state"],track[@"state_code"],
-            track[@"legacy_state"]?:SAPLocalized(@"not received"),track[@"ui_status"]?:SAPLocalized(@"not observed")]);
+        message([NSString stringWithFormat:SAPLocalized(@"core_row_icon_observation_data_and"),uri,track[@"state"],track[@"state_code"],
+            track[@"legacy_state"]?:SAPLocalized(@"not_received"),track[@"ui_status"]?:SAPLocalized(@"not_observed_2")]);
     });
 }
 void SAPCancelTrackDownload(void) {
@@ -559,7 +559,7 @@ void SAPCancelTrackDownload(void) {
                     @"lifetime_returned":@(lifetime!=nil),@"reply_confirmed":@NO});
             } @catch (NSException *exception) {}
         }
-        finish(@"cancelled", SAPLocalized(@"Monitoring stopped. If the command was accepted, RemoveDownload was sent; its completion is not confirmed here."));
+        finish(@"cancelled", SAPLocalized(@"monitoring_stopped_if_the_command_was"));
     });
 }
 BOOL SAPTrackDownloadActive(void) { return atomic_load(&active); }
@@ -577,5 +577,5 @@ NSDictionary *SAPTrackDownloadReportWithJournal(NSDictionary *journalReport) {
 }
 NSString *SAPTrackDownloadSummary(void) {
     os_unfair_lock_lock(&reportLock);NSDictionary *report=reportSnapshot;os_unfair_lock_unlock(&reportLock);
-    return [NSString stringWithFormat:@"%@%@%@", report[@"track_title"] ?: @"", [report[@"track_title"] length] ? @"\n" : @"", report[@"detail"] ?: SAPLocalized(@"No download started")];
+    return [NSString stringWithFormat:@"%@%@%@", report[@"track_title"] ?: @"", [report[@"track_title"] length] ? @"\n" : @"", report[@"detail"] ?: SAPLocalized(@"no_download_started")];
 }

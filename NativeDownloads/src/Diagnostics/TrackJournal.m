@@ -481,7 +481,7 @@ NSDictionary *SAPJournalReport(void) {
         @"unanswered_calls": [SAPJournalStateStorage.unanswered copy], @"outstanding_calls": [[SAPJournalStateStorage.outstanding allKeys] copy],
         @"log_file": @"SpotifyAudioProbeJournal.log",
         @"tracks": list,
-        @"note": SAPLocalized(@"Offline core errors contain no URI (Error{code}; see analysis/offline-esperanto-service.md), so errors are associated with tracks by timestamp and marked as correlated.")
+        @"note": SAPLocalized(@"offline_core_errors_contain_no_uri")
     };
     os_unfair_lock_unlock(&SAPJournalStateStorage.lock);
     return report;

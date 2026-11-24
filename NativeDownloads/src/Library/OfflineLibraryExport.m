@@ -35,7 +35,7 @@ static NSMapTable<NSProgress *,SAPOfflineLibraryExportJob *> *activeJobs;
     if(self.ownsCurrentExport){self.ownsCurrentExport=NO;SAPCancelAudioExport();}
     for(NSProgress *progress in self.conversions.allValues)[progress cancel];
     if(!package)[self.packageProgress cancel];
-    if(self.event)self.event(@{@"phase":self.operation.cancelled?@"cancelled":package?@"ready":@"failed",@"message":error?:SAPLocalized(@"Files ready"),@"failed":@(self.failures.count)});
+    if(self.event)self.event(@{@"phase":self.operation.cancelled?@"cancelled":package?@"ready":@"failed",@"message":error?:SAPLocalized(@"files_ready"),@"failed":@(self.failures.count)});
     self.operation.cancellationHandler=nil;self.operation.completedUnitCount=self.operation.totalUnitCount;
     self.packageProgress=nil;[self.prepared removeAllObjects];[self.conversions removeAllObjects];
     void (^completion)(NSURL *,NSArray *,NSString *)=self.completion;
@@ -67,7 +67,7 @@ static NSMapTable<NSProgress *,SAPOfflineLibraryExportJob *> *activeJobs;
     if(self.finished)return;
     if(self.progress)self.progress(self.completed,self.tracks.count,message);
     if(self.event) {
-        NSMutableDictionary *event=[@{@"phase":phase,@"completed":@(self.completed),@"total":@(self.tracks.count),@"message":message?:SAPLocalized(@"Preparing files…")}mutableCopy];
+        NSMutableDictionary *event=[@{@"phase":phase,@"completed":@(self.completed),@"total":@(self.tracks.count),@"message":message?:SAPLocalized(@"preparing_files_2")}mutableCopy];
         if(uri)event[@"uri"]=uri;if(self.packaging)event[@"fraction"]=@(self.packageFraction);self.event(event);
     }
 }
@@ -77,7 +77,7 @@ static NSMapTable<NSProgress *,SAPOfflineLibraryExportJob *> *activeJobs;
     if(self.operation.cancelled){[self cancel];return;}
     BOOL success=file.isFileURL && !error.length;
     if(success){NSMutableDictionary *record=[track mutableCopy];record[@"file"]=file;self.prepared[track[@"uri"]]=record;}
-    else {NSMutableDictionary *failure=[track mutableCopy];failure[@"error"]=error?:SAPLocalized(@"No audio file was produced.");[self.failures addObject:failure];}
+    else {NSMutableDictionary *failure=[track mutableCopy];failure[@"error"]=error?:SAPLocalized(@"no_audio_file_was_produced");[self.failures addObject:failure];}
     self.completed++;self.operation.completedUnitCount=(int64_t)self.completed;
     if(self.event)self.event(@{@"phase":@"prepared",@"uri":track[@"uri"],@"success":@(success),@"error":error?:@""});
     [self schedule];
@@ -87,7 +87,7 @@ static NSMapTable<NSProgress *,SAPOfflineLibraryExportJob *> *activeJobs;
     if(![NSFileManager.defaultManager createDirectoryAtURL:folder withIntermediateDirectories:YES attributes:@{NSFileProtectionKey:NSFileProtectionCompleteUntilFirstUserAuthentication} error:&error]){[self completeTrack:track file:nil error:error.localizedDescription];return;}
     NSURL *output=[folder URLByAppendingPathComponent:[input.lastPathComponent.stringByDeletingPathExtension stringByAppendingPathExtension:@"m4a"]];
     SAPRetainTemporaryAudioFiles(@[output],folder);
-    NSDictionary *art=SAPAttachedExportArtwork(input);[self report:SAPLocalized(@"Converting to M4A…") uri:track[@"uri"] phase:@"converting"];
+    NSDictionary *art=SAPAttachedExportArtwork(input);[self report:SAPLocalized(@"converting_to_m4a_2") uri:track[@"uri"] phase:@"converting"];
     NSProgress *conversion=SAPQueueM4AConversion(input,output,track,art,^BOOL{return self.operation.cancelled;},^(SAPM4AExportStatus code){
         dispatch_async(dispatch_get_main_queue(),^{
             if(self.finished)return;[self.conversions removeObjectForKey:track[@"uri"]];
@@ -95,22 +95,22 @@ static NSMapTable<NSProgress *,SAPOfflineLibraryExportJob *> *activeJobs;
                 NSString *filename=art[@"share_filename"]?:input.lastPathComponent;preview[@"share_filename"]=[filename.stringByDeletingPathExtension stringByAppendingPathExtension:@"m4a"];
                 SAPAttachExportArtwork(output,preview);
             }
-            [self completeTrack:track file:code==SAPM4AExportOK?output:nil error:code==SAPM4AExportOK?nil:[NSString stringWithFormat:SAPLocalized(@"M4A conversion failed (code %u)."),(unsigned)code]];
+            [self completeTrack:track file:code==SAPM4AExportOK?output:nil error:code==SAPM4AExportOK?nil:[NSString stringWithFormat:SAPLocalized(@"m4a_conversion_failed_code"),(unsigned)code]];
         });
     });
     self.conversions[track[@"uri"]]=conversion;
 }
 - (void)package {
-    if(!self.prepared.count){[self finish:nil error:SAPLocalized(@"No selected tracks could be exported.")];return;}
+    if(!self.prepared.count){[self finish:nil error:SAPLocalized(@"no_selected_tracks_could_be_exported")];return;}
     BOOL archive=self.zip && self.prepared.count>1;
     NSUInteger generation=++self.packageGeneration;
-    self.packaging=YES;[self report:archive?SAPLocalized(@"Creating ZIP…"):self.prepared.count==1?SAPLocalized(@"Preparing audio file…"):SAPLocalized(@"Preparing folder…") uri:nil phase:@"packaging"];
+    self.packaging=YES;[self report:archive?SAPLocalized(@"creating_zip"):self.prepared.count==1?SAPLocalized(@"preparing_audio_file"):SAPLocalized(@"preparing_folder") uri:nil phase:@"packaging"];
     if(self.finished || !self.packaging || generation!=self.packageGeneration)return;
     // Conversion completion order must never change the requested release/track order.
     NSMutableArray *ordered=NSMutableArray.array;for(NSDictionary *track in self.tracks)if(self.prepared[track[@"uri"]])[ordered addObject:self.prepared[track[@"uri"]]];
     NSProgress *packageProgress=SAPPrepareOfflineLibraryPackage(ordered,archive,^(double fraction){
         if(self.finished || generation!=self.packageGeneration)return;
-        self.packageFraction=fraction;[self report:[NSString stringWithFormat:SAPLocalized(@"Packaging · %.0f%%"),fraction*100] uri:nil phase:@"packaging"];
+        self.packageFraction=fraction;[self report:[NSString stringWithFormat:SAPLocalized(@"packaging"),fraction*100] uri:nil phase:@"packaging"];
     },^(NSURL *package,NSError *error){
         if(self.finished || generation!=self.packageGeneration){if(package)SAPReleaseOfflineLibraryPackage(package);return;}
         [self finish:package error:error.localizedDescription];
@@ -121,10 +121,10 @@ static NSMapTable<NSProgress *,SAPOfflineLibraryExportJob *> *activeJobs;
 - (void)pump {
     if(self.finished || self.packaging)return;
     if(self.operation.cancelled){[self cancel];return;}
-    if(![SAPAudioExportFormat()isEqual:self.format]){[self finish:nil error:SAPLocalized(@"The export format changed. Start again with the chosen format.")];return;}
+    if(![SAPAudioExportFormat()isEqual:self.format]){[self finish:nil error:SAPLocalized(@"the_export_format_changed_start_again")];return;}
     if(self.completed==self.tracks.count){[self package];return;}
     if(self.ownsCurrentExport || self.nextIndex==self.tracks.count || self.conversions.count>=20)return;
-    NSDictionary *track=self.tracks[self.nextIndex++];[self report:track[@"name"]?:SAPLocalized(@"Preparing track…") uri:track[@"uri"] phase:@"preparing"];
+    NSDictionary *track=self.tracks[self.nextIndex++];[self report:track[@"name"]?:SAPLocalized(@"preparing_track") uri:track[@"uri"] phase:@"preparing"];
     self.ownsCurrentExport=YES;
     SAPExportAudioURIForBatch(track[@"uri"],self.format,^(NSString *message){[self report:message uri:track[@"uri"] phase:@"preparing"];},^(NSArray<NSURL *> *files,NSString *error){
         self.ownsCurrentExport=NO;if(self.finished)return;

@@ -284,7 +284,7 @@ static void updateDownloads(UIView *header);
     if (!header) return;
     updateDownloads(header);
     if (!self.button.hidden && self.button.enabled && self.uri && self.presenter) {
-        SAPShowArtistDownloads(self.uri, self.name ?: SAPLocalized(@"Artist"), self.presenter);
+        SAPShowArtistDownloads(self.uri, self.name ?: SAPLocalized(@"artist_2"), self.presenter);
     }
 }
 @end
@@ -352,7 +352,7 @@ static void updateDownloads(UIView *header) {
         button.tintColor = color;
         button.translatesAutoresizingMaskIntoConstraints = NO;
         button.accessibilityIdentifier = @"PixieNativeArtistDownload";
-        button.accessibilityLabel = SAPLocalized(@"Artist downloads");
+        button.accessibilityLabel = SAPLocalized(@"artist_downloads");
         [button addTarget:context action:@selector(open) forControlEvents:UIControlEventTouchUpInside];
         context.button = button;
     }

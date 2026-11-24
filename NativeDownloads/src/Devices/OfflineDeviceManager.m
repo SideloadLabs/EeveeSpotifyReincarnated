@@ -77,7 +77,7 @@ static NSMutableSet<SAPSlotRequest *> *slotRequests;
             SAP_JOURNAL_ACTION(@"offline_slot_http_reply",@{@"method":method,@"path":path,@"http_status":@(status),@"bytes":@(data.length),@"error_domain":error.domain?:@"",@"error_code":@(error.code)});
             SAP_TRACE("http","management_completion",trace,@{@"http_status":@(status),@"bytes":@(data.length),@"error_domain":error.domain?:@"",@"error_code":@(error.code),@"authenticated_headers_logged":@NO});
             if(error || status<200 || status>=300 || data.length>8*1024*1024) {
-                reply(nil,status,[NSString stringWithFormat:SAPLocalized(@"Spotify management request %@ returned HTTP %ld (%@). No success inferred."),method,(long)status,error.localizedDescription?:@"no transport error"]);return;
+                reply(nil,status,[NSString stringWithFormat:SAPLocalized(@"spotify_management_request_returned_http_no"),method,(long)status,error.localizedDescription?:@"no transport error"]);return;
             }
             reply(data?:NSData.data,status,nil);
         });
@@ -86,7 +86,7 @@ static NSMutableSet<SAPSlotRequest *> *slotRequests;
 @end
 
 static SAPSlotRequest *beginSlots(void (^completion)(NSDictionary *,NSString *)) {
-    if(slotOperationActive){if(completion)completion(nil,SAPLocalized(@"Another offline-device operation is in progress."));return nil;}
+    if(slotOperationActive){if(completion)completion(nil,SAPLocalized(@"another_offline_device_operation_is_in"));return nil;}
     slotOperationActive=YES;
     SAPSlotRequest *op=[SAPSlotRequest new];op.completion=completion;op.released=[NSMutableArray array];
     op.traceOperation=SAPTraceCurrentOperation();if(!op.traceOperation&&SAPTraceIsActive())op.traceOperation=SAPTraceBegin(@"offline_device_management",@"pixie_ui",@{});
@@ -99,7 +99,7 @@ static SAPSlotRequest *beginSlots(void (^completion)(NSDictionary *,NSString *))
     op.session=[NSURLSession sessionWithConfiguration:configuration delegate:op delegateQueue:nil];
     __weak SAPSlotRequest *weakOp=op;
     op.deadline=SAPScheduleDeadline(dispatch_get_main_queue(),60,^{
-        SAPSlotRequest *op=weakOp;if(op)[op finish:@{@"released_cache_ids":op.released?:@[],@"status":@"unconfirmed"} error:SAPLocalized(@"Offline-device operation timed out. No command is automatically retried; refresh to see the actual state.")];
+        SAPSlotRequest *op=weakOp;if(op)[op finish:@{@"released_cache_ids":op.released?:@[],@"status":@"unconfirmed"} error:SAPLocalized(@"offline_device_operation_timed_out_no")];
     });
     return op;
 }
@@ -109,13 +109,13 @@ static void withHeaders(SAPSlotRequest *op,void (^ready)(SAPSlotRequest *)) {
     void (^received)(NSDictionary *)=^(NSDictionary *headers){
         dispatch_async(dispatch_get_main_queue(),^{
             SAPSlotRequest *op=weakOp;if(!op||op.finished||op.headers)return;
-            if(![headers isKindOfClass:NSDictionary.class]){[op finish:nil error:SAPLocalized(@"The authenticated request provider returned invalid headers. No device request was sent.")];return;}
+            if(![headers isKindOfClass:NSDictionary.class]){[op finish:nil error:SAPLocalized(@"the_authenticated_request_provider_returned_invalid")];return;}
             NSMutableDictionary *allowed=[NSMutableDictionary dictionary];
             NSSet *names=[NSSet setWithArray:@[@"authorization",@"client-token",@"spotify-app-version",@"app-platform",@"user-agent"]];
             for(id key in headers)if([key isKindOfClass:NSString.class]&&[names containsObject:[key lowercaseString]]&&[headers[key]isKindOfClass:NSString.class])allowed[key]=headers[key];
             BOOL authenticated=NO;
             for(NSString *key in allowed)if([key caseInsensitiveCompare:@"Authorization"]==NSOrderedSame&&[allowed[key]hasPrefix:@"Bearer "])authenticated=YES;
-            if(!authenticated){[op finish:nil error:SAPLocalized(@"Spotify's existing authenticated headers are not available. Play one track online on this device, then refresh.")];return;}
+            if(!authenticated){[op finish:nil error:SAPLocalized(@"spotify_s_existing_authenticated_headers_are")];return;}
             SAP_TRACE("offline_devices","existing_authentication_available",op.traceOperation,@{@"credentials_logged":@NO});
             op.headers=allowed;ready(op);
         });
@@ -137,7 +137,7 @@ static void withHeaders(SAPSlotRequest *op,void (^ready)(SAPSlotRequest *)) {
     }
     SAP_TRACE("offline_devices","authentication_provider_resolved",op.traceOperation,
         @{@"provider":valid?@"Eevee.PixieAuthentication":@"none",@"class_present":@(eevee!=Nil),@"signature_valid":@(valid),@"credentials_logged":@NO});
-    if(!valid){[op finish:nil error:SAPLocalized(@"The authenticated request provider (EeveeSpotify) is unavailable. Play one track online on this device, then refresh.")];return;}
+    if(!valid){[op finish:nil error:SAPLocalized(@"the_authenticated_request_provider_eeveespotify_is")];return;}
     ((void (*)(id,SEL,void (^)(NSDictionary *)))objc_msgSend)(eevee,selector,received);
 }
 static NSArray *activeDevices(NSArray *devices) {
@@ -164,19 +164,19 @@ static void readRegistry(SAPSlotRequest *op,void (^reply)(NSDictionary *,NSStrin
     [op request:@"offline/v1/licenseStatus" method:@"GET" completion:^(NSData *data,NSInteger status,NSString *error){
         if(error){reply(nil,error);return;}
         NSArray *fields=SAPProtoFields(data);int32_t maximum=(int32_t)SAPProtoNumber(fields,1,0),free=(int32_t)SAPProtoNumber(fields,2,0);
-        if(!fields||maximum<=0||maximum>1000||free<0||free>maximum){reply(nil,SAPLocalized(@"The direct license response is not a valid LicenseStatus protobuf; the current state cannot be confirmed."));return;}
+        if(!fields||maximum<=0||maximum>1000||free<0||free>maximum){reply(nil,SAPLocalized(@"the_direct_license_response_is_not"));return;}
         [op request:@"offline/v1/devices" method:@"GET" completion:^(NSData *data,NSInteger status,NSString *error){
             if(error){reply(nil,error);return;}
-            NSArray *fields=SAPProtoFields(data);if(!fields){reply(nil,SAPLocalized(@"The direct device response is not valid protobuf; the current state cannot be confirmed."));return;}
+            NSArray *fields=SAPProtoFields(data);if(!fields){reply(nil,SAPLocalized(@"the_direct_device_response_is_not"));return;}
             NSMutableArray *devices=[NSMutableArray array];
             for(NSDictionary *field in fields)if([field[@"number"]unsignedIntValue]==1&&[field[@"wire"]unsignedIntValue]==2) {
                 NSArray *f=SAPProtoFields(field[@"value"]);NSString *identifier=SAPProtoString(f,1),*cache=SAPProtoString(f,2);
-                if(!identifier.length||!cache.length||identifier.length>512||cache.length>512){reply(nil,SAPLocalized(@"The direct device response has incomplete identifiers; the current state cannot be confirmed."));return;}
+                if(!identifier.length||!cache.length||identifier.length>512||cache.length>512){reply(nil,SAPLocalized(@"the_direct_device_response_has_incomplete"));return;}
                 NSArray *seen=SAPProtoFields(SAPProtoData(f,10));
                 [devices addObject:@{@"device_id":identifier,@"cache_id":cache,@"name":SAPProtoString(f,3)?:@"Spotify device",
                     @"offline_enabled":@(SAPProtoNumber(f,6,0)!=0),@"last_seen_at":@(SAPProtoNumber(seen,1,0))}];
             }
-            if(!deviceKeys(devices)){reply(nil,SAPLocalized(@"The direct device response has duplicate or invalid identities; the current state cannot be confirmed."));return;}
+            if(!deviceKeys(devices)){reply(nil,SAPLocalized(@"the_direct_device_response_has_duplicate"));return;}
             NSDictionary *value=@{@"max_licenses":@(maximum),@"free_licenses":@(free),@"devices":devices,@"observed_at":@(NSDate.date.timeIntervalSince1970),@"source":@"direct_https_response"};
             SAP_JOURNAL_ACTION(@"offline_slot_registry_read",value);SAP_TRACE("offline_devices","registry_readback",op.traceOperation,value);reply(value,nil);
         }];
@@ -217,8 +217,8 @@ static NSDictionary *deviceSnapshot(NSDictionary *registry,NSDictionary *native,
         current[@"synthetic_record"]=@YES;[records addObject:current];
     }
     NSString *reason=error;
-    if(!reason&&!agreed)reason=SAPLocalized(@"Native and direct source states do not agree. This snapshot is read only; refresh before changing registrations.");
-    if(!localValid)reason=SAPLocalized(@"The current device identity is unavailable. Play one track online on this device, then refresh.");
+    if(!reason&&!agreed)reason=SAPLocalized(@"native_and_direct_source_states_do");
+    if(!localValid)reason=SAPLocalized(@"the_current_device_identity_is_unavailable");
     NSString *nativeStatus=native[@"status"]?:@"unavailable";
     double nativeAge=NSDate.date.timeIntervalSince1970-[native[@"finished_at"]doubleValue];
     if(native[@"finished_at"]&&(nativeAge<0||nativeAge>90))nativeStatus=@"stale";
@@ -266,7 +266,7 @@ static void releaseNext(SAPSlotRequest *op,NSDictionary *before) {
             if(error){[op finish:nil error:error];return;}
             BOOL stillEnabled=[deviceKeys(activeDevices(after[@"devices"]))containsObject:deviceKey(device)];
             if(stillEnabled || ![after[@"max_licenses"]isEqual:before[@"max_licenses"]] || [after[@"free_licenses"]integerValue]<[before[@"free_licenses"]integerValue]+1) {
-                [op finish:@{@"status":@"unconfirmed",@"released_cache_ids":[op.released copy],@"observed_registry":after} error:SAPLocalized(@"Spotify acknowledged the command, but a freed slot was not confirmed. No command will be repeated automatically; refresh the state before trying again.")];return;
+                [op finish:@{@"status":@"unconfirmed",@"released_cache_ids":[op.released copy],@"observed_registry":after} error:SAPLocalized(@"spotify_acknowledged_the_command_but_a")];return;
             }
             [op.released addObject:device[@"cache_id"]];op.index++;
             releaseNext(op,after);
@@ -278,11 +278,11 @@ static void releaseSelection(NSString *planID,NSArray<NSString *> *cacheIDs,BOOL
     NSDictionary *plan=lastPlan;lastPlan=nil;
     if(![plan[@"id"]isEqual:planID] || !cacheIDs.count || [NSSet setWithArray:cacheIDs].count!=cacheIDs.count ||
        NSDate.date.timeIntervalSince1970-[plan[@"created_at"]doubleValue]>90 || NSDate.date.timeIntervalSince1970<[plan[@"created_at"]doubleValue]) {
-        if(completion)completion(nil,SAPLocalized(@"The reviewed device selection is missing, expired or invalid. Refresh it before changing registrations."));return;
+        if(completion)completion(nil,SAPLocalized(@"the_reviewed_device_selection_is_missing"));return;
     }
     NSMutableArray *selected=[NSMutableArray array];
     for(NSDictionary *device in plan[@"active_devices"])if(![device[@"synthetic_record"]boolValue]&&[cacheIDs containsObject:device[tokens?@"selection_token":@"cache_id"]])[selected addObject:device];
-    if(selected.count!=cacheIDs.count){if(completion)completion(nil,SAPLocalized(@"The selected registrations were not in the reviewed list. Nothing was changed."));return;}
+    if(selected.count!=cacheIDs.count){if(completion)completion(nil,SAPLocalized(@"the_selected_registrations_were_not_in"));return;}
     SAPSlotRequest *op=beginSlots(completion);if(!op)return;op.plan=plan;op.selected=selected;
     SAP_JOURNAL_ACTION(@"offline_slot_release_confirmed",@{@"plan_id":planID,@"selected_cache_ids":cacheIDs});
     // Authenticate afresh and compare with the reviewed snapshot before any POST.
@@ -293,7 +293,7 @@ static void releaseSelection(NSString *planID,NSArray<NSString *> *cacheIDs,BOOL
         if(!registryMatchesNative(registry,native)||![deviceKey(native[@"sources"][@"local_device"][@"device"])isEqual:deviceKey(plan[@"local_device"])]||
            ![deviceKeys(activeDevices(registry[@"devices"]))isEqual:deviceKeys(plan[@"active_devices"])] ||
            ![registry[@"free_licenses"]isEqual:plan[@"free_licenses"]] || ![registry[@"max_licenses"]isEqual:plan[@"max_licenses"]]) {
-            [request finish:nil error:SAPLocalized(@"The registration state changed after review. Nothing was changed; refresh the list.")];return;
+            [request finish:nil error:SAPLocalized(@"the_registration_state_changed_after_review")];return;
         }
         releaseNext(request,registry);
     });});
@@ -309,18 +309,18 @@ void SAPEnableOfflineOnCurrentDevice(void (^completion)(NSDictionary *,NSString 
     if(!NSThread.isMainThread){dispatch_async(dispatch_get_main_queue(),^{SAPEnableOfflineOnCurrentDevice(completion);});return;}
     // A fresh native/direct comparison is also required when enabling.
     SAPPreviewOfflineDeviceSlots(^(NSDictionary *plan,NSString *error){
-        if(error||![plan[@"actions_allowed"]boolValue]){if(completion)completion(plan,error?:SAPLocalized(@"Registration state is unavailable. Play one track online on this device, then refresh."));return;}
+        if(error||![plan[@"actions_allowed"]boolValue]){if(completion)completion(plan,error?:SAPLocalized(@"registration_state_is_unavailable_play_one"));return;}
         NSDictionary *before=plan[@"native_snapshot"],*local=plan[@"local_device"];
         if([local[@"offline_enabled"]boolValue]&&[before[@"sources"][@"playback"][@"allowed"]boolValue]) {
             if(completion)completion(before,nil);return;
         }
-        if([plan[@"free_licenses"]integerValue]<=0){if(completion)completion(before,SAPLocalized(@"No free offline-device slot was reported. Disable a reviewed registration first."));return;}
+        if([plan[@"free_licenses"]integerValue]<=0){if(completion)completion(before,SAPLocalized(@"no_free_offline_device_slot_was"));return;}
         lastPlan=nil;SAPSlotRequest *op=beginSlots(completion);if(!op)return;
         SAPCallOfflineCommandOnce(@"SetOfflinePlaybackAllowed",SAPProtoInteger(1,1),^(NSData *data,NSString *commandError){
             if(op.finished)return;
             NSArray *fields=data?SAPProtoFields(data):nil;
             if(commandError||!fields||SAPProtoNumber(fields,1,0)!=1) {
-                [op finish:nil error:commandError?:SAPLocalized(@"Spotify did not confirm the enable command. Refresh before trying again; no command is automatically repeated.")];return;
+                [op finish:nil error:commandError?:SAPLocalized(@"spotify_did_not_confirm_the_enable")];return;
             }
             SAPRefreshDownloadCompatibility(^(NSDictionary *after){
                 if(op.finished)return;op.native=after;
@@ -330,7 +330,7 @@ void SAPEnableOfflineOnCurrentDevice(void (^completion)(NSDictionary *,NSString 
                         [deviceKey(local)isEqual:deviceKey(observed)]&&[observed[@"offline_enabled"]boolValue]&&
                         [after[@"sources"][@"playback"][@"read_status"]isEqual:@"received"]&&[after[@"sources"][@"playback"][@"allowed"]boolValue];
                     SAP_JOURNAL_ACTION(@"offline_current_device_enable_result",@{@"registration_observed":@(registered),@"check":after,@"audio_playback_tested":@NO});
-                    [request finish:after error:registered?nil:readError?:SAPLocalized(@"Spotify acknowledged the command, but this exact device's offline registration is not confirmed. Refresh; no command is automatically repeated.")];
+                    [request finish:after error:registered?nil:readError?:SAPLocalized(@"spotify_acknowledged_the_command_but_this")];
                 });});
             });
         });

@@ -32,7 +32,7 @@ def compile_fixture(name, out, sdk, target):
     common = ["xcrun", "clang", "-target", target, "-isysroot", sdk, "-fobjc-arc", "-std=gnu11", "-DSAP_TESTING", *includes]
     if name in ("settings", "lyrics"):
         sources = [resolve_source(s) for s in ("PixieManagerSettings.m", "PixiePageController.m", "DiagnosticsPreferences.m", "Localization.m", "DiagnosticTrace.m", "NativeKeyTrace.m", "WireProto.m")]
-        sources.extend((ROOT / "tests/trace_platform_stub.m", ROOT / "tests/SettingsFixtureActions.m"))
+        sources.extend((ROOT / "tests/trace_platform_stub.m", ROOT / "tests/SettingsFixtureActions.m", ROOT / "tests/eevee_localized_english.m"))
         objects = []
         for source in sources:
             obj = folder / (source.stem + ".o")
@@ -43,7 +43,7 @@ def compile_fixture(name, out, sdk, target):
             ROOT / ("tests/LyricsSettingsFixture.swift" if name == "lyrics" else "tests/SettingsFixture.swift"), *objects, "-framework", "UIKit", "-framework", "SwiftUI", "-o", app / "PixieUIFixture")
         scene = "SAPLyricsFixtureScene" if name == "lyrics" else "SAPFixtureSceneDelegate"
     else:
-        sources = [*source_group("artist_ui"), resolve_source("WireProto.m"), resolve_source("Localization.m"), ROOT / "tests/ArtistDownloadsUIFixture.m"]
+        sources = [*source_group("artist_ui"), resolve_source("WireProto.m"), resolve_source("Localization.m"), ROOT / "tests/eevee_localized_english.m", ROOT / "tests/ArtistDownloadsUIFixture.m"]
         run(*common, *sources, "-framework", "UIKit", "-framework", "QuartzCore", "-framework", "ImageIO", "-framework", "CoreText", "-framework", "CoreGraphics", "-o", app / "PixieUIFixture")
         scene = "ArtistPickerFixtureScene"
     info = {"CFBundleIdentifier": bundle, "CFBundleExecutable": "PixieUIFixture", "CFBundleName": "Pixie UI Fixture",

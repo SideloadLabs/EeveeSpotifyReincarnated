@@ -135,11 +135,11 @@ static NSArray *albumTracks(NSData *data,NSString *uri,NSMutableDictionary *proo
  NSMutableArray *results=NSMutableArray.array;BOOL retained=NO;
  for(NSString *u in self.uris){BOOL offline=self.latestStates[u]&&[self.latestStates[u]unsignedIntegerValue]==0;BOOL library=self.latestSaved[u]&&![self.latestSaved[u]boolValue];for(NSString *album in self.albumMembership[u])if([self.saved[album]boolValue]&&(!self.latestSaved[album]||[self.latestSaved[album]boolValue]))library=NO;
   if(offline)SAPRemoveOfflineLyrics(u,@[u]);
-  if(!offline){retained=YES;[self note:self.latestStates[u]?SAPLocalized(@"Spotify still reports a download, pending policy, expired item, or error state."):SAPLocalized(@"Offline removal was not confirmed by an exact native readback.") uri:u];}
-  if(!library){retained=YES;[self note:SAPLocalized(@"Saved-library removal was not confirmed by an exact native readback.") uri:u];}
+  if(!offline){retained=YES;[self note:self.latestStates[u]?SAPLocalized(@"spotify_still_reports_a_download_pending"):SAPLocalized(@"offline_removal_was_not_confirmed_by") uri:u];}
+  if(!library){retained=YES;[self note:SAPLocalized(@"saved_library_removal_was_not_confirmed") uri:u];}
   NSString *detail=[self.notes[u]array]?[[self.notes[u]array]componentsJoinedByString:@" "]:@"";
   [results addObject:@{@"uri":u,@"name":self.rows[u][@"name"]?:u,@"offline_removed":@(offline),@"library_removed":@(library),@"detail":detail}];}
- NSString *finalError=error?:retained?SAPLocalized(@"Spotify did not confirm removal of every selected track."):nil;
+ NSString *finalError=error?:retained?SAPLocalized(@"spotify_did_not_confirm_removal_of_every"):nil;
  [self traceEntries:results stage:"result_items" facts:@{@"readback_required":@YES}];
  DELETE_TRACE("finished",@{@"cancelled":@(self.cancelled),@"selected_count":@(self.uris.count),@"unconfirmed_results":@(retained),@"verification_attempts":@(self.traceVerificationCount),@"error":finalError?:NSNull.null,@"success":@(!error.length&&!retained),@"filesystem_files_deleted_directly":@NO});
  void(^callback)(NSArray *,NSString *)=self.completion;self.completion=nil;self.event=nil;self.progress.cancellationHandler=nil;self.keepAlive=nil;
@@ -153,11 +153,11 @@ static NSArray *albumTracks(NSData *data,NSString *uri,NSMutableDictionary *proo
  DELETE_TRACE("finished",@{@"cancelled":@NO,@"selected_count":@(self.uris.count),@"unconfirmed_results":@NO,@"verification_attempts":@0,@"error":SAPOfflineLibraryDeleteBusyError,@"success":@NO,@"blocked_by_active_download":@YES,@"filesystem_files_deleted_directly":@NO});
  void(^callback)(NSArray *,NSString *)=self.completion;self.completion=nil;self.event=nil;self.progress.cancellationHandler=nil;self.keepAlive=nil;
  if(callback)callback(@[],SAPOfflineLibraryDeleteBusyError);}
-- (void)cancel{if(self.finished)return;self.cancelled=YES;[self finish:SAPLocalized(@"Deletion cancelled. Submitted native commands were not undone; unverified results remain uncertain.")];}
+- (void)cancel{if(self.finished)return;self.cancelled=YES;[self finish:SAPLocalized(@"deletion_cancelled_submitted_native_commands_were")];}
 - (void)read:(NSString *)service method:(NSString *)method payload:(NSData *)payload reply:(void(^)(NSData *,NSString *))reply{
  if(![self active])return;[self stopRead];NSUInteger epoch=self.epoch;
  DELETE_TRACE("read_requested",@{@"service":service,@"method":method,@"read_epoch":@(epoch),@"verifying":@(self.verifying)});
- self.readDeadline=SAPScheduleDeadline(dispatch_get_main_queue(),12,^{if(![self active]||epoch!=self.epoch)return;DELETE_TRACE("read_timeout",@{@"service":service,@"method":method,@"read_epoch":@(epoch),@"seconds":@12});[self stopRead];reply(nil,SAPLocalized(@"Native read timed out."));});
+ self.readDeadline=SAPScheduleDeadline(dispatch_get_main_queue(),12,^{if(![self active]||epoch!=self.epoch)return;DELETE_TRACE("read_timeout",@{@"service":service,@"method":method,@"read_epoch":@(epoch),@"seconds":@12});[self stopRead];reply(nil,SAPLocalized(@"native_read_timed_out"));});
  dispatch_block_t cancel=SAPCallReadOnlyServiceCancellable(service,method,payload,^(NSData *data,NSString *error){dispatch_async(dispatch_get_main_queue(),^{
   DELETE_TRACE("read_reply",@{@"service":service,@"method":method,@"read_epoch":@(epoch),@"response_bytes":@(data.length),@"response_received":@(data!=nil),@"error":error?:NSNull.null,@"ignored":@(![self active]||epoch!=self.epoch)});
   if(![self active]||epoch!=self.epoch)return;[self stopRead];reply(data,error);});});
@@ -175,24 +175,24 @@ static NSArray *albumTracks(NSData *data,NSString *uri,NSMutableDictionary *proo
 - (void)begin{
  if(SAPTraceIsActive()){self.traceGeneration=SAPTraceGeneration();self.traceID=SAPTraceBegin(@"offline_library_delete",@"pixie",@{@"input_count":@([self.input isKindOfClass:NSArray.class]?self.input.count:0),@"automatic_replay":@NO});}
  NSMutableOrderedSet *ids=NSMutableOrderedSet.orderedSet,*albums=NSMutableOrderedSet.orderedSet;self.rows=NSMutableDictionary.dictionary;self.notes=NSMutableDictionary.dictionary;self.safeAlbums=NSMutableSet.set;self.albumMembership=NSMutableDictionary.dictionary;
- if(![self.input isKindOfClass:NSArray.class]||!self.input.count||self.input.count>10000){[self finish:SAPLocalized(@"Invalid or oversized track selection.")];return;}
- for(id row in self.input){if(![row isKindOfClass:NSDictionary.class]||!valid(row[@"uri"],@"track")||(row[@"album_uri"]&&(![row[@"album_uri"]isKindOfClass:NSString.class]||([row[@"album_uri"]length]&&!valid(row[@"album_uri"],@"album"))))){[self finish:SAPLocalized(@"Invalid selected track or album identity. No commands were sent.")];return;}
-  NSString *u=row[@"uri"];if(self.rows[u]&&![self.rows[u][@"album_uri"]?:@"" isEqual:row[@"album_uri"]?:@""]){[self finish:SAPLocalized(@"Conflicting selected track identities. No commands were sent.")];return;}
+ if(![self.input isKindOfClass:NSArray.class]||!self.input.count||self.input.count>10000){[self finish:SAPLocalized(@"invalid_or_oversized_track_selection")];return;}
+ for(id row in self.input){if(![row isKindOfClass:NSDictionary.class]||!valid(row[@"uri"],@"track")||(row[@"album_uri"]&&(![row[@"album_uri"]isKindOfClass:NSString.class]||([row[@"album_uri"]length]&&!valid(row[@"album_uri"],@"album"))))){[self finish:SAPLocalized(@"invalid_selected_track_or_album_identity")];return;}
+  NSString *u=row[@"uri"];if(self.rows[u]&&![self.rows[u][@"album_uri"]?:@"" isEqual:row[@"album_uri"]?:@""]){[self finish:SAPLocalized(@"conflicting_selected_track_identities_no_commands")];return;}
   [ids addObject:u];self.rows[u]=@{@"uri":u,@"name":[row[@"name"]isKindOfClass:NSString.class]?row[@"name"]:u,@"album_uri":row[@"album_uri"]?:@""};if(valid(row[@"album_uri"],@"album"))[albums addObject:row[@"album_uri"]];}
  self.uris=ids.array;self.selected=[NSSet setWithArray:self.uris];self.progress.totalUnitCount=self.uris.count;self.input=nil;if(self.progress.cancelled){[self cancel];return;}[self emit:@"checking" uri:nil completed:0];
  if([self tracing]){NSMutableArray *entries=NSMutableArray.array;for(NSString *u in self.uris)[entries addObject:self.rows[u]];[self traceEntries:entries stage:"selection" facts:@{@"selected_count":@(self.uris.count)}];}
- [self read:Offline method:@"GetContexts" payload:SAPProtoBytes(1,SAPProtoInteger(1,1)) reply:^(NSData *data,NSString *error){self.contexts=error?nil:parseContexts(data);if(!self.contexts){DELETE_TRACE("contexts_rejected",@{@"error":error?:NSNull.null,@"response_bytes":@(data.length),@"response_shape":fieldShape(SAPProtoFields(data)),@"reason":error?@"transport_error":@"native_context_parser_rejected",@"commands_sent":@NO});[self finish:SAPLocalized(@"Spotify did not return a complete valid native context baseline. No commands were sent.")];return;}
+ [self read:Offline method:@"GetContexts" payload:SAPProtoBytes(1,SAPProtoInteger(1,1)) reply:^(NSData *data,NSString *error){self.contexts=error?nil:parseContexts(data);if(!self.contexts){DELETE_TRACE("contexts_rejected",@{@"error":error?:NSNull.null,@"response_bytes":@(data.length),@"response_shape":fieldShape(SAPProtoFields(data)),@"reason":error?@"transport_error":@"native_context_parser_rejected",@"commands_sent":@NO});[self finish:SAPLocalized(@"spotify_did_not_return_a_complete")];return;}
   DELETE_TRACE("contexts_baseline",@{@"context_count":@(self.contexts.count),@"response_bytes":@(data.length),@"source":@"preflight_snapshot"});
   NSMutableArray *playlists=NSMutableArray.array,*busy=NSMutableArray.array;for(NSDictionary *context in self.contexts){NSString *u=context[@"uri"];BOOL intersects=NO;for(NSString *t in context[@"items"])if([self.selected containsObject:t]){intersects=YES;break;}if(!intersects)continue;
    NSUInteger contextState=[context[@"state"]unsignedIntegerValue];if(contextState==2||contextState==4||contextState==5)[busy addObject:@{@"uri":u?:@"",@"state":@(contextState)}];
    if(valid(u,@"album"))[albums addObject:u];if(valid(u,@"playlist"))[playlists addObject:context];
    [self traceMembership:u items:context[@"items"] source:@"native_context_preflight"];
-   if(![self allSelected:context[@"items"]])for(NSString *t in context[@"items"])if([self.selected containsObject:t])[self note:[NSString stringWithFormat:SAPLocalized(@"Preserved %@ because it includes unselected or unsupported items."),u]uri:t];}
+   if(![self allSelected:context[@"items"]])for(NSString *t in context[@"items"])if([self.selected containsObject:t])[self note:[NSString stringWithFormat:SAPLocalized(@"preserved_because_it_includes_unselected_or"),u]uri:t];}
   if(busy.count){[self finishBlockedByActiveDownload:busy];return;}
   self.albumURIs=albums.array;self.playlistContexts=playlists;NSMutableOrderedSet *library=[NSMutableOrderedSet orderedSetWithArray:self.uris];[library addObjectsFromArray:self.albumURIs];self.libraryURIs=library.array;
   self.states=NSMutableDictionary.dictionary;self.saved=NSMutableDictionary.dictionary;
-  [self readBatches:self.uris saved:NO index:0 into:self.states reply:^(BOOL ok){if(!ok){[self finish:SAPLocalized(@"Spotify omitted or returned invalid selected-item states. No commands were sent.")];return;}
-   [self readBatches:self.libraryURIs saved:YES index:0 into:self.saved reply:^(BOOL ok){if(!ok){[self finish:SAPLocalized(@"Spotify omitted or returned invalid saved-library flags. No commands were sent.")];return;}[self nextAlbum:0];}];}];
+  [self readBatches:self.uris saved:NO index:0 into:self.states reply:^(BOOL ok){if(!ok){[self finish:SAPLocalized(@"spotify_omitted_or_returned_invalid_selected")];return;}
+   [self readBatches:self.libraryURIs saved:YES index:0 into:self.saved reply:^(BOOL ok){if(!ok){[self finish:SAPLocalized(@"spotify_omitted_or_returned_invalid_saved")];return;}[self nextAlbum:0];}];}];
  }];
 }
 // Mutations have their own bounded gate. A timeout advances to readback; late
@@ -218,7 +218,7 @@ static NSArray *albumTracks(NSData *data,NSString *uri,NSMutableDictionary *proo
    [self traceEntries:fields stage:"album_track_fields" facts:@{@"album_uri":u,@"source":@"received_metadata_fields",@"absent_values":@"null; membership requires identity, not display hydration"}];
    if(tracks)[self traceMembership:u items:tracks source:@"validated_album_metadata"];
    DELETE_TRACE("album_decision",@{@"uri":u,@"metadata_valid":@(tracks!=nil),@"all_tracks_selected":@([self allSelected:tracks]),@"native_context_present":@(context!=nil),@"saved_at_preflight":self.saved[u]?:NSNull.null,@"policy_reset_authorized":@(context&&[self allSelected:tracks])});}
-  if(![self allSelected:tracks]){for(NSString *t in self.uris)if([self.rows[t][@"album_uri"]isEqual:u])[self note:SAPLocalized(@"Saved album and album download policy were preserved: full selected membership was not proven.") uri:t];[self nextAlbum:index+1];return;}
+  if(![self allSelected:tracks]){for(NSString *t in self.uris)if([self.rows[t][@"album_uri"]isEqual:u])[self note:SAPLocalized(@"saved_album_and_album_download_policy") uri:t];[self nextAlbum:index+1];return;}
   [self.safeAlbums addObject:u];for(NSString *track in tracks){NSMutableSet *members=self.albumMembership[track];if(!members){members=NSMutableSet.set;self.albumMembership[track]=members;}[members addObject:u];}dispatch_block_t removeSaved=^{[self removeLibrary:[self.saved[u]boolValue]?@[u]:@[] next:^{[self nextAlbum:index+1];}];};
   if(context){[self emit:@"removing" uri:tracks[0] completed:0];[self command:^(dispatch_block_t done){SAPResetEntityOffline(u,^(BOOL attempted,NSString *failure){
    DELETE_TRACE("command_reply",@{@"method":@"resetEntityOfflineAvailabilityWithURL:",@"uri":u,@"handler_returned":@(attempted),@"error":failure?:NSNull.null,@"effect_confirmed":@NO});done();});}method:@"resetEntityOfflineAvailabilityWithURL:" targets:@[u] next:removeSaved];}else removeSaved();
@@ -230,15 +230,15 @@ static NSArray *albumTracks(NSData *data,NSString *uri,NSMutableDictionary *proo
  void(^reply)(NSDictionary *,NSString *)=^(NSDictionary *list,NSString *error){dispatch_async(dispatch_get_main_queue(),^{if(![self active]||epoch!=self.epoch)return;[self stopRead];NSArray *items=[list[@"items"]isKindOfClass:NSArray.class]?list[@"items"]:nil;NSNumber *total=[list[@"total"]isKindOfClass:NSNumber.class]?list[@"total"]:nil;
   [self traceMembership:u items:items source:@"fresh_complete_playlist_read"];
   DELETE_TRACE("playlist_decision",@{@"uri":u,@"error":error?:NSNull.null,@"declared_total":total?:NSNull.null,@"received_count":@(items.count),@"revision":list[@"revision"]?:NSNull.null,@"policy_reset_authorized":@(!error&&total&&items.count==total.unsignedIntegerValue&&[self allSelected:items])});
-  if(error||!total||items.count!=total.unsignedIntegerValue||![self allSelected:items]){for(NSString *t in c[@"items"])[self note:SAPLocalized(@"Playlist policy was preserved: its current full selected membership was not proven.") uri:t];[self nextPlaylist:index+1];return;}
+  if(error||!total||items.count!=total.unsignedIntegerValue||![self allSelected:items]){for(NSString *t in c[@"items"])[self note:SAPLocalized(@"playlist_policy_was_preserved_its_current") uri:t];[self nextPlaylist:index+1];return;}
   [self command:^(dispatch_block_t done){SAPSetPlaylistOfflineOnceWithDisposition(u,NO,^(NSData *d,NSString *e,SAPCommandInvocationDisposition disposition){
    DELETE_TRACE("command_reply",@{@"method":@"SetPlaylistOffline",@"uri":u,@"enabled":@NO,@"transport_invoked":@(disposition==SAPCommandInvoked),@"response_received":@(d!=nil),@"response_bytes":@(d.length),@"error":e?:NSNull.null,@"effect_confirmed":@NO});done();});}method:@"SetPlaylistOffline" targets:@[u] next:^{[self nextPlaylist:index+1];}];});};
- self.readDeadline=SAPScheduleDeadline(dispatch_get_main_queue(),12,^{reply(nil,SAPLocalized(@"Playlist read timed out."));});
+ self.readDeadline=SAPScheduleDeadline(dispatch_get_main_queue(),12,^{reply(nil,SAPLocalized(@"playlist_read_timed_out"));});
  dispatch_block_t cancel=SAPFetchPlaylistContents(u,reply);if([self active]&&epoch==self.epoch)self.cancelRead=cancel;else if(cancel)cancel();
 }
 - (void)removeTracks:(NSUInteger)index{
  if(![self active])return;if(index>=self.uris.count){[self removeSavedTracks:0];return;}NSString *u=self.uris[index];
- [self read:Offline method:@"GetItems" payload:str(1,u) reply:^(NSData *data,NSString *error){NSDictionary *state=error?nil:parseItems(data,@[u]);if(!state){[self note:SAPLocalized(@"Targeted removal was skipped because its current native state could not be read.") uri:u];[self removeTracks:index+1];return;}
+ [self read:Offline method:@"GetItems" payload:str(1,u) reply:^(NSData *data,NSString *error){NSDictionary *state=error?nil:parseItems(data,@[u]);if(!state){[self note:SAPLocalized(@"targeted_removal_was_skipped_because_its") uri:u];[self removeTracks:index+1];return;}
   DELETE_TRACE("track_decision",@{@"uri":u,@"current_state":state[u],@"not_downloaded_state":@0,@"remove_requested":@([state[u]unsignedIntegerValue]!=0)});
   if([state[u]unsignedIntegerValue]==0){[self removeTracks:index+1];return;}[self emit:@"removing" uri:u completed:index];
   [self command:^(dispatch_block_t done){SAPCallOfflineCommandOnceWithDisposition(@"RemoveDownload",str(2,u),^(NSData *d,NSString *e,SAPCommandInvocationDisposition disposition){
@@ -247,7 +247,7 @@ static NSArray *albumTracks(NSData *data,NSString *uri,NSMutableDictionary *proo
 }
 - (void)removeSavedTracks:(NSUInteger)index{
  if(![self active])return;if(index>=self.uris.count){self.verifyAttempt=0;self.verifying=YES;
-  self.phaseDeadline=SAPScheduleDeadline(dispatch_get_main_queue(),8,^{[self finish:SAPLocalized(@"Native verification timed out. Unconfirmed removals remain uncertain.")];});[self verify];return;}
+  self.phaseDeadline=SAPScheduleDeadline(dispatch_get_main_queue(),8,^{[self finish:SAPLocalized(@"native_verification_timed_out_unconfirmed_removals")];});[self verify];return;}
  NSArray *batch=[self.uris subarrayWithRange:NSMakeRange(index,MIN((NSUInteger)64,self.uris.count-index))];NSMutableArray *remove=NSMutableArray.array;for(NSString *u in batch)if([self.saved[u]boolValue])[remove addObject:u];
  [self removeLibrary:remove next:^{[self removeSavedTracks:index+batch.count];}];
 }
@@ -259,7 +259,7 @@ static NSArray *albumTracks(NSData *data,NSString *uri,NSMutableDictionary *proo
    // Album readbacks are included even though each row's library flag refers to
    // the selected track. A saved album that remains is reported explicitly.
    for(NSString *a in self.safeAlbums)if([self.saved[a]boolValue]&&(!saved[a]||[saved[a]boolValue]))complete=NO;
-   for(NSString *a in self.albumURIs)if([saved[a]boolValue])for(NSString *u in self.uris)if([self.rows[u][@"album_uri"]isEqual:a]||[self.albumMembership[u]containsObject:a])[self note:[self.safeAlbums containsObject:a]?SAPLocalized(@"Spotify still reports the wholly selected album as saved."):SAPLocalized(@"The associated saved album was preserved.") uri:u];
+   for(NSString *a in self.albumURIs)if([saved[a]boolValue])for(NSString *u in self.uris)if([self.rows[u][@"album_uri"]isEqual:a]||[self.albumMembership[u]containsObject:a])[self note:[self.safeAlbums containsObject:a]?SAPLocalized(@"spotify_still_reports_the_wholly_selected"):SAPLocalized(@"the_associated_saved_album_was_preserved") uri:u];
    if([self tracing]){NSMutableArray *entries=NSMutableArray.array;
     for(NSString *u in self.uris)[entries addObject:@{@"uri":u,@"before_state":self.states[u]?:NSNull.null,@"after_state":self.latestStates[u]?:NSNull.null,@"before_saved":self.saved[u]?:NSNull.null,@"after_saved":self.latestSaved[u]?:NSNull.null,@"offline_removed":@(self.latestStates[u]&&[self.latestStates[u]unsignedIntegerValue]==0),@"not_downloaded_state":@0}];
     [self traceEntries:entries stage:"verified_items" facts:@{@"attempt":@(self.verifyAttempt+1),@"offline_read_valid":@(offlineOK),@"library_read_valid":@(savedOK),@"complete":@(complete),@"holding_contexts_source":@"preflight snapshot only; not queried again by verification"}];}
