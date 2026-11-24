@@ -29,22 +29,86 @@ private func shouldStopProviderFallback(_ error: Error) -> Bool {
     return transport.code == .cancelled || transport.code == .notConnectedToInternet
 }
 
-func geniusLyricsUnavailable(_ error: Error) -> Bool {
-    if case LyricsError.noSuchSong = error { return true }
-    if case OfflineLyricsFetchError.noMetadata = error { return true }
-    if case OfflineLyricsFetchError.metadataUnavailable = error { return true }
-    return false
+func isUsableSavedLyrics(_ entry: OfflineLyricsStore.Entry) -> Bool {
+    (try? Lyrics(serializedBytes: entry.data))?.hasData == true
 }
 
-func isUsableSavedLyrics(_ entry: OfflineLyricsStore.Entry) -> Bool {
-    guard let lyrics = try? Lyrics(serializedBytes: entry.data), !lyrics.data.lines.isEmpty else { return false }
-    let data = lyrics.data
-    // Genius did not identify instrumentals. Old builds generated this placeholder
-    // for an empty response and saved it under the selected provider's key.
-    guard data.providedBy == "\(LyricsSource.genius.description) (EeveeSpotify)",
-          !data.timeSynchronized, data.lines.count == 3,
-          data.lines.allSatisfy({ $0.offsetMs == 0 }), data.lines[2].content.isEmpty else { return true }
-    return !BundleHelper.instrumentalLyricsPrompts.contains(data.lines.prefix(2).map(\.content))
+/// The lyrics a saved file shows, as upstream builds them from the provider's answer: a file
+/// without lines (an instrumental) gets upstream's prompts, in the language Eevee shows now.
+func savedDisplayLyrics(_ entry: OfflineLyricsStore.Entry) -> Lyrics? {
+    (try? Lyrics(serializedBytes: entry.data)).flatMap(savedDisplayLyrics)
+}
+
+func savedDisplayLyrics(_ saved: Lyrics) -> Lyrics? {
+    guard saved.hasData else { return nil }
+    var lyrics = saved
+    if lyrics.data.lines.isEmpty {
+        let empty = LyricsDto(lines: [], timeSynced: false, romanization: .original, translation: nil)
+        lyrics.data.lines = empty.toSpotifyLyricsData(source: "").lines
+    }
+    return lyrics
+}
+
+/// Names a provider's error in a saved file, for the fallback reason upstream's header shows.
+private extension LyricsError {
+    static let saved: [LyricsError] = [.noCurrentTrack, .trackMismatch, .decodingError, .noSuchSong,
+                                       .unknownError, .invalidSource, .invalidSpicyKey]
+    var savedName: String {
+        switch self {
+        case .noCurrentTrack: return "noCurrentTrack"
+        case .trackMismatch: return "trackMismatch"
+        case .decodingError: return "decodingError"
+        case .noSuchSong: return "noSuchSong"
+        case .unknownError: return "unknownError"
+        case .invalidSource: return "invalidSource"
+        case .invalidSpicyKey: return "invalidSpicyKey"
+        }
+    }
+    /// As upstream records a failed provider: its LyricsError, anything else as unknownError.
+    init(failure error: Error) { self = error as? LyricsError ?? .unknownError }
+}
+
+/// The selected provider's error from upstream's last fetch, with its song. After a Genius
+/// fallback upstream throws Genius's error, while its header names this one.
+final class SelectedProviderFailure {
+    static let shared = SelectedProviderFailure()
+    private let lock = NSLock()
+    private var last: (trackId: String, error: LyricsError)?
+
+    func record(trackId: String, error: LyricsError?) {
+        lock.lock(); defer { lock.unlock() }
+        last = error.map { (trackId, $0) }
+    }
+
+    func error(trackId: String) -> LyricsError? {
+        lock.lock(); defer { lock.unlock() }
+        return last?.trackId == trackId ? last?.error : nil
+    }
+}
+
+/// What upstream's lyrics header shows for this answer, set as upstream's fetch sets it.
+/// `failure`: the online request's error, when a saved text stands in for it.
+func applySavedLyricsState(_ entry: OfflineLyricsStore.Entry, failure: Error? = nil) {
+    var state = LyricsLoadingState()
+    state.wasRomanized = entry.romanized
+    state.fallbackError = failure.map(LyricsError.init(failure:))
+        ?? LyricsError.saved.first { $0.savedName == entry.fallbackReason }
+    state.isEmpty = (try? Lyrics(serializedBytes: entry.data))?.data.lines.isEmpty ?? false
+    state.loadedSuccessfully = true
+    lyricsState = state
+}
+
+/// Offline, Spotify shows the playing song's saved lyrics from its own database without
+/// asking Eevee, so the header gets that text's state when the song changes (no-op online).
+func publishSavedLyricsState(trackId: String) {
+    guard EeveeOfflineLyricsDownloader.shared.foreground.isOffline else { return }
+    DispatchQueue.global(qos: .utility).async {
+        if let entry = savedOfflineLyricsEntry(trackId: trackId, allowOtherProvider: true) {
+            applySavedLyricsState(entry)
+        } else {
+            lyricsState = LyricsLoadingState()
+        }
+    }
 }
 
 /// Colors used whenever there is no server response to take them from.
@@ -78,13 +142,14 @@ func savedOfflineLyricsEntry(trackId: String, allowOtherProvider: Bool) -> Offli
 /// well: online, those songs have no button lyrics either.
 private func savedSelectedProviderLyrics(trackId: String, originalLyrics: Lyrics?) -> Data? {
     guard let entry = savedOfflineLyricsEntry(trackId: trackId, allowOtherProvider: false),
-          var lyrics = try? Lyrics(serializedBytes: entry.data), !lyrics.data.lines.isEmpty else { return nil }
+          var lyrics = savedDisplayLyrics(entry) else { return nil }
     let buttonLyrics = entry.karaoke.flatMap { try? JSONDecoder().decode(KaraokeLyricsDto.self, from: $0) }
     applyLyricsColors(&lyrics, originalLyrics: originalLyrics)
     guard let data = try? lyrics.serializedData() else { return nil }
     // What the provider's fetch does: this request marks the playing song, and the button
     // shows only lyrics this answer brings.
     KaraokePlaybackTracker.shared.updateTrackIdFromLyricsFetch(trackId)
+    applySavedLyricsState(entry)
     if let buttonLyrics { KaraokeLyricsStore.shared.set(trackId: trackId, lyrics: buttonLyrics) }
     else { KaraokeLyricsStore.shared.remove(trackId: trackId) }
     writeDebugLog("[Lyrics] \(trackId): saved \(UserDefaults.lyricsSource.description) lyrics, no request")
@@ -94,10 +159,14 @@ private func savedSelectedProviderLyrics(trackId: String, originalLyrics: Lyrics
 /// Saved text for a lyrics request that already failed (no network). `offline`:
 /// another provider's saved text may stand in until the selected one is saved.
 func cachedOfflineLyrics(trackId: String, offline: Bool = false) -> Lyrics? {
+    cachedOfflineEntry(trackId: trackId, offline: offline)?.lyrics
+}
+
+private func cachedOfflineEntry(trackId: String, offline: Bool) -> (entry: OfflineLyricsStore.Entry, lyrics: Lyrics)? {
     guard let entry = savedOfflineLyricsEntry(trackId: trackId, allowOtherProvider: offline),
-          var lyrics = try? Lyrics(serializedBytes: entry.data) else { return nil }
+          var lyrics = savedDisplayLyrics(entry) else { return nil }
     lyrics.colors = offlineLyricsColors()
-    return lyrics
+    return (entry, lyrics)
 }
 
 /// The custom lyrics view learns a track's lyrics only from a fetch, and offline there is
@@ -118,9 +187,10 @@ func publishSavedKaraokeLyrics(trackId: String) {
 }
 
 /// What a saved file holds for a provider's answer: its text, romanized as the options say,
-/// and the custom view's lyrics.
-private func offlineEntry(_ dto: LyricsDto, used: LyricsSource, source: LyricsSource,
-                          options: LyricsOptions, karaoke: KaraokeLyricsDto?) -> (lyrics: Lyrics, karaoke: Data?) {
+/// whether it was (upstream's rule for the header), and the custom view's lyrics.
+/// An instrumental is saved without lines: savedDisplayLyrics adds the prompts when shown.
+private func offlineEntry(_ dto: LyricsDto, used: LyricsSource, source: LyricsSource, options: LyricsOptions,
+                          karaoke: KaraokeLyricsDto?) -> (lyrics: Lyrics, karaoke: Data?, romanized: Bool) {
     var savedDTO = dto
     let romanize = options.romanization && dto.romanization == .canBeRomanized
     savedDTO.lines = dto.lines.map { line in
@@ -128,13 +198,14 @@ private func offlineEntry(_ dto: LyricsDto, used: LyricsSource, source: LyricsSo
         return LyricsLineDto(content: content, offsetMs: line.offsetMs.map { Int(Int32(clamping: $0)) })
     }
     if romanize { savedDTO.romanization = .romanized }
-    let lyrics = Lyrics.with { $0.data = savedDTO.toSpotifyLyricsData(source: used.description) }
+    var lyrics = Lyrics.with { $0.data = savedDTO.toSpotifyLyricsData(source: used.description) }
+    if dto.lines.isEmpty { lyrics.data.lines = [] }
     // The custom view's lyrics are made as playback makes them: a provider's own (Spicy Lyrics),
     // or upstream's line-synced view of the provider's answer. Only the selected provider's,
     // since the custom view follows it; nothing for a provider or song online has none for.
     let viewLyrics = used == source && source.supportsCustomLyricsView
         ? karaoke ?? KaraokeLyricsDto.lineSynced(from: dto, providerName: used.description) : nil
-    return (lyrics, viewLyrics.flatMap { try? JSONEncoder().encode($0) })
+    return (lyrics, viewLyrics.flatMap { try? JSONEncoder().encode($0) }, savedDTO.romanization == .romanized)
 }
 
 /// The selected provider answered while a downloaded song played: save that answer, so the
@@ -153,10 +224,11 @@ func savePlaybackLyrics(trackId: String, dto: LyricsDto, source: LyricsSource) {
             let store = OfflineLyricsStore.shared
             guard UserDefaults.lyricsSource == source, UserDefaults.lyricsOptions.downloadOptions == options,
                   store.entry(trackId: trackId, source: source.rawValue, options: options) == nil else { return }
-            let (lyrics, savedKaraoke) = offlineEntry(dto, used: source, source: source, options: options, karaoke: karaoke)
+            let (lyrics, savedKaraoke, romanized) = offlineEntry(dto, used: source, source: source,
+                                                                 options: options, karaoke: karaoke)
             guard let data = try? lyrics.serializedData(),
-                  (try? store.save(trackId: trackId, source: source.rawValue, options: options,
-                                   data: data, karaoke: savedKaraoke)) == true else { return }
+                  (try? store.save(trackId: trackId, source: source.rawValue, options: options, data: data,
+                                   karaoke: savedKaraoke, romanized: romanized)) == true else { return }
             LyricsNotFoundStore.shared.succeeded(trackId, source: source.rawValue)
             writeDebugLog("[Lyrics] \(trackId): saved the playing \(source.description) answer for offline")
         }
@@ -237,19 +309,11 @@ func downloadProviderLyrics(trackId: String, metadata: (title: String, artist: S
     var used = source
     let dto: LyricsDto
     var karaoke: KaraokeLyricsDto?
+    var fallbackReason = "none"
     do {
         if needsMetadata { try requireMetadata() }
         guard stillWanted() else { throw URLError(.cancelled) }
         (dto, karaoke) = try fetch(repository)
-    } catch let primaryError where source == .genius && geniusLyricsUnavailable(primaryError) {
-        // SpicyLyrics can look up the same recording by Spotify ID.
-        guard stillWanted() else { throw URLError(.cancelled) }
-        used = .spicylyrics
-        do { (dto, _) = try fetch(SpicyLyricsRepository.shared) }
-        catch LyricsError.noSuchSong {
-            // A missing metadata lookup is retryable even if Spicy had no lyrics.
-            throw primaryError
-        }
     } catch {
         // A cooldown/cancellation must not start another provider. Other errors
         // retain the configured Genius fallback, without turning a temporary
@@ -269,6 +333,7 @@ func downloadProviderLyrics(trackId: String, metadata: (title: String, artist: S
             }
         }
         used = .genius
+        fallbackReason = LyricsError(failure: primaryError).savedName
         do {
             (dto, _) = try fetch(GeniusLyricsRepository.shared)
         } catch {
@@ -280,21 +345,26 @@ func downloadProviderLyrics(trackId: String, metadata: (title: String, artist: S
         }
     }
     guard stillWanted() else { throw URLError(.cancelled) }
-    let (lyrics, savedKaraoke) = offlineEntry(dto, used: used, source: source, options: options, karaoke: karaoke)
-    guard try store.save(trackId: trackId, source: source.rawValue, options: options,
-                         data: lyrics.serializedData(), karaoke: savedKaraoke, revision: revision) else { throw URLError(.cancelled) }
+    let (lyrics, savedKaraoke, romanized) = offlineEntry(dto, used: used, source: source, options: options, karaoke: karaoke)
+    let data = try lyrics.serializedData()
+    guard try store.save(trackId: trackId, source: source.rawValue, options: options, data: data, karaoke: savedKaraoke,
+                         romanized: romanized, fallbackReason: fallbackReason, revision: revision) else { throw URLError(.cancelled) }
     LyricsNotFoundStore.shared.succeeded(trackId, source: source.rawValue)
     writeDebugLog("[Lyrics] download \(trackId): \(used.description), \(dto.lines.count) lines saved\(savedKaraoke == nil ? "" : " with the custom view's lyrics")")
-    return lyrics
+    // What Spotify's offline plugin gets, as the saved file shows it.
+    return savedDisplayLyrics(lyrics) ?? lyrics
 }
 
 /// Saved lyrics for a lyrics request that failed in transport (offline).
 func savedLyrics(forFailed url: URL, error: Error?) -> Data? {
     guard let error, (error as? URLError)?.code != .cancelled, url.isLyrics,
           let trackId = extractTrackId(from: url.path),
-          let lyrics = cachedOfflineLyrics(trackId: trackId, offline: true) else { return nil }
-    if !url.path.contains("/download/") { KaraokePlaybackTracker.shared.updateTrackIdFromLyricsFetch(trackId) }
-    return try? lyrics.serializedData()
+          let saved = cachedOfflineEntry(trackId: trackId, offline: true) else { return nil }
+    if !url.path.contains("/download/") {
+        KaraokePlaybackTracker.shared.updateTrackIdFromLyricsFetch(trackId)
+        applySavedLyricsState(saved.entry)
+    }
+    return try? saved.lyrics.serializedData()
 }
 
 /// Lyrics hook entry point. Spotify's offline-lyrics plugin asks for
@@ -318,8 +388,11 @@ func eeveeLyricsData(_ path: String, originalLyrics: Lyrics? = nil, task: URLSes
             // as offline. With Spotify's own lyrics, those stay as before.
             guard originalLyrics == nil, (error as? URLError)?.code != .cancelled,
                   let entry = savedOfflineLyricsEntry(trackId: trackId, allowOtherProvider: true),
-                  var lyrics = try? Lyrics(serializedBytes: entry.data) else { throw error }
+                  var lyrics = savedDisplayLyrics(entry) else { throw error }
             applyLyricsColors(&lyrics, originalLyrics: nil)
+            // Upstream's header names the selected provider's error; after a Genius fallback
+            // `error` is Genius's, so take the one upstream's fetch recorded for this song.
+            applySavedLyricsState(entry, failure: SelectedProviderFailure.shared.error(trackId: trackId) ?? error)
             writeDebugLog("[Lyrics] \(trackId): provider has no lyrics online (\(error)); saved lyrics are shown")
             return try lyrics.serializedData()
         }

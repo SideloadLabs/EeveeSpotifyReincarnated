@@ -22,13 +22,28 @@ let validatingStore = OfflineLyricsStore(directory: folder, isUsable: { $0.data 
 check(validatingStore.entry(trackId: track, source: 5, options: options) == nil, "invalid saved payload was reused")
 check(validatingStore.fallbackEntry(trackId: track, sources: [5]) == nil, "invalid saved payload was returned as a fallback")
 check(validatingStore.missingTrackIds([track], source: 5, options: options) == [track], "invalid saved payload was not queued for recovery")
-// Files written by earlier builds carry a "karaoke" key; they must still load.
-let legacyURL = folder.appendingPathComponent("5-\(track).json")
-var legacy = try JSONSerialization.jsonObject(with: Data(contentsOf: legacyURL)) as! [String: Any]
-legacy["karaoke"] = ["lines": [], "songWriters": [], "providerCode": "X", "providerName": "Y"]
-try JSONSerialization.data(withJSONObject: legacy).write(to: legacyURL)
-check(OfflineLyricsStore(directory: folder).entry(trackId: track, source: 5, options: options)?.data == payload,
-      "a file from an earlier build with karaoke data no longer loads")
+// The header fields upstream shows are part of every file.
+check(entry?.romanized == false && entry?.fallbackReason == "none", "default header fields were not saved")
+let headerFolder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+defer { try? FileManager.default.removeItem(at: headerFolder) }
+check(try OfflineLyricsStore(directory: headerFolder).save(trackId: track, source: 3, options: options, data: payload,
+    romanized: true, fallbackReason: "noSuchSong"), "header fields could not be saved")
+let headerEntry = OfflineLyricsStore(directory: headerFolder).entry(trackId: track, source: 3, options: options)
+check(headerEntry?.romanized == true && headerEntry?.fallbackReason == "noSuchSong", "header fields did not survive reopening")
+// An instrumental is saved without lines: an empty payload is a saved text.
+check(try OfflineLyricsStore(directory: headerFolder).save(trackId: "instrumental", source: 3, options: options, data: Data()),
+      "an instrumental could not be saved")
+check(OfflineLyricsStore(directory: headerFolder).entry(trackId: "instrumental", source: 3, options: options)?.data == Data(),
+      "an instrumental did not survive reopening")
+// A file without the header fields (an earlier build) is not a saved text: it is downloaded again.
+let oldURL = headerFolder.appendingPathComponent("3-\(track).json")
+var old = try JSONSerialization.jsonObject(with: Data(contentsOf: oldURL)) as! [String: Any]
+old["romanized"] = nil
+old["fallbackReason"] = nil
+try JSONSerialization.data(withJSONObject: old).write(to: oldURL)
+let withOldFile = OfflineLyricsStore(directory: headerFolder)
+check(withOldFile.entry(trackId: track, source: 3, options: options) == nil, "a file without header fields was used")
+check(withOldFile.missingTrackIds([track], source: 3, options: options) == [track], "a file without header fields was not downloaded again")
 check(reopened.entry(trackId: track, source: 1, options: options) == nil, "wrong provider reused")
 var changed = options
 changed.romanization = true

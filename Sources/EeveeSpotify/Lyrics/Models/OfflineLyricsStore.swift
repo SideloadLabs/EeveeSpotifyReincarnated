@@ -12,26 +12,15 @@ final class OfflineLyricsStore {
         let version: Int
         let options: LyricsOptions
         /// Spotify's lyrics message, the only part the native lyrics view and database get.
+        /// No lines: the provider found an instrumental (the prompts are made when shown).
         let data: Data
         /// JSON of the lyrics Eevee's custom lyrics view shows, made at download as playback makes them.
-        /// Kept as bytes so reading an entry never decodes it. Files from earlier builds may
-        /// carry another "karaoke" value; it is ignored.
+        /// Kept as bytes so reading an entry never decodes it.
         let karaoke: Data?
-
-        init(version: Int, options: LyricsOptions, data: Data, karaoke: Data?) {
-            self.version = version
-            self.options = options
-            self.data = data
-            self.karaoke = karaoke
-        }
-
-        init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            version = try container.decode(Int.self, forKey: .version)
-            options = try container.decode(LyricsOptions.self, forKey: .options)
-            data = try container.decode(Data.self, forKey: .data)
-            karaoke = try? container.decodeIfPresent(Data.self, forKey: .karaoke)
-        }
+        /// What upstream's lyrics header shows for the provider's answer: whether the text
+        /// was romanized, and why the selected provider fell back to Genius ("none": it did not).
+        let romanized: Bool
+        let fallbackReason: String
     }
     struct Revision: Equatable {
         let epoch: UInt64
@@ -185,13 +174,14 @@ final class OfflineLyricsStore {
 
     @discardableResult
     func save(trackId: String, source: Int, options: LyricsOptions, data: Data, karaoke: Data? = nil,
-              revision: Revision? = nil) throws -> Bool {
+              romanized: Bool = false, fallbackReason: String = "none", revision: Revision? = nil) throws -> Bool {
         lock.lock(); defer { lock.unlock() }
         loadSuppressed()
         guard let url = url(trackId: trackId, source: source), !suppressed!.contains(trackId), !removedDownloads!.contains(trackId),
               revision == nil || currentRevision(trackId) == revision else { return false }
         try prepareDirectory()
-        let entry = Entry(version: 1, options: options, data: data, karaoke: karaoke)
+        let entry = Entry(version: 1, options: options, data: data, karaoke: karaoke,
+                          romanized: romanized, fallbackReason: fallbackReason)
         let encoded = try JSONEncoder().encode(entry)
         try encoded.write(to: url, options: .atomic)
         fileIndex?.put(url.lastPathComponent, id: trackId, bytes: encoded.count)

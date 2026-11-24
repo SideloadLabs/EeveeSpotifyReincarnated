@@ -133,6 +133,7 @@ private func loadCustomLyricsForTrackId(_ trackId: String) throws -> Lyrics {
         } else {
             lyricsState.fallbackError = .unknownError
         }
+        SelectedProviderFailure.shared.record(trackId: searchQuery.spotifyTrackId, error: lyricsState.fallbackError)
 
         // Attempt Genius fallback if enabled and the primary source isn't already Genius.
         // Genius requires title + artist to search — only attempt if we have them.

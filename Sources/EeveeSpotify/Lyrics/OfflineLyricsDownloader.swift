@@ -181,6 +181,7 @@ final class EeveeOfflineLyricsDownloader: NSObject {
                 // The song already playing gets its saved lyrics too, also when Spotify starts offline.
                 if let trackId = KaraokePlaybackTracker.shared.playerReportedTrackId() {
                     publishSavedKaraokeLyrics(trackId: trackId)
+                    publishSavedLyricsState(trackId: trackId)
                 }
                 // Spotify can finish its request while our persisted queue waits for the network.
                 for job in Array(self.pending.values) {
@@ -723,7 +724,7 @@ final class EeveeOfflineLyricsDownloader: NSObject {
         catch { return .cancelled }
         guard !store.automaticallyRetryableTrackIds([id]).isEmpty else { return .cancelled }
         if let entry = store.entry(trackId: id, source: job.source.rawValue, options: job.options),
-           let cached = try? Lyrics(serializedBytes: entry.data), cached.hasData {
+           let cached = savedDisplayLyrics(entry) {
             LyricsNotFoundStore.shared.succeeded(id, source: job.source.rawValue)
             return .skipped(cached)
         }

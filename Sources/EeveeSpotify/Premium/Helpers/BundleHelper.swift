@@ -63,21 +63,6 @@ class BundleHelper {
         return fallback == key ? (Self.builtInStrings[key] ?? key) : fallback
     }
 
-    /// Earlier offline lyrics files contain the display strings at the time of download.
-    static let instrumentalLyricsPrompts: Set<[String]> = {
-        let keys = ["song_is_instrumental", "let_the_music_play"]
-        let helper = BundleHelper.shared
-        var prompts: Set<[String]> = [keys, keys.map(helper.localizedString)]
-        if let bundle = helper.bundle {
-            for locale in bundle.localizations {
-                guard let path = bundle.path(forResource: locale, ofType: "lproj"),
-                      let localized = Bundle(path: path) else { continue }
-                prompts.insert(keys.map { localized.localizedString(forKey: $0, value: nil, table: nil) })
-            }
-        }
-        return prompts
-    }()
-
     private static let builtInStrings: [String: String] = [
         "manage_downloads": "Manage downloads",
         "manage_downloads_subtitle": "Pixie offline downloads",

@@ -180,9 +180,10 @@ final class NativeOfflineLyrics {
                 // hook answers with the selected provider). Until the selected
                 // provider's text is downloaded, keep the previous provider's text.
                 if let entry = savedOfflineLyricsEntry(trackId: id, allowOtherProvider: true),
-                   let lyrics = try? Lyrics(serializedBytes: entry.data), !lyrics.data.lines.isEmpty {
+                   let lyrics = savedDisplayLyrics(entry), let shown = try? lyrics.serializedData() {
                     have.insert(id)
-                    let digest = codec.digest(of: entry.data, settings: settings)
+                    // From the text as shown: an instrumental's prompts follow Eevee's language.
+                    let digest = codec.digest(of: shown, settings: settings)
                     // Our row is intact and built from this very text: nothing to encode.
                     if try database.isProjected(uri, digest: digest) { continue }
                     changes.append((uri: uri, data: try codec.encode(trackId: id, lyrics: lyrics), digest: digest))
