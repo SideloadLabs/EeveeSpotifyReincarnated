@@ -100,6 +100,8 @@ final class KaraokePlaybackTracker {
     func isPlaying() -> Bool { false }
 }
 func publishSavedKaraokeLyrics(trackId: String) {}
+func publishSavedLyricsState(trackId: String) {}
+func savedDisplayLyrics(_ entry: OfflineLyricsStore.Entry) -> Lyrics? { nil }
 final class NativeOfflineLyrics {
     static let shared = NativeOfflineLyrics()
     static var placeholders: [String] = []
@@ -551,13 +553,13 @@ downloader.lyricsForNativeDownload(trackId: rateLimitedOnce) { result in
 pump(until: { rateLimitedNativeReplies == 1 }, "Spotify's joined callback waited behind the retry queue")
 check(visibleBatch()["completed"] as? Int == 0 && attempts(rateLimitedOnce) == 1 && attempts(rateLimitedTwice) == 1,
       "A 429 job retried or counted as complete before the ordinary job finished")
-let retryGate = holdFetch(rateLimitedOnce)
+// The two retries may run in either order; the batch's final counts are logged when it closes.
+let rateLimitSummary = "Missing completed 3/3: saved=2 skipped=0 not_found=0 failed=1 cancelled=0"
+let rateLimitSummariesBefore = logged(rateLimitSummary)
 firstAttemptGate.signal()
-pump(until: { visibleBatch()["completed"] as? Int == 2 }, "The queue did not run its two deferred retries")
-check(visibleBatch()["failed"] as? Int == 1 && visibleBatch()["not_found"] as? Int == 0 && attempts(rateLimitedTwice) == 2,
+pump(until: { visibleBatch().isEmpty }, "The queue did not run its two deferred retries")
+check(logged(rateLimitSummary) == rateLimitSummariesBefore + 1 && attempts(rateLimitedTwice) == 2,
       "A second 429 was retried again or misclassified")
-retryGate.signal()
-pump(until: { visibleBatch().isEmpty }, "A successful 429 retry left the batch open")
 check(attempts(rateLimitedOnce) == 2 && rateLimitedNativeReplies == 1, "A recovered job or native callback ran more than once")
 print("Rate-limited tracks wait for the queue to finish, retry once and preserve progress")
 
