@@ -1,6 +1,7 @@
 import EeveeSpotifyC
 import Orion
 import UIKit
+import QuartzCore
 
 struct GlassNowPlayingBarGroup: HookGroup {}
 
@@ -111,6 +112,21 @@ enum GlassNowPlayingBar {
             artwork.layer.cornerRadius = artworkRadius(artwork)
             artwork.layer.cornerCurve = .continuous
             artwork.clipsToBounds = true
+            // Music videos can render into a non-square artwork view. Crop it to a
+            // centered square before rounding so the corner radius masks the video
+            // instead of stretching an ellipse over it (issue #193).
+            let side = min(artwork.bounds.width, artwork.bounds.height)
+            if side > 0, abs(artwork.bounds.width - artwork.bounds.height) > 1 {
+                let mask = CAShapeLayer()
+                let origin = CGPoint(x: (artwork.bounds.width - side) / 2,
+                                     y: (artwork.bounds.height - side) / 2)
+                let rect = CGRect(origin: origin, size: CGSize(width: side, height: side))
+                mask.path = UIBezierPath(roundedRect: rect,
+                                         cornerRadius: artworkRadius(artwork)).cgPath
+                artwork.layer.mask = mask
+            } else {
+                artwork.layer.mask = nil
+            }
         }
     }
 
@@ -245,20 +261,35 @@ enum GlassNowPlayingBar {
     private static func findArtwork(in card: UIView) -> UIView? {
         let limit = card.bounds.height
         guard limit > 0 else { return nil }
-        var best: UIView?
-        var bestMinX = CGFloat.greatestFiniteMagnitude
+        // Prefer a square artwork view; fall back to a non-square one (e.g. a
+        // music-video surface) only when no square candidate exists (#193).
+        var bestSquare: UIView?
+        var bestSquareMinX = CGFloat.greatestFiniteMagnitude
+        var bestAny: UIView?
+        var bestAnyMinX = CGFloat.greatestFiniteMagnitude
         var queue = card.subviews
         while !queue.isEmpty {
             let view = queue.removeFirst()
             queue += view.subviews
             let size = view.bounds.size
-            guard size.width >= 24, size.width <= limit, abs(size.width - size.height) < 1 else { continue }
+            guard size.width >= 24, size.height >= 24 else { continue }
             let minX = view.convert(view.bounds, to: card).minX
-            guard minX < card.bounds.width / 3, minX < bestMinX else { continue }
-            bestMinX = minX
-            best = view
+            guard minX < card.bounds.width / 3 else { continue }
+            let isSquare = abs(size.width - size.height) < 1
+            let withinLimit = size.width <= limit && size.height <= limit
+            if isSquare && withinLimit {
+                if minX < bestSquareMinX {
+                    bestSquareMinX = minX
+                    bestSquare = view
+                }
+            } else if size.width <= limit * 2 && size.height <= limit * 2 {
+                if minX < bestAnyMinX {
+                    bestAnyMinX = minX
+                    bestAny = view
+                }
+            }
         }
-        return best
+        return bestSquare ?? bestAny
     }
 
     private static func findCard(in root: UIView) -> UIView? {

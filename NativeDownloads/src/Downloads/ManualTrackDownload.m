@@ -6,7 +6,6 @@
 #import "PlayerTrace.h"
 #import "Diagnostics.h"
 #import "Deadline.h"
-#import "EncodedAudio.h"
 #import "DiagnosticTrace.h"
 #import <objc/runtime.h>
 #import <objc/message.h>
@@ -585,20 +584,9 @@ NSDictionary *SAPTrackDownloadReportWithJournal(NSDictionary *journalReport) {
     report[@"journal_summary"] = (journalReport?SAPJournalSummaryForReport(journalReport):SAPJournalSummaryText()) ?: @"";
     report[@"history"] = recent;
     [report addEntriesFromDictionary:SAPTransportWatchReport()];
-    report[@"observed_audio_keys"]=@(SAPObservedAudioKeyCount());
     return report;
 }
 NSString *SAPTrackDownloadSummary(void) {
     os_unfair_lock_lock(&reportLock);NSDictionary *report=reportSnapshot;os_unfair_lock_unlock(&reportLock);
     return [NSString stringWithFormat:@"%@%@%@", report[@"track_title"] ?: @"", [report[@"track_title"] length] ? @"\n" : @"", report[@"detail"] ?: SAPL(@"Загрузка не запускалась",@"No download started")];
 }
-#ifdef SAP_RUNTIME_TESTING
-id SAP14PlayerForTesting(void) { return SAPTransportPlayer(); }
-NSArray *SAP14TransportsForTesting(void) { return SAPTransportCandidates(); }
-void SAP14SeedServices(id seedPlayer, id seedTransport) {
-    SAPTransportSetPlayer(seedPlayer); SAPRememberTransport(seedTransport, NO, NO);
-}
-NSDictionary *SAP14ServiceInventory(void) {
-    return SAPTransportInventoryForTesting();
-}
-#endif

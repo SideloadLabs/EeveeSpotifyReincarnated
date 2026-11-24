@@ -12,8 +12,3 @@ BOOL SAPResetNativeEntityDownload(NSString *uri,NSString **reason);
 NSDictionary *SAPNativeOfflineReport(void);
 void SAPSampleNativeOffline(void);
 void SAPReadNativeTrackState(NSString *uri);
-#ifdef SAP_RUNTIME_TESTING
-id SAPNativeOfflineWrapperForTesting(void);
-void SAPNativeOfflineSnapshotForTesting(void (^completion)(NSDictionary *));
-void SAPNativeOfflineZeroUpdateForTesting(void (^completion)(NSDictionary *));
-#endif

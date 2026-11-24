@@ -47,17 +47,6 @@ id SAPProvenTransport(void) {os_unfair_lock_lock(&candidatesLock);id value=prove
 void SAPTransportVerifiedEndpoints(id __strong *proven,id __strong *bridge) {
     os_unfair_lock_lock(&candidatesLock);*proven=provenTransport;*bridge=provenBridge;os_unfair_lock_unlock(&candidatesLock);
 }
-#ifdef SAP_RUNTIME_TESTING
-static NSMutableArray *seenNativeCalls;
-void SAPRememberNativeCall(id endpoint, id serviceName, id methodName) {
-    if (![serviceName isKindOfClass:NSString.class] || ![methodName isKindOfClass:NSString.class]) return;
-    NSDictionary *entry = @{@"class": NSStringFromClass(object_getClass(endpoint)), @"service": serviceName, @"method": methodName};
-    os_unfair_lock_lock(&candidatesLock);
-    if (!seenNativeCalls) seenNativeCalls = [NSMutableArray array];
-    if (![seenNativeCalls containsObject:entry]) { [seenNativeCalls addObject:entry]; if (seenNativeCalls.count > 64) [seenNativeCalls removeObjectAtIndex:0]; }
-    os_unfair_lock_unlock(&candidatesLock);
-}
-#endif
 void SAPRememberTransport(id value, BOOL provided, BOOL proven) {
     if (!value) return;
     os_unfair_lock_lock(&candidatesLock);
@@ -211,11 +200,3 @@ NSUInteger SAPReadRouteRememberCountForTesting(void) {
 }
 #endif
 
-#ifdef SAP_RUNTIME_TESTING
-NSDictionary *SAPTransportInventoryForTesting(void) {
-    NSArray *pool=SAPTransportCandidates();NSMutableArray *classes=[NSMutableArray array];
-    for(id value in pool)[classes addObject:NSStringFromClass(object_getClass(value))];
-    os_unfair_lock_lock(&candidatesLock);NSArray *seen=[seenNativeCalls copy]?:@[];os_unfair_lock_unlock(&candidatesLock);
-    return @{@"candidates":classes,@"native_calls":seen};
-}
-#endif

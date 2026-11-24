@@ -28,44 +28,7 @@ enum { MediaRecordCapacity=64 };
 static struct { uint8_t file[20], value[36]; BOOL used; } mediaRecords[MediaRecordCapacity];
 static unsigned mediaRecordCount,nextMediaRecord;
 static uint64_t mediaRecordCaptures;
-enum { AesKeyCapacity=128 };
-static struct { uint8_t key[32]; uint8_t length; uint8_t caller[8]; BOOL used; } aesKeys[AesKeyCapacity];
-static unsigned aesKeyCount,nextAesKey;
-static uint64_t aesKeyCaptures;
-enum { CCCryptoCapacity=64, CCCryptoRecordSize=62 };
-static struct {
-    uint8_t key[32], keyLength, iv[16], ivLength;
-    uint32_t mode, algorithm, options;
-    BOOL used;
-} ccCryptos[CCCryptoCapacity];
-static unsigned ccCryptoCount,nextCCCrypto;
-static uint64_t ccCryptoCaptures;
-enum { AesCtrCapacity=32 };
-static struct { uint8_t key[32], iv[16]; uint8_t keyLength; uint32_t rounds; BOOL used; } aesCtrs[AesCtrCapacity];
-static unsigned aesCtrCount,nextAesCtr;
-static uint64_t aesCtrCaptures;
-enum { AesBlockCapacity=32 };
-static struct { uint8_t schedule[176]; uint8_t key[32]; uint8_t object[128]; uint8_t keyLength; uint32_t rounds; BOOL used; } aesBlocks[AesBlockCapacity];
-static unsigned aesBlockCount,nextAesBlock;
-static uint64_t aesBlockCaptures;
 
-#ifndef SAP_RESEARCH_DUMP
-#define SAP_RESEARCH_DUMP 0
-#endif
-static void liveWrite(const char *tag,const uint8_t *bytes,size_t length) {
-#if SAP_RESEARCH_DUMP
-    if(!tag||!bytes||!length)return;
-    @autoreleasepool {
-        NSString *dir=[NSHomeDirectory() stringByAppendingPathComponent:@"Documents/Pixie Research"];
-        [[NSFileManager defaultManager] createDirectoryAtPath:dir withIntermediateDirectories:YES attributes:@{NSFileProtectionKey:NSFileProtectionCompleteUntilFirstUserAuthentication} error:nil];
-        NSString *path=[dir stringByAppendingPathComponent:@"live.bin"];
-        FILE *file=fopen(path.fileSystemRepresentation,"ab");
-        if(file){uint8_t header[5]={(uint8_t)tag[0],(uint8_t)(length&255),(uint8_t)((length>>8)&255),(uint8_t)((length>>16)&255),(uint8_t)((length>>24)&255)};fwrite(header,1,sizeof(header),file);fwrite(bytes,1,length,file);fclose(file);}
-    }
-#else
-    (void)tag;(void)bytes;(void)length;
-#endif
-}
 static BOOL readBytes(uintptr_t address,void *out,size_t size) {
     vm_size_t read=0;
     return address && address<=UINTPTR_MAX-size &&
@@ -97,143 +60,8 @@ static void observeCipherCaller(const uint64_t *registers,uintptr_t image) {
             @"track_association_proven":@NO,@"key_bytes_read":@NO,@"key_in_log":@NO,
             @"coverage":@"first 32 unique caller/length pairs per diagnostic generation; these two AES implementations only"});
 }
-static void captureAesKey(const uint64_t *registers,uintptr_t image) {
-    if(!registers||!image)return;
-    unsigned length=(unsigned)registers[2];
-    if(length!=16 && length!=24 && length!=32)return;
-    uintptr_t caller=(uintptr_t)registers[30];
-    if(caller<image || caller-image>0x10000000)return;
-    uint8_t key[32]={0};
-    if(!readBytes(registers[1],key,length))return;
-    os_unfair_lock_lock(&storageLock);
-    unsigned slot=AesKeyCapacity;BOOL added=NO;
-    for(unsigned i=0;i<aesKeyCount;i++)if(aesKeys[i].used&&aesKeys[i].length==length&&!memcmp(aesKeys[i].key,key,length)&&!memcmp(aesKeys[i].caller,&caller,8)){slot=i;break;}
-    if(slot==AesKeyCapacity){slot=nextAesKey++%AesKeyCapacity;if(aesKeyCount<AesKeyCapacity)aesKeyCount++;added=YES;}
-    memcpy(aesKeys[slot].key,key,length);aesKeys[slot].length=(uint8_t)length;memcpy(aesKeys[slot].caller,&caller,8);aesKeys[slot].used=YES;
-    if(added){aesKeyCaptures++;uint8_t live[32+8+1]={0};live[0]=(uint8_t)length;memcpy(live+1,key,length);memcpy(live+1+32,&caller,8);liveWrite("K",live,1+32+8);}
-    os_unfair_lock_unlock(&storageLock);
-    memset_s(key,sizeof(key),0,sizeof(key));
-}
-void SAPCaptureCCCrypto(const void *key,size_t keyLength,const void *iv,size_t ivLength,
-                        uint32_t mode,uint32_t algorithm,uint32_t options) {
-    if(!key || keyLength>32 || ivLength>16)return;
-    uint8_t keyBytes[32]={0},ivBytes[16]={0};
-    if(!readBytes((uintptr_t)key,keyBytes,keyLength))return;
-    if(iv && ivLength && !readBytes((uintptr_t)iv,ivBytes,ivLength))return;
-    os_unfair_lock_lock(&storageLock);
-    unsigned slot=CCCryptoCapacity;BOOL added=NO;
-    for(unsigned i=0;i<ccCryptoCount;i++)if(ccCryptos[i].used&&ccCryptos[i].keyLength==keyLength&&
-        ccCryptos[i].ivLength==ivLength&&ccCryptos[i].mode==mode&&ccCryptos[i].algorithm==algorithm&&
-        !memcmp(ccCryptos[i].key,keyBytes,keyLength)&&!memcmp(ccCryptos[i].iv,ivBytes,ivLength)){slot=i;break;}
-    if(slot==CCCryptoCapacity){slot=nextCCCrypto++%CCCryptoCapacity;if(ccCryptoCount<CCCryptoCapacity)ccCryptoCount++;added=YES;}
-    memcpy(ccCryptos[slot].key,keyBytes,keyLength);ccCryptos[slot].keyLength=(uint8_t)keyLength;
-    memcpy(ccCryptos[slot].iv,ivBytes,ivLength);ccCryptos[slot].ivLength=(uint8_t)ivLength;
-    ccCryptos[slot].mode=mode;ccCryptos[slot].algorithm=algorithm;ccCryptos[slot].options=options;ccCryptos[slot].used=YES;
-    if(added){ccCryptoCaptures++;uint8_t live[64]={0};live[0]=(uint8_t)keyLength;memcpy(live+1,keyBytes,keyLength);live[33]=(uint8_t)ivLength;memcpy(live+34,ivBytes,ivLength);liveWrite("C",live,64);}
-    os_unfair_lock_unlock(&storageLock);
-    memset_s(keyBytes,sizeof(keyBytes),0,sizeof(keyBytes));memset_s(ivBytes,sizeof(ivBytes),0,sizeof(ivBytes));
-}
-NSUInteger SAPCopyRecentCCCryptos(uint8_t *records,size_t maximum) {
-    if(!records||!maximum)return 0;NSUInteger written=0;
-    os_unfair_lock_lock(&storageLock);
-    NSUInteger available=ccCryptoCount<CCCryptoCapacity?ccCryptoCount:CCCryptoCapacity;
-    for(NSUInteger i=0;i<available&&written<maximum;i++){
-        unsigned slot=(nextCCCrypto+CCCryptoCapacity-1-i)%CCCryptoCapacity;
-        if(!ccCryptos[slot].used)continue;
-        uint8_t *r=records+written*CCCryptoRecordSize;memset(r,0,CCCryptoRecordSize);
-        r[0]=ccCryptos[slot].keyLength;memcpy(r+1,ccCryptos[slot].key,32);
-        r[33]=ccCryptos[slot].ivLength;memcpy(r+34,ccCryptos[slot].iv,16);
-        memcpy(r+50,&ccCryptos[slot].mode,4);memcpy(r+54,&ccCryptos[slot].algorithm,4);
-        memcpy(r+58,&ccCryptos[slot].options,4);
-        written++;
-    }
-    os_unfair_lock_unlock(&storageLock);return written;
-}
-void SAPObserveAesBlock(const uint64_t *registers,uintptr_t image) {
-    if(!registers||!image)return;
-    uintptr_t object=(uintptr_t)registers[0];
-    uintptr_t schedule=(uintptr_t)registers[21];
-    uint32_t rounds=(uint32_t)(registers[22]&0xff);
-    size_t keyLength=rounds==10?16:(rounds==12?24:(rounds==14?32:16));
-    if(!object||!schedule)return;
-    uint8_t sched[176]={0},key[32]={0},obj[128]={0};
-    if(!readBytes(schedule,sched,sizeof(sched))||!readBytes(schedule,key,keyLength))return;
-    readBytes(object,obj,sizeof(obj));
-    os_unfair_lock_lock(&storageLock);
-    unsigned slot=AesBlockCapacity;BOOL added=NO;
-    for(unsigned i=0;i<aesBlockCount;i++)if(aesBlocks[i].used&&aesBlocks[i].rounds==rounds&&!memcmp(aesBlocks[i].key,key,keyLength)){slot=i;break;}
-    if(slot==AesBlockCapacity){slot=nextAesBlock++%AesBlockCapacity;if(aesBlockCount<AesBlockCapacity)aesBlockCount++;added=YES;}
-    memcpy(aesBlocks[slot].schedule,sched,sizeof(sched));memcpy(aesBlocks[slot].key,key,keyLength);memcpy(aesBlocks[slot].object,obj,sizeof(obj));
-    aesBlocks[slot].keyLength=(uint8_t)keyLength;aesBlocks[slot].rounds=rounds;aesBlocks[slot].used=YES;
-    if(added){aesBlockCaptures++;uint8_t live[338]={0};live[0]=(uint8_t)keyLength;memcpy(live+1,key,keyLength);live[33]=(uint8_t)rounds;memcpy(live+34,obj,128);memcpy(live+162,sched,176);liveWrite("B",live,sizeof(live));}
-    os_unfair_lock_unlock(&storageLock);
-    memset_s(sched,sizeof(sched),0,sizeof(sched));memset_s(key,sizeof(key),0,sizeof(key));memset_s(obj,sizeof(obj),0,sizeof(obj));
-}
-NSUInteger SAPCopyRecentAesBlocks(uint8_t *records,size_t maximum) {
-    if(!records||!maximum)return 0;NSUInteger written=0;
-    os_unfair_lock_lock(&storageLock);
-    NSUInteger available=aesBlockCount<AesBlockCapacity?aesBlockCount:AesBlockCapacity;
-    for(NSUInteger i=0;i<available&&written<maximum;i++){
-        unsigned slot=(nextAesBlock+AesBlockCapacity-1-i)%AesBlockCapacity;
-        if(!aesBlocks[slot].used)continue;
-        uint8_t *r=records+written*338;memset(r,0,338);
-        r[0]=aesBlocks[slot].keyLength;memcpy(r+1,aesBlocks[slot].key,32);
-        r[33]=aesBlocks[slot].rounds;memcpy(r+34,aesBlocks[slot].object,128);
-        memcpy(r+162,aesBlocks[slot].schedule,176);
-        written++;
-    }
-    os_unfair_lock_unlock(&storageLock);return written;
-}
-void SAPObserveAesCtr(const uint64_t *registers,uintptr_t image) {
-    if(!registers||!image)return;
-    uintptr_t schedule=(uintptr_t)registers[22];
-    uintptr_t counter=(uintptr_t)registers[24];
-    uint32_t rounds=(uint32_t)(registers[23]&0xffffu);
-    size_t keyLength=rounds==12?24:(rounds==14?32:16);
-    uint8_t key[32]={0},iv[16]={0};
-    if(!schedule||!counter||!readBytes(schedule,key,keyLength)||!readBytes(counter,iv,16))return;
-    os_unfair_lock_lock(&storageLock);
-    unsigned slot=AesCtrCapacity;BOOL added=NO;
-    for(unsigned i=0;i<aesCtrCount;i++)if(aesCtrs[i].used&&aesCtrs[i].keyLength==keyLength&&
-        aesCtrs[i].rounds==rounds&&!memcmp(aesCtrs[i].key,key,keyLength)&&!memcmp(aesCtrs[i].iv,iv,16)){slot=i;break;}
-    if(slot==AesCtrCapacity){slot=nextAesCtr++%AesCtrCapacity;if(aesCtrCount<AesCtrCapacity)aesCtrCount++;added=YES;}
-    memcpy(aesCtrs[slot].key,key,keyLength);aesCtrs[slot].keyLength=(uint8_t)keyLength;
-    memcpy(aesCtrs[slot].iv,iv,16);aesCtrs[slot].rounds=rounds;aesCtrs[slot].used=YES;
-    if(added){aesCtrCaptures++;uint8_t live[1+32+1+16+4]={0};live[0]=(uint8_t)keyLength;memcpy(live+1,key,keyLength);live[33]=16;memcpy(live+34,iv,16);memcpy(live+50,&rounds,4);liveWrite("T",live,sizeof(live));}
-    os_unfair_lock_unlock(&storageLock);
-    memset_s(key,sizeof(key),0,sizeof(key));memset_s(iv,sizeof(iv),0,sizeof(iv));
-}
-NSUInteger SAPCopyRecentAesCtrs(uint8_t *records,size_t maximum) {
-    if(!records||!maximum)return 0;NSUInteger written=0;
-    os_unfair_lock_lock(&storageLock);
-    NSUInteger available=aesCtrCount<AesCtrCapacity?aesCtrCount:AesCtrCapacity;
-    for(NSUInteger i=0;i<available&&written<maximum;i++){
-        unsigned slot=(nextAesCtr+AesCtrCapacity-1-i)%AesCtrCapacity;
-        if(!aesCtrs[slot].used)continue;
-        uint8_t *r=records+written*56;memset(r,0,56);
-        r[0]=aesCtrs[slot].keyLength;memcpy(r+1,aesCtrs[slot].key,32);
-        r[33]=16;memcpy(r+34,aesCtrs[slot].iv,16);memcpy(r+50,&aesCtrs[slot].rounds,4);
-        written++;
-    }
-    os_unfair_lock_unlock(&storageLock);return written;
-}
-NSUInteger SAPCopyRecentAesKeys(uint8_t *records,size_t maximum) {
-    if(!records||!maximum)return 0;NSUInteger written=0;
-    os_unfair_lock_lock(&storageLock);
-    NSUInteger available=aesKeyCount<AesKeyCapacity?aesKeyCount:AesKeyCapacity;
-    for(NSUInteger i=0;i<available&&written<maximum;i++){
-        unsigned slot=(nextAesKey+AesKeyCapacity-1-i)%AesKeyCapacity;
-        if(!aesKeys[slot].used)continue;
-        records[written*41]=aesKeys[slot].length;
-        memcpy(records+written*41+1,aesKeys[slot].key,32);
-        memcpy(records+written*41+33,aesKeys[slot].caller,8);
-        written++;
-    }
-    os_unfair_lock_unlock(&storageLock);return written;
-}
 void SAPObserveCacheStorageKey(const uint64_t *registers,uintptr_t image) {
     observeCipherCaller(registers,image);
-    captureAesKey(registers,image);
     if(!registers || !image)return;
     uintptr_t caller=registers[30];
     if(registers[2]==24 && caller>=image && caller-image==SAPExportMediaContextOffset) {
@@ -397,7 +225,7 @@ void SAPObserveMediaRecord(const uint64_t *registers,uintptr_t image) {
     BOOL added=NO;
     if(slot==MediaRecordCapacity){slot=nextMediaRecord++%MediaRecordCapacity;if(mediaRecordCount<MediaRecordCapacity)mediaRecordCount++;added=YES;}
     memcpy(mediaRecords[slot].file,file,20);memcpy(mediaRecords[slot].value,value,36);mediaRecords[slot].used=YES;
-    if(added){mediaRecordCaptures++;liveWrite("R",value,36);}
+    if(added)mediaRecordCaptures++;
     os_unfair_lock_unlock(&storageLock);
     if(added&&SAPTraceIsActive()) {
         NSMutableString *id=[NSMutableString string];
@@ -437,7 +265,7 @@ NSDictionary *SAPCacheStorageKeyReport(void) {
     NSDictionary *result=@{@"contexts":@(storageCount),@"captures":@(captures),
         @"read_failures":@(readFailures),@"guard_failures":@(guardFailures),
         @"capacity":@(StorageKeyCapacity),@"media_keys_24":@(mediaKey24Count),
-        @"media_key_24_captures":@(mediaKey24Captures),@"media_contexts":@(mediaContextCount),@"media_context_captures":@(mediaContextCaptures),@"media_outputs":@(mediaOutputCount),@"media_output_captures":@(mediaOutputCaptures),@"media_records":@(mediaRecordCount),@"media_record_captures":@(mediaRecordCaptures),@"aes_keys":@(aesKeyCount),@"aes_key_captures":@(aesKeyCaptures),@"cccryptos":@(ccCryptoCount),@"cccrypto_captures":@(ccCryptoCaptures),@"aes_ctr":@(aesCtrCount),@"aes_ctr_captures":@(aesCtrCaptures),@"aes_blocks":@(aesBlockCount),@"aes_block_captures":@(aesBlockCaptures),@"protected_persistence":@"device-only Keychain, status in export key_vault",@"research_disk_dump_enabled":@(SAP_RESEARCH_DUMP!=0),@"key_material_logged":@(SAP_RESEARCH_DUMP!=0)};
+        @"media_key_24_captures":@(mediaKey24Captures),@"media_contexts":@(mediaContextCount),@"media_context_captures":@(mediaContextCaptures),@"media_outputs":@(mediaOutputCount),@"media_output_captures":@(mediaOutputCaptures),@"media_records":@(mediaRecordCount),@"media_record_captures":@(mediaRecordCaptures),@"protected_persistence":@"device-only Keychain, status in export key_vault",@"research_disk_dump_enabled":@NO,@"key_material_logged":@NO};
     os_unfair_lock_unlock(&storageLock);return result;
 }
 NSUInteger SAPMediaKey24Count(void) {

@@ -50,10 +50,10 @@ class EeveeSettingsViewController: SPTPageViewController {
         
         let alert = UIAlertController(
             title: "Special License Detected",
-            message: "Subscribed to Elsa by Hysan since 2026.",
+            message: "Hysan didn’t catch Elsa, but the future still has someone for him.",
             preferredStyle: .alert
         )
-        alert.addAction(UIAlertAction(title: "Prayers for Hysan 🙏", style: .default))
+        alert.addAction(UIAlertAction(title: "Good luck, Hysan", style: .default))
         WindowHelper.shared.present(alert)
     }
     

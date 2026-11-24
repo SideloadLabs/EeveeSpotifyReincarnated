@@ -1,4 +1,4 @@
-"""Generate or check the 9.1.92 export headers from targets/spotify-9.1.92.json."""
+"""Generate or check the export headers from the PIXIE_TARGET profile."""
 import argparse
 from pixie_target import ROOT
 from export_headers import headers

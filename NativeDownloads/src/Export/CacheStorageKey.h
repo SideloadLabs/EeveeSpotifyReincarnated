@@ -28,22 +28,6 @@ NSUInteger SAPCopyRecentMediaOutputs(uint8_t *outputs, uint8_t *lengths, size_t 
 __attribute__((visibility("default"))) void SAPObserveMediaRecord(const uint64_t *registers, uintptr_t image);
 NSUInteger SAPCopyRecentMediaRecords(uint8_t *records, size_t maximum);
 
-// Every 16/24/32-byte key passed to the two verified native AES setters,
-// with its caller. Process memory only; used by the research build.
-NSUInteger SAPCopyRecentAesKeys(uint8_t *records, size_t maximum);
-
-// CommonCrypto create calls (key, IV, mode, algorithm, options).
-void SAPCaptureCCCrypto(const void *key, size_t keyLength, const void *iv, size_t ivLength,
-                        uint32_t mode, uint32_t algorithm, uint32_t options);
-NSUInteger SAPCopyRecentCCCryptos(uint8_t *records, size_t maximum);
-
-// Native AES-CTR core key schedule + counter.
-__attribute__((visibility("default"))) void SAPObserveAesCtr(const uint64_t *registers, uintptr_t image);
-NSUInteger SAPCopyRecentAesCtrs(uint8_t *records, size_t maximum);
-
-// Native block-AES core key schedule/object.
-__attribute__((visibility("default"))) void SAPObserveAesBlock(const uint64_t *registers, uintptr_t image);
-NSUInteger SAPCopyRecentAesBlocks(uint8_t *records, size_t maximum);
 
 
 #ifdef SAP_TESTING

@@ -1,5 +1,6 @@
 import Orion
 import UIKit
+import MessageUI
 
 enum CleanShareLinks {
     private static let spotifyShareURLPattern = #"https?://(?:[a-z0-9-]+\.)*open\.spotify\.com/[^\s"<>]+"#
@@ -261,6 +262,17 @@ class UIApplicationCleanShareLinksHook: ClassHook<UIApplication> {
             options: options,
             completionHandler: completionHandler
         )
+    }
+}
+
+/// Cleans Spotify share links written into a Messages compose sheet's body.
+///
+/// The share sheet's direct-destination buttons (and `MFMessageComposeViewController`
+/// paths) bypass the pasteboard and `UIActivityViewController` item cleaning, so
+/// we intercept the body setter at the MessageUI boundary.
+class MFMessageComposeViewControllerCleanShareLinksHook: ClassHook<MFMessageComposeViewController> {
+    func setBody(_ body: String?) {
+        orig.setBody(body.map { CleanShareLinks.cleanedString(from: $0) })
     }
 }
 
