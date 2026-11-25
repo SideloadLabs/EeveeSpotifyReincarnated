@@ -403,7 +403,7 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
         if (!categories[category]) categories[category] = NSMutableDictionary.dictionary;
         if (!categories[category][key]) {
             categories[category][key] = NSMutableArray.array;
-            releaseByKey[key] = [@{@"key":key,@"name":SAPOfflineString(row[@"album_name"], SAPLocalized(SAPOfflineUnknownAlbum)),@"cover_url":SAPOfflineString(row[@"cover_url"], @""),@"tracks":categories[category][key]} mutableCopy];
+            releaseByKey[key] = [@{@"key":key,@"name":SAPOfflineString(row[@"album_name"], SAPOfflineUnknownAlbum),@"cover_url":SAPOfflineString(row[@"cover_url"], @""),@"tracks":categories[category][key]} mutableCopy];
         }
         [categories[category][key] addObject:row];
     }
@@ -430,7 +430,7 @@ static NSString *SAPOfflineReleaseKey(NSDictionary *row) {
     for (NSString *category in categoryNames) {
         NSMutableArray *releases = NSMutableArray.array;
         for (NSString *key in [categoryGroups[category] keysSortedByValueUsingComparator:^NSComparisonResult(NSArray *a, NSArray *b) {
-            return [SAPOfflineString(a.firstObject[@"album_name"], SAPLocalized(SAPOfflineUnknownAlbum)) localizedCaseInsensitiveCompare:SAPOfflineString(b.firstObject[@"album_name"], SAPLocalized(SAPOfflineUnknownAlbum))];
+            return [SAPOfflineString(a.firstObject[@"album_name"], SAPOfflineUnknownAlbum) localizedCaseInsensitiveCompare:SAPOfflineString(b.firstObject[@"album_name"], SAPOfflineUnknownAlbum)];
         }]) [releases addObject:releaseByKey[key]];
         [sections addObject:@{@"category":category,@"releases":[releases copy]}];
     }

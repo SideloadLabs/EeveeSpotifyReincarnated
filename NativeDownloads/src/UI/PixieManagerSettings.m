@@ -539,7 +539,9 @@ static id SAPLyricsCatalogObserver;
             NSUInteger count=[self.lyrics[@"tracks"]unsignedIntegerValue];
             NSString *format=count==1?SAPLocalized(@"lyrics_for_song"):SAPLocalized(@"lyrics_for_songs");
             NSString *title=[NSString stringWithFormat:format,(unsigned long)count];
-            UITableViewCell *cell=SAPSettingsCell(table,title,nil,@"music.note.list",UIColor.systemPurpleColor,NO);
+            NSUInteger genius=[self.lyrics[@"genius_tracks"]unsignedIntegerValue];
+            NSString *detail=genius?[NSString stringWithFormat:SAPLocalized(@"lyrics_from_genius"),(unsigned long)genius]:nil;
+            UITableViewCell *cell=SAPSettingsCell(table,title,detail,@"music.note.list",UIColor.systemPurpleColor,NO);
             UILabel *size=[UILabel new];size.text=[NSByteCountFormatter stringFromByteCount:[self.lyrics[@"bytes"]longLongValue] countStyle:NSByteCountFormatterCountStyleFile];
             size.textColor=UIColor.secondaryLabelColor;size.font=[UIFont preferredFontForTextStyle:UIFontTextStyleBody];[size sizeToFit];
             cell.accessoryView=size;cell.selectionStyle=UITableViewCellSelectionStyleNone;return cell;
@@ -557,12 +559,17 @@ static id SAPLyricsCatalogObserver;
     if(![self.lyrics[@"available"]boolValue])detail=SAPLocalized(@"choose_a_lyrics_provider_in_eeveespotify");
     BOOL allSaved=[self.lyrics[@"all_saved"]boolValue];
     BOOL checking=[self.lyrics[@"statistics_loading"]boolValue];
+    // Nothing is missing, but some texts came from the Genius fallback: ask the selected provider again.
+    NSUInteger genius=[self.lyrics[@"genius_tracks"]unsignedIntegerValue];
+    BOOL recheck=allSaved&&genius>0;
     if(![self busy] && checking)detail=SAPLocalized(@"checking_saved_lyrics");
+    else if(![self busy] && recheck)detail=[NSString stringWithFormat:SAPLocalized(@"lyrics_from_genius"),(unsigned long)genius];
     else if(![self busy] && [self.lyrics[@"library_known"]boolValue] && !allSaved)
         detail=[NSString stringWithFormat:SAPLocalized(@"missing_lyrics_for_songs"),self.lyrics[@"library_missing"]?:@0];
-    NSString *title=allSaved?([self.lyrics[@"library_total"]unsignedIntegerValue]?SAPLocalized(@"all_lyrics_are_downloaded"):SAPLocalized(@"no_downloaded_songs")):SAPLocalized(@"download_missing_lyrics");
-    UITableViewCell *cell=SAPSettingsCell(table,title,detail,allSaved?@"checkmark.circle.fill":@"arrow.down.circle.fill",UIColor.systemGreenColor,NO);
-    cell.userInteractionEnabled=[self.lyrics[@"enabled"]boolValue]&&[self.lyrics[@"available"]boolValue]&&![self busy]&&!self.clearing&&!allSaved&&!checking;
+    NSString *title=recheck?SAPLocalized(@"recheck_lyrics_from_genius"):allSaved?([self.lyrics[@"library_total"]unsignedIntegerValue]?SAPLocalized(@"all_lyrics_are_downloaded"):SAPLocalized(@"no_downloaded_songs")):SAPLocalized(@"download_missing_lyrics");
+    NSString *icon=recheck?@"arrow.clockwise.circle.fill":allSaved?@"checkmark.circle.fill":@"arrow.down.circle.fill";
+    UITableViewCell *cell=SAPSettingsCell(table,title,detail,icon,UIColor.systemGreenColor,NO);
+    cell.userInteractionEnabled=[self.lyrics[@"enabled"]boolValue]&&[self.lyrics[@"available"]boolValue]&&![self busy]&&!self.clearing&&(!allSaved||recheck)&&!checking;
     if(!cell.userInteractionEnabled)cell.selectionStyle=UITableViewCellSelectionStyleNone;
     return cell;
 }
@@ -577,7 +584,7 @@ static id SAPLyricsCatalogObserver;
     [alert addAction:[UIAlertAction actionWithTitle:SAPLocalized(@"ok") style:UIAlertActionStyleCancel handler:nil]];[self presentViewController:alert animated:YES completion:nil];
 }
 - (void)downloadExisting {
-    if([self busy] || self.clearing || [self.lyrics[@"all_saved"]boolValue])return;
+    if([self busy] || self.clearing || ([self.lyrics[@"all_saved"]boolValue] && ![self.lyrics[@"genius_tracks"]unsignedIntegerValue]))return;
     self.scanning=YES;
     if(!SAPLyricsCatalogObserver)SAPLyricsCatalogObserver=[NSNotificationCenter.defaultCenter addObserverForName:@"EeveeOfflineLyricsSettingsChanged" object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note){
         if(SAPLyricsCatalogCancel && ![SAPLyricsSnapshot()[@"scan_active"]boolValue]){dispatch_block_t cancel=SAPLyricsCatalogCancel;SAPLyricsCatalogCancel=nil;cancel();}

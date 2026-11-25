@@ -53,20 +53,9 @@ final class NativeOfflineLyricsDatabase {
         } catch {
             throw Failure(message: "lyrics_entities has another layout: \(error)")
         }
-        try execute("CREATE TABLE IF NOT EXISTS eevee_lyrics_projection_v1 (track_uri TEXT NOT NULL PRIMARY KEY, original BLOB, injected BLOB NOT NULL)")
-        // Digest of the saved text and format an injected row was built from. Lets a
-        // launch skip re-encoding rows whose input did not change.
-        if !(try hasColumn("eevee_lyrics_projection_v1", "source_digest")) {
-            try execute("ALTER TABLE eevee_lyrics_projection_v1 ADD COLUMN source_digest TEXT")
-        }
-    }
-    private func hasColumn(_ table: String, _ column: String) throws -> Bool {
-        let statement = try prepare("PRAGMA table_info(\(table))")
-        defer { sqlite3_finalize(statement) }
-        while sqlite3_step(statement) == SQLITE_ROW {
-            if let name = sqlite3_column_text(statement, 1), String(cString: name) == column { return true }
-        }
-        return false
+        // source_digest: the saved text and format an injected row was built from, so a
+        // launch skips re-encoding rows whose input did not change.
+        try execute("CREATE TABLE IF NOT EXISTS eevee_lyrics_projection_v1 (track_uri TEXT NOT NULL PRIMARY KEY, original BLOB, injected BLOB NOT NULL, source_digest TEXT)")
     }
     deinit {
         for statement in statements.values { sqlite3_finalize(statement) }
@@ -257,6 +246,27 @@ final class NativeOfflineLyricsDatabase {
             SELECT 1 FROM eevee_lyrics_projection_v1 p JOIN lyrics_entities e ON e.track_uri = p.track_uri
             WHERE p.original IS NULL AND CAST(e.entity_data AS BLOB) = p.injected AND p.track_uri = ?
             """, uri)
+    }
+    /// Every row of ours in one query: whether it holds lyrics (not an empty marker),
+    /// whether Spotify's row is still the one we wrote, and the digest it was built from.
+    func projectedRows() throws -> [String: (lyrics: Bool, intact: Bool, digest: String?)] {
+        try withStatement("""
+            SELECT p.track_uri, length(p.injected) > 0,
+                   e.track_uri IS NOT NULL AND CAST(e.entity_data AS BLOB) = p.injected, p.source_digest
+            FROM eevee_lyrics_projection_v1 p LEFT JOIN lyrics_entities e ON e.track_uri = p.track_uri
+            """) { statement in
+            var result: [String: (lyrics: Bool, intact: Bool, digest: String?)] = [:]
+            while true {
+                switch sqlite3_step(statement) {
+                case SQLITE_ROW:
+                    guard let uri = sqlite3_column_text(statement, 0) else { continue }
+                    result[String(cString: uri)] = (sqlite3_column_int(statement, 1) != 0,
+                        sqlite3_column_int(statement, 2) != 0, sqlite3_column_text(statement, 3).map { String(cString: $0) })
+                case SQLITE_DONE: return result
+                default: throw Failure(message: String(cString: sqlite3_errmsg(db)))
+                }
+            }
+        }
     }
     func ownedTrackURIs() throws -> [String] {
         try withStatement("SELECT track_uri FROM eevee_lyrics_projection_v1") { statement in

@@ -129,7 +129,7 @@ func savedOfflineLyricsEntry(trackId: String, allowOtherProvider: Bool) -> Offli
 }
 
 /// The newest text saved with a provider other than `source`.
-private func otherProviderLyricsEntry(trackId: String, source: LyricsSource) -> OfflineLyricsStore.Entry? {
+func otherProviderLyricsEntry(trackId: String, source: LyricsSource) -> OfflineLyricsStore.Entry? {
     guard source.isReplacingLyrics else { return nil }
     let others = LyricsSource.allCases.filter { $0 != source && $0.isReplacingLyrics }.map(\.rawValue)
     return OfflineLyricsStore.shared.fallbackEntry(trackId: trackId, sources: others)
@@ -265,6 +265,7 @@ func downloadProviderLyrics(trackId: String, metadata: (title: String, artist: S
                             metadataTimeout: TimeInterval,
                             expectedRevision: OfflineLyricsStore.Revision? = nil,
                             foreground: LyricsForegroundExecution,
+                            recheck: Bool = false,
                             isCancelled: @escaping () -> Bool = { false }) throws -> Lyrics {
     let store = OfflineLyricsStore.shared
     let revision = expectedRevision ?? store.revision(trackId: trackId)
@@ -330,7 +331,8 @@ func downloadProviderLyrics(trackId: String, metadata: (title: String, artist: S
         // primary failure into a permanent "no lyrics" marker.
         if shouldStopProviderFallback(error) { throw error }
         guard stillWanted() else { throw URLError(.cancelled) }
-        guard source != .genius, options.geniusFallback else { throw error }
+        // A recheck of a saved Genius fallback asks the selected provider only.
+        guard source != .genius, options.geniusFallback, !recheck else { throw error }
         let primaryError = error
         // Spicy can search by ID alone. Genius needs verified track metadata,
         // including when the automatic catalog scan has only returned URIs.
@@ -359,7 +361,10 @@ func downloadProviderLyrics(trackId: String, metadata: (title: String, artist: S
     let data = try lyrics.serializedData()
     guard try store.save(trackId: trackId, source: source.rawValue, options: options, data: data, karaoke: savedKaraoke,
                          romanized: romanized, fallbackReason: fallbackReason, revision: revision) else { throw URLError(.cancelled) }
-    LyricsNotFoundStore.shared.succeeded(trackId, source: source.rawValue)
+    let outcomes = LyricsNotFoundStore.shared
+    outcomes.succeeded(trackId, source: source.rawValue)
+    // A Genius fallback stands in until the selected provider is asked again tomorrow.
+    if fallbackReason != "none" { outcomes.retryLater(trackId, source: source.rawValue) }
     writeDebugLog("[Lyrics] download \(trackId): \(used.description), \(dto.lines.count) lines saved\(savedKaraoke == nil ? "" : " with the custom view's lyrics")")
     // What Spotify's offline plugin gets, as the saved file shows it.
     return savedDisplayLyrics(lyrics) ?? lyrics

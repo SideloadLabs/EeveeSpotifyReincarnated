@@ -53,6 +53,11 @@ final class LyricsNotFoundStore {
         values[id] = now.addingTimeInterval(Self.retryDelay).timeIntervalSince1970
         defaults.set(values, forKey: retryKey(source))
     }
+    /// Tracks whose next-day retry is due. Read before `waiting`, which drops them.
+    func due(source: Int, now: Date = Date()) -> Set<String> {
+        lock.lock(); defer { lock.unlock() }
+        return Set(retries(source).filter { $0.value <= now.timeIntervalSince1970 }.keys)
+    }
     /// Tracks still waiting for their next-day retry. Expired entries are dropped.
     func waiting(source: Int, now: Date = Date()) -> Set<String> {
         lock.lock(); defer { lock.unlock() }

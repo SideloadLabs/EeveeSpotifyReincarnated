@@ -70,7 +70,8 @@ class LocalPlaylistDownloadActionHook: ClassHook<UIButton> {
         }
 
         guard LocalPlaylistDownload.launchEnabled else { return }
-        if LatestPremiumPatchingGroup.isActive || IOS14And15PremiumPatchingGroup.isActive {
+        // With Pixie loaded the playlist downloads natively, so the server-side popup is not shown.
+        if pixieCompanionPresent || LatestPremiumPatchingGroup.isActive || IOS14And15PremiumPatchingGroup.isActive {
             orig.sendAction(action, to: recipient, forEvent: event)
             return
         }

@@ -153,24 +153,17 @@ precondition(digestOnlyWrite == 1 && projectedC && value("digest") == first)
 sql("UPDATE lyrics_entities SET entity_data = CAST('spotify-new' AS BLOB) WHERE track_uri = 'digest'")
 let projectedAfterSpotify = try database!.isProjected("digest", digest: "text-c")
 precondition(!projectedAfterSpotify, "a row Spotify rewrote still counted as ours")
+// The launch check reads every row of ours in one query: lyrics or marker, and still ours.
+try database!.update([(uri: "check-intact", data: first, digest: String?("text-d:other")), (uri: "check-gone", data: second, digest: String?("text-e"))])
+sql("DELETE FROM lyrics_entities WHERE track_uri = 'check-gone'")
+sql("INSERT INTO lyrics_entities VALUES ('spotify-only', CAST('real' AS BLOB))")
+try database!.ensurePlaceholders([(uri: "check-marker", data: Data())])
+let rows = try database!.projectedRows()
+precondition(rows["check-intact"].map { $0.lyrics && $0.intact && $0.digest == "text-d:other" } == true, "an intact row was not reported as ours")
+precondition(rows["digest"].map { $0.lyrics && !$0.intact } == true, "a row Spotify rewrote was reported intact")
+precondition(rows["check-gone"].map { $0.lyrics && !$0.intact } == true, "a row Spotify removed was reported intact")
+precondition(rows["check-marker"].map { !$0.lyrics && $0.intact } == true, "an empty marker was reported as lyrics")
+precondition(rows["spotify-only"] == nil, "Spotify's own row was reported as ours")
 try database!.update(uri: "digest", data: nil)
 
-// Databases written before the digest column gain it without losing rows.
-let legacyURL = folder.appendingPathComponent("legacy.sqlite3")
-var legacy: OpaquePointer?
-precondition(sqlite3_open(legacyURL.path, &legacy) == SQLITE_OK)
-for statement in ["CREATE TABLE lyrics_entities (track_uri TEXT NOT NULL PRIMARY KEY, entity_data BLOB NOT NULL)",
-                  "CREATE TABLE eevee_lyrics_projection_v1 (track_uri TEXT NOT NULL PRIMARY KEY, original BLOB, injected BLOB NOT NULL)",
-                  "INSERT INTO lyrics_entities VALUES ('old', CAST('external-a' AS BLOB))",
-                  "INSERT INTO eevee_lyrics_projection_v1 VALUES ('old', NULL, CAST('external-a' AS BLOB))"] {
-    precondition(sqlite3_exec(legacy, statement, nil, nil, nil) == SQLITE_OK)
-}
-sqlite3_close(legacy)
-let migrated = try NativeOfflineLyricsDatabase(url: legacyURL)
-let migratedOwned = try migrated.ownsWithoutOriginal("old")
-let migratedProjected = try migrated.isProjected("old", digest: "text-a")
-precondition(migratedOwned && !migratedProjected, "the migrated row was lost or claimed a digest it never had")
-let migratedWrite = try migrated.update([(uri: "old", data: first, digest: String?("text-a"))])
-let migratedNowProjected = try migrated.isProjected("old", digest: "text-a")
-precondition(migratedWrite == 1 && migratedNowProjected)
-print("NativeOfflineLyricsDatabase: transactional projection, restart restoration, native refresh preservation, rollback, cleanup, WAL, no-op skip and single-transaction batch, empty-row placeholders, source digests and migration passed")
+print("NativeOfflineLyricsDatabase: transactional projection, restart restoration, native refresh preservation, rollback, cleanup, WAL, no-op skip and single-transaction batch, empty-row placeholders, source digests and the launch check query passed")

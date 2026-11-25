@@ -26,6 +26,8 @@ final class EeveeOfflineLyricsDownloader: NSObject {
         var operation: Operation?
         var priority: Operation.QueuePriority
         var isRateLimitRetry = false
+        /// Asks the selected provider again for a saved Genius fallback; keeps it otherwise.
+        var recheck = false
         let metadataTimeout: TimeInterval
         let queuedAt = Date()
 
@@ -412,6 +414,15 @@ final class EeveeOfflineLyricsDownloader: NSObject {
     private static func rememberFailure(_ error: Error, job: Job) {
         let store = LyricsNotFoundStore.shared
         let source = job.source.rawValue
+        if job.recheck {
+            // The saved Genius text stays and the selected provider is asked again tomorrow
+            // (booked when the recheck was queued). A rejected key still pauses the provider.
+            if case LyricsError.invalidSpicyKey = error { store.providerRefused(source: source) }
+            else if let http = error as? LyricsProviderHTTPError, http.status == 401 || http.status == 403 {
+                store.providerRefused(source: source)
+            }
+            return
+        }
         if case LyricsError.noSuchSong = error {
             store.record(job.id, source: source)
             NativeOfflineLyrics.shared.providerHasNoLyrics(trackId: job.id)
@@ -458,6 +469,7 @@ final class EeveeOfflineLyricsDownloader: NSObject {
             return
         }
         let notFound = outcomes.entries(source: source.rawValue)
+        let due = userInitiated ? [] : outcomes.due(source: source.rawValue)
         let waiting = userInitiated ? [] : outcomes.waiting(source: source.rawValue)
         let checkStored = includeStored || downloadedIds == nil
         let candidatesFromLibrary = downloadedIds ?? (userInitiated ? knownDownloadedIds ?? [] : [])
@@ -478,8 +490,13 @@ final class EeveeOfflineLyricsDownloader: NSObject {
             if known > 0 {
                 writeDebugLog("[Lyrics] \(reason): skipped \(known) tracks with a known result (no lyrics, or retry tomorrow)")
             }
-            let order = missing.count > 1 ? Self.pixieCatalogOrder() : [:]
-            let sorted = missing.sorted { (order[$0] ?? Int.max, $0) < (order[$1] ?? Int.max, $1) }
+            // Due and saved: a Genius fallback whose daily recheck with the selected provider is due.
+            // The next one is booked now, so a recheck cut short is not lost.
+            let recheck = store.automaticallyRetryableTrackIds(Array(due.subtracting(lacking)))
+                .filter { store.hasFile(trackId: $0, source: source.rawValue) }
+            for id in recheck { outcomes.retryLater(id, source: source.rawValue) }
+            let order = missing.count + recheck.count > 1 ? Self.pixieCatalogOrder() : [:]
+            let sorted = (missing + recheck).sorted { (order[$0] ?? Int.max, $0) < (order[$1] ?? Int.max, $1) }
             DispatchQueue.main.async {
                 defer {
                     completion?()
@@ -492,9 +509,16 @@ final class EeveeOfflineLyricsDownloader: NSObject {
                       UserDefaults.lyricsSource == source, UserDefaults.lyricsOptions.downloadOptions == options else { return }
                 let current = sorted.filter { (self.removedAt[$0] ?? .distantPast) <= observedAt }
                 guard !current.isEmpty else { return }
-                writeDebugLog("[Lyrics] \(reason): \(current.count) tracks lack \(source.description) lyrics")
+                let rechecks = Set(recheck).intersection(current)
+                if current.count > rechecks.count {
+                    writeDebugLog("[Lyrics] \(reason): \(current.count - rechecks.count) tracks lack \(source.description) lyrics")
+                }
+                if !rechecks.isEmpty {
+                    writeDebugLog("[Lyrics] \(reason): asking \(source.description) again for \(rechecks.count) Genius fallbacks")
+                }
                 self.enqueue(current.map { ["uri": "spotify:track:\($0)"] }, allowPreviouslyDeleted: false,
-                             priority: priority, tracksRefresh: showsProgress, rateLimitRetryIds: rateLimitRetryIds)
+                             priority: priority, tracksRefresh: showsProgress, rateLimitRetryIds: rateLimitRetryIds,
+                             recheckIds: rechecks)
             }
         }
     }
@@ -605,7 +629,7 @@ final class EeveeOfflineLyricsDownloader: NSObject {
     }
     private func enqueue(_ rows: [[String: String]], allowPreviouslyDeleted: Bool = true,
                          priority: Operation.QueuePriority = .normal, tracksRefresh: Bool = false,
-                         rateLimitRetryIds: Set<String> = [],
+                         rateLimitRetryIds: Set<String> = [], recheckIds: Set<String> = [],
                          completion: ((JobStatus) -> Void)? = nil) {
         flushRemovals()
         defer { scheduleRateLimitRetriesIfReady(); changed() }
@@ -629,7 +653,7 @@ final class EeveeOfflineLyricsDownloader: NSObject {
             }
             submit(id: id, row: row, source: source, options: options, priority: priority,
                    metadataTimeout: 10, tracksRefresh: tracksRefresh, isRateLimitRetry: rateLimitRetryIds.contains(id),
-                   completion: completion)
+                   recheck: recheckIds.contains(id), completion: completion)
         }
     }
 
@@ -658,12 +682,13 @@ final class EeveeOfflineLyricsDownloader: NSObject {
 
     private func submit(id: String, row: [String: String], source: LyricsSource, options: LyricsOptions,
                         priority: Operation.QueuePriority, metadataTimeout: TimeInterval, tracksRefresh: Bool = false,
-                        isRateLimitRetry: Bool = false,
+                        isRateLimitRetry: Bool = false, recheck: Bool = false,
                         completion: ((JobStatus) -> Void)? = nil, nativeCompletion: ((Result<Lyrics, Error>) -> Void)? = nil) {
         let revision = OfflineLyricsStore.shared.revision(trackId: id)
         let key = Job.key(source: source, id: id)
         let previous = pending[key]
         if let job = previous, job.revision == revision, job.options == options {
+            if recheck { job.recheck = true }
             if tracksRefresh { trackRefresh(job) }
             if let completion { job.callbacks.append(completion) }
             if let nativeCompletion {
@@ -690,6 +715,7 @@ final class EeveeOfflineLyricsDownloader: NSObject {
             deliver(.cancelled, to: previous)
         }
         job.isRateLimitRetry = isRateLimitRetry
+        job.recheck = recheck
         if isRateLimitRetry { rateLimitedJobs[key] = job }
         else { schedule(job, key: key) }
     }
@@ -755,7 +781,7 @@ final class EeveeOfflineLyricsDownloader: NSObject {
         catch { return .cancelled }
         guard !store.automaticallyRetryableTrackIds([id]).isEmpty else { return .cancelled }
         if let entry = store.entry(trackId: id, source: job.source.rawValue, options: job.options),
-           let cached = savedDisplayLyrics(entry) {
+           !(job.recheck && entry.fallbackReason != "none"), let cached = savedDisplayLyrics(entry) {
             LyricsNotFoundStore.shared.succeeded(id, source: job.source.rawValue)
             return .skipped(cached)
         }
@@ -773,7 +799,7 @@ final class EeveeOfflineLyricsDownloader: NSObject {
                 try foreground.whenNetworkAvailable(isCancelled: cancelled)
                 let lyrics = try downloadProviderLyrics(trackId: id, metadata: metadata,
                     metadataTimeout: job.metadataTimeout, expectedRevision: job.revision,
-                    foreground: foreground, isCancelled: cancelled)
+                    foreground: foreground, recheck: job.recheck, isCancelled: cancelled)
                 guard job.isWanted else { return .cancelled }
                 writeDebugLog("[Lyrics] offline lyrics ready for \(id)")
                 return .saved(lyrics)
@@ -913,7 +939,7 @@ final class EeveeOfflineLyricsDownloader: NSObject {
                 "statistics_loading": !downloader.statisticsReady,
                 "scan_active": downloader.scanningLibrary, "scan_completed": downloader.scanCompleted, "scan_total": downloader.scanTotal,
                 "enabled": UserDefaults.offlineLyricsEnabled, "available": UserDefaults.lyricsSource.isReplacingLyrics,
-                "tracks": downloader.savedTracks, "bytes": downloader.savedBytes, "source": UserDefaults.lyricsSource.description, "pending": downloader.pending.count, "batch": visibleBatch] as NSDictionary
+                "tracks": downloader.savedTracks, "bytes": downloader.savedBytes, "genius_tracks": NativeOfflineLyrics.shared.geniusFallbackCount, "source": UserDefaults.lyricsSource.description, "pending": downloader.pending.count, "batch": visibleBatch] as NSDictionary
     }
     @objc static func setDownloadsEnabled(_ enabled: Bool) {
         shared.flushRemovals()
@@ -1000,7 +1026,12 @@ final class EeveeOfflineLyricsDownloader: NSObject {
         // thousands of tracks must finish in the worker, without blocking UIKit.
         shared.statisticsQueue.async {
             let missing = Set(OfflineLyricsStore.shared.missingTrackIds(Array(ids), source: source.rawValue, options: options))
-            let needed = unique.filter { row in row["uri"].flatMap(trackId).map(missing.contains) ?? false }
+            // The button also asks the selected provider again for every Genius fallback, now.
+            let genius = NativeOfflineLyrics.shared.geniusFallbackIds.intersection(ids)
+            for id in genius { LyricsNotFoundStore.shared.retryLater(id, source: source.rawValue) }
+            let needed = unique.filter { row in
+                row["uri"].flatMap(trackId).map { missing.contains($0) || genius.contains($0) } ?? false
+            }
             DispatchQueue.main.async {
                 guard shared.batchID == token, shared.scanningLibrary else { return }
                 let valid = ids.filter { (shared.removedAt[$0] ?? .distantPast) <= started || shared.completedDuringManualScan.contains($0) }
@@ -1011,11 +1042,12 @@ final class EeveeOfflineLyricsDownloader: NSObject {
                     shared.batchID = nil; shared.scheduleRateLimitRetriesIfReady(); shared.changed(); return
                 }
                 let current = needed.filter { $0["uri"].flatMap(trackId).map(valid.contains) ?? false }
-                shared.startBatch(current, catalog: unique, token: token)
+                shared.startBatch(current, catalog: unique, token: token, recheck: genius)
             }
         }
     }
-    private func startBatch(_ needed: [[String: String]], catalog: [[String: String]], token: UUID) {
+    private func startBatch(_ needed: [[String: String]], catalog: [[String: String]], token: UUID,
+                            recheck: Set<String> = []) {
         flushRemovals()
         guard !needed.isEmpty else {
             batchID = nil; batch = nil; scheduleRateLimitRetriesIfReady(); changed(); return
@@ -1030,7 +1062,7 @@ final class EeveeOfflineLyricsDownloader: NSObject {
             do { try OfflineLyricsStore.shared.remember(contexts: contexts) }
             catch { writeDebugLog("[Lyrics] could not save album membership: \(error)") }
         }
-        enqueue(needed) { status in
+        enqueue(needed, recheckIds: recheck) { status in
             guard self.batchID == token, var progress = self.batch else { return }
             progress.count(status)
             if progress.isDone {

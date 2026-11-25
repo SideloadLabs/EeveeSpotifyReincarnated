@@ -38,7 +38,7 @@ extension Notification.Name {
 final class OfflineLyricsStore {
     static let shared = OfflineLyricsStore()
     struct Revision: Equatable { let epoch: Int }
-    struct Entry { let data: Data }
+    struct Entry { let data: Data; var fallbackReason = "none" }
     struct Summary { let tracks: Int; let bytes: Int }
     let entered = DispatchSemaphore(value: 0)
     let release = DispatchSemaphore(value: 0)
@@ -62,6 +62,9 @@ final class OfflineLyricsStore {
         return queriedIds
     }
     var alreadySaved = Set<String>()
+    /// Saved texts that came from the Genius fallback.
+    var geniusFallbacks = Set<String>()
+    func hasFile(trackId: String, source: Int) -> Bool { geniusFallbacks.contains(trackId) || alreadySaved.contains(trackId) }
     var saved: [String] = []
     var blockSaved = false
     let savedEntered = DispatchSemaphore(value: 0), savedRelease = DispatchSemaphore(value: 0)
@@ -109,6 +112,8 @@ final class NativeOfflineLyrics {
     var forgetCalls = 0
     func forgetNoLyrics(trackIds: [String]?) { forgetCalls += 1; forgotten += trackIds ?? [] }
     func providerHasNoLyrics(trackId: String) {}
+    var geniusFallbackCount: Int { 2 }
+    var geniusFallbackIds: Set<String> { [] }
 }
 struct Lyrics {
     init(serializedBytes: Data) throws {}
@@ -162,16 +167,18 @@ func holdFetch(_ id: String) -> DispatchSemaphore {
     fetchGates[id] = gate
     return gate
 }
+var rechecked = Set<String>()
 @discardableResult
 func downloadProviderLyrics(trackId id: String,
     metadata: (title: String, artist: String)?, metadataTimeout: TimeInterval,
     expectedRevision: OfflineLyricsStore.Revision, foreground: LyricsForegroundExecution,
-    isCancelled: @escaping () -> Bool) throws -> Lyrics {
+    recheck: Bool = false, isCancelled: @escaping () -> Bool) throws -> Lyrics {
     check(metadataTimeout == 10 || metadataTimeout == 3, "Unexpected metadata deadline")
     if id == "0000000000000000000099" {
         check(metadata == nil && metadataTimeout == 10, "The bulk fetch changed metadata behavior")
     }
     fetchLock.lock()
+    if recheck { rechecked.insert(id) }
     fetchedCount += 1
     attemptsByTrack[id, default: 0] += 1
     let gate = fetchGates.removeValue(forKey: id)
@@ -228,7 +235,7 @@ OfflineLyricsStore.shared.release.signal()
 pump(until: { EeveeOfflineLyricsDownloader.settingsSnapshot()["statistics_loading"] as? Bool == false },
      "Statistics did not recover after a provider switch")
 let ready = EeveeOfflineLyricsDownloader.settingsSnapshot()
-check(ready["tracks"] as? Int == 7 && ready["bytes"] as? Int == 1234, "Statistics were not published")
+check(ready["tracks"] as? Int == 7 && ready["bytes"] as? Int == 1234 && ready["genius_tracks"] as? Int == 2, "Statistics were not published")
 check(ready["all_saved"] as? Bool == true, "Stale provider results replaced current statistics")
 check(ready["scan_active"] as? Bool == false && ready["pending"] as? Int == 0 && fetched == 0,
       "Cancelled library preparation restarted downloads")
@@ -673,6 +680,19 @@ NotificationCenter.default.post(name: removal, object: nil, userInfo: [
 drainMain()
 check(!outcomes.entries(source: launchSource).contains(definiteMiss), "A removed download kept its remembered result")
 print("Launches skip known lyrics results and retry temporary failures only the next day")
+
+// A Genius fallback is asked again, with the selected provider only, once a day.
+let geniusTrack = String(format: "%022d", 9_088_001)
+OfflineLyricsStore.shared.geniusFallbacks.insert(geniusTrack)
+OfflineLyricsStore.shared.alreadySaved.insert(geniusTrack)
+outcomes.retryLater(geniusTrack, source: launchSource, now: yesterday)
+launch([geniusTrack])
+check(attempts(geniusTrack) == 1 && rechecked.contains(geniusTrack), "A due Genius fallback was not asked again as a recheck")
+check(outcomes.waiting(source: launchSource).contains(geniusTrack) && !outcomes.entries(source: launchSource).contains(geniusTrack),
+      "A failed recheck was not booked for tomorrow, or was remembered as a definite miss")
+launch([geniusTrack])
+check(attempts(geniusTrack) == 1, "A Genius fallback was asked again before its next day")
+print("Genius fallbacks are asked again with the selected provider once a day")
 
 launch([refusedTrack])
 check(attempts(refusedTrack) == 1 && outcomes.refusal(source: launchSource) != nil

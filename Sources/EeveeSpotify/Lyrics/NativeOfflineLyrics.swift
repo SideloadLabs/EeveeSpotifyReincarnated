@@ -28,6 +28,32 @@ final class NativeOfflineLyrics {
         lock.lock(); defer { lock.unlock() }
         return withLyrics.contains(trackId)
     }
+    /// Tracks whose projected text is the selected provider's fallback to Genius.
+    private var geniusFallbacks = Set<String>()
+    var geniusFallbackCount: Int {
+        lock.lock(); defer { lock.unlock() }
+        return geniusFallbacks.count
+    }
+    var geniusFallbackIds: Set<String> {
+        lock.lock(); defer { lock.unlock() }
+        return geniusFallbacks
+    }
+    /// Sets both under the lock; the settings page refreshes if the Genius count changed.
+    private func publishProjected(lyrics: Set<String>, genius: Set<String>, replacing ids: Set<String>?) {
+        lock.lock()
+        let before = geniusFallbacks.count
+        if let ids {
+            withLyrics.subtract(ids); withLyrics.formUnion(lyrics)
+            geniusFallbacks.subtract(ids); geniusFallbacks.formUnion(genius)
+        } else { withLyrics = lyrics; geniusFallbacks = genius }
+        let changed = geniusFallbacks.count != before
+        lock.unlock()
+        if changed {
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(name: Notification.Name("EeveeOfflineLyricsSettingsChanged"), object: nil)
+            }
+        }
+    }
     /// Cheap check for the track metadata hook, which Spotify calls very often.
     var hasAnyProviderLyrics: Bool {
         lock.lock(); defer { lock.unlock() }
@@ -125,8 +151,52 @@ final class NativeOfflineLyrics {
                 self?.scheduleReconcile(note.userInfo?["tracks"] as? [String])
             }
             publish(active: true, reason: "native projection verified; Spotify controls its download configuration")
-            reconcile(nil)
+            reconcileAtLaunch()
         }
+    }
+    /// What every row depends on besides its own text. A complete pass saves it.
+    private static let passKeyName = "EeveeNativeOfflineLyricsPassKey"
+    private func passKey(_ codec: Codec) -> String {
+        let options = UserDefaults.lyricsOptions
+        // Instrumental rows hold Eevee's prompts as shown, in Eevee's language.
+        let prompts = savedDisplayLyrics(Lyrics.with { $0.data.timeSynchronized = false })
+            .flatMap { try? $0.serializedData() } ?? Data()
+        return [codec.formatKey, codec.settingsKey(), SHA256.hash(data: prompts).description,
+                "\(UserDefaults.lyricsSource.rawValue)", "\(options.romanization)", options.lrclibUrl,
+                "\(options.geniusFallback)", EeveeSpotify.version, Self.spotifyIdentity].joined(separator: "|")
+    }
+    /// Only Eevee writes the saved files, and it projects each write. So while nothing
+    /// that every row depends on changed since the last complete pass, a launch reads
+    /// only the tracks whose rows can differ from the files: one query and the file
+    /// names show them. Any other launch, or a failed check, reconciles every track.
+    private func reconcileAtLaunch() {
+        guard let codec, UserDefaults.container.string(forKey: Self.passKeyName) == passKey(codec),
+              let stale = try? staleTrackIds() else { return reconcile(nil) }
+        writeDebugLog("[Lyrics][NativeOffline] launch check: \(stale.count) tracks differ from the saved files")
+        if !stale.isEmpty { reconcile(Array(stale)) }
+    }
+    private func staleTrackIds() throws -> Set<String> {
+        let rows = try openDatabase().projectedRows()
+        let source = UserDefaults.lyricsSource
+        let files = source.isReplacingLyrics ? Set(OfflineLyricsStore.shared.savedTrackIds()) : []
+        var stale = Set<String>(), shown = Set<String>(), genius = Set<String>()
+        for (uri, row) in rows where uri.hasPrefix("spotify:track:") {
+            let id = String(uri.dropFirst("spotify:track:".count))
+            // Spotify changed or removed the row, a text was saved or removed since,
+            // or the row shows another provider's text and the selected one's is saved now.
+            if !row.intact || row.lyrics != files.contains(id)
+                || (row.digest?.hasSuffix(Codec.otherProvider) == true
+                    && OfflineLyricsStore.shared.hasFile(trackId: id, source: source.rawValue)) {
+                stale.insert(id)
+            } else if row.lyrics {
+                shown.insert(id)
+                if row.digest?.hasSuffix(Codec.geniusFallback) == true { genius.insert(id) }
+            }
+        }
+        // Saved texts and empty-row markers without any row of ours.
+        for id in files.union(noLyrics) where rows["spotify:track:\(id)"] == nil { stale.insert(id) }
+        publishProjected(lyrics: shown, genius: genius, replacing: nil)
+        return stale
     }
     /// Opens (once) and verifies the native database. Runs on `queue`.
     private func openDatabase() throws -> NativeOfflineLyricsDatabase {
@@ -166,6 +236,8 @@ final class NativeOfflineLyrics {
         do {
             guard let codec else { return }
             let database = try openDatabase()
+            // Saved only once this pass completes; a pass cut short repeats at the next launch.
+            let key = requested == nil ? passKey(codec) : nil
             let ids: Set<String>
             if let requested { ids = Set(requested) }
             else {
@@ -177,7 +249,7 @@ final class NativeOfflineLyrics {
             }
             var changes: [(uri: String, data: Data?, digest: String?)] = []
             var placeholders: [(uri: String, data: Data)] = []
-            var have = Set<String>()
+            var have = Set<String>(), genius = Set<String>()
             let oldMarkerCount = noLyrics.count
             let settings = codec.settingsKey()
             for id in ids {
@@ -187,13 +259,16 @@ final class NativeOfflineLyrics {
                 // Spotify reads this table only offline (online it fetches, and our
                 // hook answers with the selected provider). Until the selected
                 // provider's text is downloaded, keep the previous provider's text.
-                if let entry = savedOfflineLyricsEntry(trackId: id, allowOtherProvider: true),
+                let selected = savedOfflineLyricsEntry(trackId: id, allowOtherProvider: false)
+                if let entry = selected ?? otherProviderLyricsEntry(trackId: id, source: UserDefaults.lyricsSource),
                    let saved = try? Lyrics(serializedBytes: entry.data), let lyrics = savedDisplayLyrics(saved),
                    // From the text as shown: an instrumental's prompts follow Eevee's language.
                    // Any other text is shown as saved.
                    let shown = saved.data.lines.isEmpty ? try? lyrics.serializedData() : entry.data {
                     have.insert(id)
-                    let digest = codec.digest(of: shown, settings: settings)
+                    let fallback = selected.map { $0.fallbackReason != "none" } ?? false
+                    if fallback { genius.insert(id) }
+                    let digest = codec.digest(of: shown, settings: settings, selected: selected != nil, genius: fallback)
                     // Our row is intact and built from this very text: nothing to encode.
                     if try database.isProjected(uri, digest: digest) { continue }
                     changes.append((uri: uri, data: try codec.encode(trackId: id, lyrics: lyrics), digest: digest))
@@ -217,12 +292,10 @@ final class NativeOfflineLyrics {
             let written = try database.update(changes)
             let empties = try database.ensurePlaceholders(placeholders)
             // Advertise a text to the native UI only after its SQLite commit.
-            lock.lock()
-            if requested == nil { withLyrics = have }
-            else { withLyrics.subtract(ids); withLyrics.formUnion(have) }
-            lock.unlock()
+            publishProjected(lyrics: have, genius: genius, replacing: requested == nil ? nil : ids)
             removedDownloads.subtract(ids)
             if requested == nil { allDownloadsRemoved = false }
+            if let key { UserDefaults.container.set(key, forKey: Self.passKeyName) }
             let encoded = changes.filter { $0.data != nil }.count
             writeDebugLog("[Lyrics][NativeOffline] reconciled \(ids.count) tracks, encoded \(encoded), wrote \(written), empty rows \(empties)/\(placeholders.count), journal=\(database.currentJournalMode())")
         } catch { writeDebugLog("[Lyrics][NativeOffline] cache projection failed: \(error)") }
@@ -252,9 +325,16 @@ final class NativeOfflineLyrics {
             let settings = UserDefaults.lyricsColors
             return "\(settings.useStaticColor):\(settings.staticColor)"
         }
-        /// What a row is built from: format, color settings and the saved text itself.
-        func digest(of saved: Data, settings: String) -> String {
+        var formatKey: String { formatDigest }
+        /// Ends the digest of a row built from a provider other than the selected one.
+        static let otherProvider = ":other"
+        /// Ends the digest of the selected provider's text that came from its fallback to Genius.
+        static let geniusFallback = ":genius"
+        /// What a row is built from: format, color settings, the saved text itself and
+        /// whose text it is.
+        func digest(of saved: Data, settings: String, selected: Bool, genius: Bool) -> String {
             "\(formatDigest):\(settings):\(Self.sha256(saved))"
+                + (selected ? (genius ? Self.geniusFallback : "") : Self.otherProvider)
         }
 
         init() throws {

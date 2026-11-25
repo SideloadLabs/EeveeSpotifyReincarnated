@@ -305,6 +305,12 @@ final class OfflineLyricsStore {
         }
         return fileIndex!.summary
     }
+    /// Whether `source` has a saved file for the track, without reading it.
+    func hasFile(trackId: String, source: Int) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        guard let url = url(trackId: trackId, source: source), !pendingDeletion.contains(url.lastPathComponent) else { return false }
+        return FileManager.default.fileExists(atPath: url.path)
+    }
     func savedTrackIds() -> [String] {
         lock.lock(); defer { lock.unlock() }
         // Only this store writes the folder, so a built index is the folder's content.
