@@ -25,6 +25,8 @@ struct LocalPlaylistDownloadGroup: HookGroup {}
 
 enum LocalPlaylistDownload {
     static let launchEnabled = UserDefaults.localPlaylistDownloadEnabled
+    // The hooks below are activated only while Eevee patches the account.
+    static let hidesButton = UserDefaults.patchType.isPatching && !launchEnabled
     private static let actionViewClass = NSClassFromString(
         "_TtC35ListUXPlatform_FreeTierPlaylistImplP33_0FBF7F603415652909A2EEC13496CA7D10ActionView"
     )
@@ -34,7 +36,9 @@ enum LocalPlaylistDownload {
         var current: UIView? = button
         var hasDownloadText = false
         while let view = current {
+            // The label and hint are matched in English only; the granular button's identifier is the same in every language.
             hasDownloadText = hasDownloadText ||
+                view.accessibilityIdentifier?.hasPrefix("DownloadButton.Granular.") == true ||
                 view.accessibilityLabel?.caseInsensitiveCompare("Download") == .orderedSame ||
                 view.accessibilityHint?.range(of: "tap to download and make available offline", options: .caseInsensitive) != nil
             if view.isKind(of: actionViewClass) { return hasDownloadText }
