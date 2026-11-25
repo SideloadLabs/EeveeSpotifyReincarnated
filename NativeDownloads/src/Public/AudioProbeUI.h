@@ -24,6 +24,7 @@ void SAPInstallDownloadSettings(void);
 @class UIViewController;
 // The Pixie download manager page, for hosts that list it in their own settings.
 UIViewController *SAPCreateDownloadsSettings(void);
+UIViewController *SAPCreateLyricsSettings(void);
 NSDictionary *SAPDownloadSettingsInstallReport(void);
 
 // Lightweight bootstrap status for Eevee startup logging; no polling or native reads.

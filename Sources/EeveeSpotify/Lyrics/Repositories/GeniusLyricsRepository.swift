@@ -43,8 +43,8 @@ class GeniusLyricsRepository: LyricsRepository {
             semaphore.signal()
         }
 
-        task.resume()
-        semaphore.wait()
+        try LyricsDownloadHTTP.start(task)
+        try LyricsDownloadHTTP.wait(semaphore, task: task)
 
         if let error = error {
             throw error

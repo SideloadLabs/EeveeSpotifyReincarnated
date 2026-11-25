@@ -12,6 +12,7 @@ import patch_key_request_mode as mode
 import patch_native_restrictions as quota
 import patch_native_trace as trace
 import patch_export as export
+import patch_lyrics_offline_cache as lyrics_cache
 from export_release_materials import notices
 from pixie_target import PROFILE
 from signing_metadata import embedded_entitlements
@@ -59,6 +60,7 @@ def main():
         prepared, _ = mode.patch(prepared, runtime_selectable=False)
         patched, trace_report = trace.patch(prepared)
         patched, export_report = export.patch(patched)
+        patched, lyrics_cache_report = lyrics_cache.patch(patched, PROFILE["spotify_version"])
         # Code outside the explicit observation entries/padding spans (the three diagnostic
         # boundaries and the Pixie 1.4 export boundaries) must remain byte-for-byte unchanged.
         spans = []
@@ -70,6 +72,10 @@ def main():
             _, address, cave, _, _ = point
             spans.extend([(address-quota.PREFERRED, address-quota.PREFERRED+4),
                           (cave-quota.PREFERRED, cave-quota.PREFERRED+len(export.trampoline(point)))])
+        if lyrics_cache_report["applied"]:
+            for field in ("file_offset", "viewer_flag_file_offset"):
+                offset = lyrics_cache_report[field]
+                spans.append((offset, offset + 4))
         position = 0
         for start, end in sorted(spans):
             require(prepared[position:start] == patched[position:start], 'Unexpected diagnostic change')
@@ -98,6 +104,7 @@ def main():
                   'restriction_fields_unchanged': [hex(0x2b0 + int(PROFILE['native'].get('manager_field_shift', 0)) + 8 * i) for i in range(5)],
                   'hook_target_names_present': required, 'rejected_invalid_patch_cases': rejected,
                   'quota': quota_report, 'diagnostic_boundaries': trace_report, 'export_boundaries': export_report,
+                  'offline_lyrics_cache': lyrics_cache_report,
                   'phone_runtime_tested': False}
         if args.output:
             with ZipFile(args.output) as result:

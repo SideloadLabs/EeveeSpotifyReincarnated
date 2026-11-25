@@ -43,6 +43,21 @@ static NSString *const trackB = @"spotify:track:bbbbbbbbbbbbbbbbbbbbbb";
 static NSString *const trackC = @"spotify:track:cccccccccccccccccccccc";
 static NSString *const playlist = @"spotify:playlist:dddddddddddddddddddddd";
 
+@protocol FixtureSPTLogObserver
+- (void)log:(id)log wroteLine:(const char *)line fromModule:(const char *)module file:(const char *)file line:(NSInteger)number threadId:(NSUInteger)thread at:(id)date logLevel:(int)level isBreadcrumb:(BOOL)crumb;
+- (void)logSwift:(id)log line:(NSData *)data module:(NSString *)module file:(NSString *)file line:(NSInteger)number threadId:(NSUInteger)thread at:(id)date logLevel:(int)level isBreadcrumb:(BOOL)crumb;
+@end
+static id<FixtureSPTLogObserver> fixtureLogObserver;
+@interface SPTLog : NSObject @end
+@implementation SPTLog
++ (instancetype)createAndInstallLogWithObserver:(id)observer identificator:(id)identifier {
+    fixtureLogObserver=observer;
+    return [self new];
+}
+- (void)removeObserver:(id)observer { if(fixtureLogObserver==observer)fixtureLogObserver=nil; }
+- (void)uninstall {}
+@end
+
 @interface FakeLifetime : NSObject
 @property(nonatomic) BOOL cancelled;
 - (void)cancel;
@@ -181,8 +196,8 @@ int main(void) {
         NSString *written = [NSString stringWithContentsOfURL:table encoding:NSUTF8StringEncoding error:NULL];
         assert([written containsString:@"waiting_limit_exceeded"] && [written containsString:@"TOO_MANY_TRACKS"]);
         NSString *summary = SAPJournalSummaryText();
-        assert([summary containsString:@"Device licenses"] && [summary containsString:SAPL(@"Очередь ядра",@"Core queue")]);
-        assert([summary containsString:SAPL(@"Проблемные треки",@"Tracks with issues")]);
+        assert([summary containsString:@"Device licenses"] && [summary containsString:@"Core queue"]);
+        assert([summary containsString:@"Tracks with issues"]);
 
         // 9. Постоянный лог на диске: весь путь треков, переживает перезапуск.
         NSString *log = [NSString stringWithContentsOfURL:[NSURL fileURLWithPath:[NSTemporaryDirectory()
@@ -321,6 +336,38 @@ int main(void) {
         assert([SAPJournalReport()[@"action_events"]count]==oldActions&&((!beforeActions&&!afterActions)||[beforeActions isEqual:afterActions]));
         assert(![quietReport[@"subscribed"] boolValue] && [quietReport[@"session"] count]==0);
         assert(![SAPNativeErrorLogReport()[@"requested"] boolValue]);
+        // Lyrics need per-track completions even while diagnostics are off.
+        SAPNativeDownloadCompletionSetActive(YES);
+        [NSRunLoop.mainRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:.02]];
+        assert(fixtureLogObserver);
+        NSMutableArray *downloadedURIs=NSMutableArray.array;
+        id listener=[NSNotificationCenter.defaultCenter addObserverForName:@"EeveeOfflineAudioTrackDownloaded" object:nil queue:nil usingBlock:^(NSNotification *note){
+            assert(NSThread.isMainThread && [note.userInfo[@"completed_at"]doubleValue]>0);
+            [downloadedURIs addObject:note.userInfo[@"uri"]];
+        }];
+        NSString *lineA=[NSString stringWithFormat:@"Track %@ downloaded",trackA];
+        [fixtureLogObserver log:nil wroteLine:lineA.UTF8String fromModule:NULL file:NULL line:0 threadId:0 at:nil logLevel:0 isBreadcrumb:NO];
+        NSString *lineB=[[NSString stringWithFormat:@"Track %@ downloaded",trackB]stringByAppendingString:nul];
+        [fixtureLogObserver logSwift:nil line:text(lineB) module:nil file:nil line:0 threadId:0 at:nil logLevel:0 isBreadcrumb:NO];
+        for(NSString *invalid in @[[NSString stringWithFormat:@"Track %@: Got key",trackC],
+            [NSString stringWithFormat:@"Track %@ downloaded soon",trackC],@"Track spotify:track:?ccccccccccccccccccccc downloaded",
+            [NSString stringWithFormat:@"Offline track error: sync_error_offline_key_failed (7004) (%@) ()",trackC]]){
+            [fixtureLogObserver logSwift:nil line:text(invalid) module:nil file:nil line:0 threadId:0 at:nil logLevel:0 isBreadcrumb:NO];
+        }
+        [NSRunLoop.mainRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:.02]];
+        SAPJournalDrainForTesting();
+        assert([downloadedURIs isEqual:(@[trackA,trackB])]);
+        assert(![SAPNativeErrorLogReport()[@"requested"]boolValue] && ![SAPNativeErrorLogReport()[@"installed"]boolValue]);
+        assert(!SAPJournalNativeErrorForURI(trackC) && "diagnostics stay off while lyrics observe completions");
+        // Turning diagnostics off must not remove the observer lyrics still use.
+        SAPNativeErrorLogSetActive(NO);
+        [NSRunLoop.mainRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:.02]];
+        assert(fixtureLogObserver);
+        SAPNativeDownloadCompletionSetActive(NO);
+        [NSRunLoop.mainRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:.02]];
+        assert(!fixtureLogObserver);
+        [NSNotificationCenter.defaultCenter removeObserver:listener];
+        puts("PASS: exact native audio completions carry a track ID without enabling diagnostics");
         verifiedDone=NO;pendingRead=nil;
         SAPJournalVerifyTrack(trackA,^(NSDictionary *track){verifiedResult=track;verifiedDone=YES;});
         SAPJournalDrainForTesting();assert(pendingRead);
@@ -341,7 +388,7 @@ int main(void) {
         assert([decoded[@"generated_at"] isEqual:saved[@"generated_at"]]);
         assert([decoded[@"tracked_tracks"] unsignedIntegerValue]==1 && [SAPJournalReport()[@"tracked_tracks"] unsignedIntegerValue]==2);
         NSString *savedTableText=[NSString stringWithContentsOfURL:savedTable encoding:NSUTF8StringEncoding error:NULL];
-        assert([savedTableText containsString:SAPL(@"Треков в журнале: 1",@"Tracks in log: 1")]);
+        assert([savedTableText containsString:@"Tracks in log: 1"]);
         SAPJournalNoteNativeError(trackB,@7004,@"immediate_flush_test");SAPJournalDrainForTesting();
         NSString *flushedLog=[NSString stringWithContentsOfFile:[NSTemporaryDirectory() stringByAppendingPathComponent:@"SpotifyAudioProbeJournal.log"] encoding:NSUTF8StringEncoding error:NULL];
         assert([flushedLog containsString:@"immediate_flush_test"]);

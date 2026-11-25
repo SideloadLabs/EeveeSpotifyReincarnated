@@ -53,14 +53,15 @@ class SpicyLyricsRepository: LyricsRepository {
         var responseStatus = 0
         var responseError: Error?
 
-        session.dataTask(with: request) { data, response, error in
+        let task = session.dataTask(with: request) { data, response, error in
             responseData = data
             responseStatus = (response as? HTTPURLResponse)?.statusCode ?? 0
             responseError = error
             semaphore.signal()
-        }.resume()
+        }
+        try LyricsDownloadHTTP.start(task)
 
-        semaphore.wait()
+        try LyricsDownloadHTTP.wait(semaphore, task: task, accepting: [401, 403, 404])
 
         if let error = responseError {
             eeveeLog("[EeveeSpotify][SpicyLyrics] %@ network error: %@", trackId, String(describing: error))
@@ -178,18 +179,21 @@ class SpicyLyricsRepository: LyricsRepository {
             )
             let normalizedKaraokeLines = SpicyLyricsRepository.normalizeMonotonicTiming(filledKaraokeLines)
 
-            KaraokeLyricsStore.shared.set(
-                trackId: trackId,
-                lyrics: KaraokeLyricsDto(
-                    lines: normalizedKaraokeLines,
-                    songWriters: songWriters,
-                    providerCode: root["source"]?.stringValue,
-                    uploaderName: attribution?["Uploader"]?["username"]?.stringValue,
-                    uploaderUrl: attribution?["Uploader"]?["url"]?.stringValue,
-                    makerName: attribution?["Maker"]?["username"]?.stringValue,
-                    makerUrl: attribution?["Maker"]?["url"]?.stringValue
-                )
+            let karaoke = KaraokeLyricsDto(
+                lines: normalizedKaraokeLines,
+                songWriters: songWriters,
+                providerCode: root["source"]?.stringValue,
+                uploaderName: attribution?["Uploader"]?["username"]?.stringValue,
+                uploaderUrl: attribution?["Uploader"]?["url"]?.stringValue,
+                makerName: attribution?["Maker"]?["username"]?.stringValue,
+                makerUrl: attribution?["Maker"]?["url"]?.stringValue
             )
+            // A download saves the custom view's lyrics with its text; playback hands them to the view.
+            if LyricsDownloadHTTP.isDownloading {
+                LyricsDownloadHTTP.downloadedKaraoke = karaoke
+            } else {
+                KaraokeLyricsStore.shared.set(trackId: trackId, lyrics: karaoke)
+            }
         }
 
         return LyricsDto(
@@ -264,18 +268,21 @@ class SpicyLyricsRepository: LyricsRepository {
                 options: options
             )
 
-            KaraokeLyricsStore.shared.set(
-                trackId: trackId,
-                lyrics: KaraokeLyricsDto(
-                    lines: SpicyLyricsRepository.normalizeMonotonicTiming(filledKaraokeLines),
-                    songWriters: root["SongWriters"]?.arrayValue?.compactMap { $0.stringValue } ?? [],
-                    providerCode: root["source"]?.stringValue,
-                    uploaderName: attribution?["Uploader"]?["username"]?.stringValue,
-                    uploaderUrl: attribution?["Uploader"]?["url"]?.stringValue,
-                    makerName: attribution?["Maker"]?["username"]?.stringValue,
-                    makerUrl: attribution?["Maker"]?["url"]?.stringValue
-                )
+            let karaoke = KaraokeLyricsDto(
+                lines: SpicyLyricsRepository.normalizeMonotonicTiming(filledKaraokeLines),
+                songWriters: root["SongWriters"]?.arrayValue?.compactMap { $0.stringValue } ?? [],
+                providerCode: root["source"]?.stringValue,
+                uploaderName: attribution?["Uploader"]?["username"]?.stringValue,
+                uploaderUrl: attribution?["Uploader"]?["url"]?.stringValue,
+                makerName: attribution?["Maker"]?["username"]?.stringValue,
+                makerUrl: attribution?["Maker"]?["url"]?.stringValue
             )
+            // A download saves the custom view's lyrics with its text; playback hands them to the view.
+            if LyricsDownloadHTTP.isDownloading {
+                LyricsDownloadHTTP.downloadedKaraoke = karaoke
+            } else {
+                KaraokeLyricsStore.shared.set(trackId: trackId, lyrics: karaoke)
+            }
         }
 
         return LyricsDto(

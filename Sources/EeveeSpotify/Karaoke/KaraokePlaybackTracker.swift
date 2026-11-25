@@ -109,6 +109,11 @@ final class KaraokePlaybackTracker {
             if self.lastTrackId != previousTrackId || self.observedTrackId != previousObservedTrackId {
                 KaraokeLyricsStore.shared.notify()
             }
+            // Offline, the new song's saved lyrics fill the custom lyrics button and the
+            // lyrics header (no-op online).
+            if let trackId = self.observedTrackId, trackId != previousObservedTrackId {
+                publishSavedLyrics(trackId: trackId)
+            }
         }
     }
 

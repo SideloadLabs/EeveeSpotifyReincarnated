@@ -1,3 +1,4 @@
+#import "OfflineLyrics.h"
 #include "TargetProfile.h"
 #import "Localization.h"
 #import "NativeOffline.h"
@@ -106,6 +107,7 @@ static BOOL supportedImage(uintptr_t image) {
     }
     return NO;
 }
+
 // 2 means the signed runtime selector is installed; 0/1 are older fixed
 // binaries. -1 means these executable bytes are unknown and must not be used.
 static int keyModeKind(uintptr_t image) {
@@ -164,8 +166,8 @@ NSDictionary *SAPKeyRequestModeReport(void) {
              @"restore_zero_supported":@(restoreZero),@"runtime_selection_supported":@(restoreZero),
              @"restart_required":@NO,
              @"compatibility_check":SAPDownloadCompatibilityReport(),
-             @"detail":restoreZero?@"The verified selector returned 1. Restoring mode 0 is available. Download authorization is separate.":
-                 (kind==0?@"Mode 0 is verified in the executable. This status does not confirm download authorization.":kind==1?@"Mode 1 is verified in the executable. This status does not confirm download authorization.":kind==2&&symbolMatches?@"Only restoring a confirmed mode 1 to mode 0 is allowed. A saved preference alone is not confirmation.":@"The installed request mode cannot be verified. Changes are disabled.")};
+             @"detail":restoreZero?@"the_verified_selector_returned_1_restoring":
+                 (kind==0?@"mode_0_is_verified_in_the":kind==1?@"mode_1_is_verified_in_the":kind==2&&symbolMatches?@"only_restoring_a_confirmed_mode_1":@"the_installed_request_mode_cannot_be")};
 }
 void SAPSetKeyRequestMode(NSInteger mode,void (^completion)(BOOL,NSString *)) {
     if(!NSThread.isMainThread){dispatch_async(dispatch_get_main_queue(),^{SAPSetKeyRequestMode(mode,completion);});return;}
@@ -338,6 +340,7 @@ void SAPInstallNativeOffline(void) {
                     @"track_count":@([trackURLs isKindOfClass:NSArray.class]?[(NSArray *)trackURLs count]:0),
                     @"result_observed":@NO});
                 SAPTraceWithOperation(trace,^{originalMakeEntity(receiver,entitySelector,url,trackURLs);});
+                SAPRequestOfflineLyrics(urlText(url),[trackURLs isKindOfClass:NSArray.class]?trackURLs:nil);
                 SAP_TRACE("native_entity","handler_returned",trace,@{@"download_completion_confirmed":@NO});
             });
             class_replaceMethod(cls,entitySelector,replacement,method_getTypeEncoding(entityMethod));entityHookInstalled=YES;
@@ -353,6 +356,7 @@ void SAPInstallNativeOffline(void) {
                 SAP_JOURNAL_ACTION(@"native_entity_add_called",@{@"entity_uri":urlText(url)?:@"",
                     @"track_count":NSNull.null,@"result_observed":@NO});
                 SAPTraceWithOperation(trace,^{originalMakeEntityOnly(receiver,entityOnly,url);});
+                SAPRequestOfflineLyrics(urlText(url),nil);
                 SAP_TRACE("native_entity","handler_returned",trace,@{@"download_completion_confirmed":@NO});
             });
             class_replaceMethod(cls,entityOnly,replacement,method_getTypeEncoding(entityOnlyMethod));
@@ -368,6 +372,7 @@ void SAPInstallNativeOffline(void) {
                 SAP_JOURNAL_ACTION(@"native_entity_remove_called",@{@"entity_uri":urlText(url)?:@"",
                     @"result_observed":@NO});
                 SAPTraceWithOperation(trace,^{originalResetEntity(receiver,resetSelector,url);});
+                SAPRemoveOfflineLyrics(urlText(url),nil);
                 SAP_TRACE("native_entity","handler_returned",trace,@{@"removal_completion_confirmed":@NO});
             });
             class_replaceMethod(cls,resetSelector,replacement,method_getTypeEncoding(resetMethod));
@@ -432,19 +437,19 @@ void SAPPrepareNativeOffline(BOOL (^stillRequested)(void),void (^completion)(BOO
     SAPInstallNativeOffline();
     SAPNativePreparation *operation=[SAPNativePreparation new];operation.completion=completion;operation.traceOperation=SAPTraceCurrentOperation();
     id wrapper=nativeWrapper;
-    if(!wrapper) { [operation finish:NO reason:SAPL(@"Нативный менеджер загрузки ещё не получен. Начни воспроизведение и повтори.",@"The native download manager is not available yet. Start playback and try again.") report:nil];return; }
+    if(!wrapper) { [operation finish:NO reason:SAPLocalized(@"the_native_download_manager_is_not") report:nil];return; }
     SEL schedulerSelector=NSSelectorFromString(@"scheduler"),post=NSSelectorFromString(@"postBlock:");
     id scheduler=((id(*)(id,SEL))objc_msgSend)(wrapper,schedulerSelector);
-    if(!scheduler||![scheduler respondsToSelector:post]) { [operation finish:NO reason:SAPL(@"Очередь нативного менеджера загрузки недоступна.",@"The native download manager queue is unavailable.") report:nil];return; }
+    if(!scheduler||![scheduler respondsToSelector:post]) { [operation finish:NO reason:SAPLocalized(@"the_native_download_manager_queue_is") report:nil];return; }
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW,5*NSEC_PER_SEC),dispatch_get_main_queue(),^{
-        [operation finish:NO reason:SAPL(@"Менеджер загрузки не ответил за 5 секунд. Запрос скачивания не отправлен.",@"The download manager did not reply within 5 seconds. No download request was sent.") report:nil];
+        [operation finish:NO reason:SAPLocalized(@"the_download_manager_did_not_reply") report:nil];
     });
     ((void(*)(id,SEL,id))objc_msgSend)(scheduler,post,^{
         if(operation.finished)return;
-        if(stillRequested&&!stillRequested()) { [operation finish:NO reason:SAPL(@"Подготовка отменена.",@"Preparation cancelled.") report:nil];return; }
+        if(stillRequested&&!stillRequested()) { [operation finish:NO reason:SAPLocalized(@"preparation_cancelled") report:nil];return; }
         void *manager=NULL;uintptr_t image=0;NSMutableDictionary *before=[NSMutableDictionary dictionary];
         // The app's invalidate method clears wrapper+8. Read it only on its queue.
-        if(!nativeState(wrapper,&manager,&image,before)) { [operation finish:NO reason:SAPL(@"Нативный менеджер завершён или сборка Spotify не совпадает с проверенной версией.",@"The native manager has shut down, or this Spotify build does not match the verified version.") report:nil];return; }
+        if(!nativeState(wrapper,&manager,&image,before)) { [operation finish:NO reason:SAPLocalized(@"the_native_manager_has_shut_down") report:nil];return; }
         // Use Spotify's 10k track quota, including replacing an elevated value
         // retained from an older Pixie build. Duration and episode policy stay separate.
         const int32_t desiredDurationSeconds=SAPMinimumMusicDurationSeconds, desiredTrackLimit=SAPMinimumTrackLimit;

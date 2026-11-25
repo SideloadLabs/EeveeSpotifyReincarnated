@@ -1,6 +1,10 @@
 #pragma once
 #import <Foundation/Foundation.h>
 
-// Pixie's interface is English-only, regardless of Spotify's preferred language.
-// Keep the paired-string API compatible with existing callers.
-NSString *SAPL(NSString *russian,NSString *english);
+NS_ASSUME_NONNULL_BEGIN
+
+// A key of EeveeSpotify.bundle's Localizable.strings, translated as `.localized` translates
+// it in the rest of the mod (Eevee does the lookup). Without Eevee the key comes back.
+NSString *SAPLocalized(NSString *key);
+
+NS_ASSUME_NONNULL_END

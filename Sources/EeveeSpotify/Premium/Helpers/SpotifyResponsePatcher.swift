@@ -184,7 +184,12 @@ enum SpotifyResponsePatcher {
             return PatchResult(data: Data(), tag: .dacEmpty)
         }
         if BrowsitaSectionStripper.shouldHandle(url) {
-            if let stripped = BrowsitaSectionStripper.strip(buffer, url: url) {
+            let stripped = BrowsitaSectionStripper.strip(buffer, url: url)
+            // Songs with saved provider lyrics get Spotify's own lyrics card under the player.
+            if let withCard = NativeLyricsCard.insert(into: stripped ?? buffer, url: url) {
+                return PatchResult(data: withCard, tag: .casitaStrip)
+            }
+            if let stripped {
                 return PatchResult(data: stripped, tag: .casitaStrip)
             }
             // Ad survived in a feed we parse but found no marker in — visible

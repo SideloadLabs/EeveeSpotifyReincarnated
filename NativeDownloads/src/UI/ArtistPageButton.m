@@ -1,3 +1,4 @@
+#import "Localization.h"
 // Artist-page download button for the stock Eevee build (moved out of the Eevee dylib).
 // Native artist downloads use a non-arranged control in Spotify's existing action row.
 // Spotify owns the row and its arranged views; none of those views are moved or hidden here.
@@ -283,7 +284,7 @@ static void updateDownloads(UIView *header);
     if (!header) return;
     updateDownloads(header);
     if (!self.button.hidden && self.button.enabled && self.uri && self.presenter) {
-        SAPShowArtistDownloads(self.uri, self.name ?: @"Artist", self.presenter);
+        SAPShowArtistDownloads(self.uri, self.name ?: SAPLocalized(@"artist_2"), self.presenter);
     }
 }
 @end
@@ -351,7 +352,7 @@ static void updateDownloads(UIView *header) {
         button.tintColor = color;
         button.translatesAutoresizingMaskIntoConstraints = NO;
         button.accessibilityIdentifier = @"PixieNativeArtistDownload";
-        button.accessibilityLabel = @"Artist downloads";
+        button.accessibilityLabel = SAPLocalized(@"artist_downloads");
         [button addTarget:context action:@selector(open) forControlEvents:UIControlEventTouchUpInside];
         context.button = button;
     }

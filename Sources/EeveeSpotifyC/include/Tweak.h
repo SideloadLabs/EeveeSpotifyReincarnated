@@ -22,6 +22,9 @@ void EeveePixieInstallArtistFollow(void);
 BOOL EeveePixieDownloadsAvailable(void);
 NSString *EeveePixieStartupSummary(void);
 UIViewController *_Nullable EeveePixieMakeDownloadsController(void);
+void EeveePixieFetchLyricsMetadata(NSString *trackURI, void (^completion)(NSDictionary *_Nullable metadata));
+dispatch_block_t _Nullable EeveePixieReadDownloadedTrackURIs(void (^completion)(NSArray<NSString *> *_Nullable tracks));
+void EeveePixieObserveDownloadCompletion(BOOL enabled);
 NSInteger EeveePixieArtistFollowing(UIView *header, void (^changed)(void));
 // 1 saved, 0 not saved, -1 not known yet. `changed` runs when Spotify reports a new state.
 NSInteger EeveePixieSavedState(UIView *page, NSString *uri, void (^changed)(void));
