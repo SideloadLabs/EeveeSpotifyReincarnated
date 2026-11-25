@@ -4,9 +4,6 @@ import UIKit
 // the Speed & pitch row in the player's ⋯ menu, which opens in place onto the sliders. it's the menu table's
 // header (or footer), so opening it resizes that view inside a table update.
 final class SpeedPitchMenuView: UIView {
-    private static let rowHeight: CGFloat = 56
-    private static let sliderHeight: CGFloat = 72
-    private static let switchHeight: CGFloat = 44
     private static let panelBottom: CGFloat = 12
     private static let margin: CGFloat = 16
     private static let gap: CGFloat = 8
@@ -19,6 +16,20 @@ final class SpeedPitchMenuView: UIView {
     static func height() -> CGFloat {
         rowHeight + (isOpen ? 2 * sliderHeight + switchHeight + panelBottom : 0)
     }
+
+    // the face and size of Spotify's own rows in this menu, so the row follows the iOS text size as they do.
+    // set from a row of theirs when there's one to copy (SpeedPitchMenu.install), else scaled here.
+    static var rowFont = UIFontMetrics(forTextStyle: .body).scaledFont(for: UIFont(name: "SpotifyMixUI-Bold", size: 16)
+                                                                        ?? .systemFont(ofSize: 16, weight: .semibold))
+    // where their titles start, copied with the font; 0 until then, for the icon's width and a margin past it.
+    static var titleX: CGFloat = 0
+
+    // the measures below grow with the text and are the old fixed ones at the default size.
+    private static var panelFont: UIFont { rowFont.withSize(rowFont.pointSize - 1) }
+    private static var rowHeight: CGFloat { max(56, ceil(rowFont.lineHeight) + 35) }
+    private static var labelHeight: CGFloat { max(24, ceil(panelFont.lineHeight) + 4) }
+    private static var sliderHeight: CGFloat { labelHeight + 48 }
+    private static var switchHeight: CGFloat { max(44, ceil(panelFont.lineHeight) + 20) }
 
     weak var table: UITableView?
     var inFooter = false
@@ -96,11 +107,11 @@ final class SpeedPitchMenuView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        let width = bounds.width, margin = Self.margin, rowHeight = Self.rowHeight
+        let width = bounds.width, margin = Self.margin, rowHeight = Self.rowHeight, labelHeight = Self.labelHeight
         row.frame = CGRect(x: 0, y: 0, width: width, height: rowHeight)
         icon.frame = CGRect(x: margin, y: (rowHeight - 24) / 2, width: 24, height: 24)
         chevron.frame = CGRect(x: width - margin - 20, y: (rowHeight - 20) / 2, width: 20, height: 20)
-        let titleX = margin + 24 + margin
+        let titleX = Self.titleX > margin + 24 ? Self.titleX : margin + 24 + margin
         let titleWidth = min(title.sizeThatFits(CGSize(width: .greatestFiniteMagnitude, height: rowHeight)).width,
                              chevron.frame.minX - titleX - Self.gap)
         title.frame = CGRect(x: titleX, y: 0, width: max(0, titleWidth), height: rowHeight)
@@ -110,9 +121,9 @@ final class SpeedPitchMenuView: UIView {
         panel.frame = CGRect(x: 0, y: rowHeight, width: width, height: 2 * Self.sliderHeight + Self.switchHeight + Self.panelBottom)
         var y: CGFloat = 0
         for (name, value, slider) in [(speedName, speedValue, speedSlider), (pitchName, pitchValue, pitchSlider)] {
-            name.frame = CGRect(x: margin, y: y + 4, width: width / 2 - margin, height: 24)
-            value.frame = CGRect(x: width / 2, y: y + 4, width: width / 2 - margin, height: 24)
-            slider.frame = CGRect(x: margin, y: y + 30, width: width - 2 * margin, height: 36)
+            name.frame = CGRect(x: margin, y: y + 4, width: width / 2 - margin, height: labelHeight)
+            value.frame = CGRect(x: width / 2, y: y + 4, width: width / 2 - margin, height: labelHeight)
+            slider.frame = CGRect(x: margin, y: y + labelHeight + 6, width: width - 2 * margin, height: 36)
             slider.layoutIfNeeded()
             Self.placeTick(on: slider)
             y += Self.sliderHeight
@@ -120,6 +131,12 @@ final class SpeedPitchMenuView: UIView {
         let size = follows.sizeThatFits(.zero)
         follows.frame = CGRect(x: width - margin - size.width, y: y + (Self.switchHeight - size.height) / 2, width: size.width, height: size.height)
         followsName.frame = CGRect(x: margin, y: y, width: max(0, follows.frame.minX - margin - Self.gap), height: Self.switchHeight)
+    }
+
+    // Spotify's rows changed size under it (their font, copied after this was made).
+    func fontChanged() {
+        applyFonts()
+        setNeedsLayout()
     }
 
     // MARK: - state
@@ -378,23 +395,12 @@ final class SpeedPitchMenuView: UIView {
         UIColor(white: 1, alpha: UIAccessibility.isDarkerSystemColorsEnabled ? 0.8 : 0.65)
     }
 
-    // the face of Spotify's own menu rows (16 pt), or the system font if Spotify drops it.
-    private static let face = UIFont(name: "SpotifyMixUI-Bold", size: 16)
-
     private func applyFonts() {
-        let name = Self.font(.subheadline)
-        title.font = Self.font(.body, upTo: 16)
+        let name = Self.panelFont
+        title.font = Self.rowFont
         summary.font = Self.digits(name)
         for label in [speedName, pitchName, followsName] { label.font = name }
         for button in [speedValue, pitchValue] { button.titleLabel?.font = Self.digits(name) }
-    }
-
-    // a text style's size, stopping at extra large so the row still fits.
-    private static func font(_ style: UIFont.TextStyle, upTo limit: CGFloat = .infinity) -> UIFont {
-        var category = UIApplication.shared.preferredContentSizeCategory
-        if category > .extraLarge { category = .extraLarge }
-        let points = min(limit, UIFont.preferredFont(forTextStyle: style, compatibleWith: UITraitCollection(preferredContentSizeCategory: category)).pointSize)
-        return face?.withSize(points) ?? .systemFont(ofSize: points, weight: .semibold)
     }
 
     // digits of one width where the face has them, so a value doesn't shuffle as it counts.
