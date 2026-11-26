@@ -203,8 +203,9 @@ private func offlineEntry(_ dto: LyricsDto, used: LyricsSource, source: LyricsSo
                           karaoke: KaraokeLyricsDto?) -> (lyrics: Lyrics, karaoke: Data?, romanized: Bool) {
     var savedDTO = dto
     let romanize = options.romanization && dto.romanization == .canBeRomanized
+    let japanese = romanize && LyricsRomanization.prefersJapaneseReadings(dto.lines.lazy.map(\.content))
     savedDTO.lines = dto.lines.map { line in
-        let content = romanize ? (line.content.applyingTransform(.toLatin, reverse: false) ?? line.content) : line.content
+        let content = romanize ? LyricsRomanization.romanizeLine(line.content, japanese: japanese) : line.content
         return LyricsLineDto(content: content, offsetMs: line.offsetMs.map { Int(Int32(clamping: $0)) })
     }
     if romanize { savedDTO.romanization = .romanized }
