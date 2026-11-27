@@ -19,6 +19,9 @@ for main_swift in Tests/*/main.swift; do
 
     extra_sources=()
     case "$suite_name" in
+        LyricsRomanization)
+            extra_sources+=("Sources/EeveeSpotify/Lyrics/Models/LyricsRomanization.swift")
+            ;;
         NativeOfflineLyricsFormat)
             extra_sources+=("Sources/EeveeSpotify/Lyrics/Models/NativeOfflineLyricsFormat.swift")
             ;;
