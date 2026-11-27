@@ -117,12 +117,14 @@ final class KaraokePlaybackTracker {
         }
     }
 
+    /// A lyrics request names the playing track only while the player observer has reported
+    /// none: Spotify also asks lyrics for the songs around the playing one.
     func updateTrackIdFromLyricsFetch(_ trackId: String) {
         guard !trackId.isEmpty else { return }
         queue.async {
             guard self.lastTrackId != trackId else { return }
             self.lastTrackId = trackId
-            KaraokeLyricsStore.shared.notify()
+            if self.observedTrackId == nil { KaraokeLyricsStore.shared.notify() }
         }
     }
 
@@ -145,8 +147,9 @@ final class KaraokePlaybackTracker {
         queue.sync { observedTrackId }
     }
 
+    /// The player's own track, or the one a lyrics request last named when the player reports none.
     func currentTrackId() -> String? {
-        queue.sync { lastTrackId }
+        queue.sync { observedTrackId ?? lastTrackId }
     }
 
     func isPlaying() -> Bool {
