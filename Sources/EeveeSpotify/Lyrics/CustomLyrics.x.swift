@@ -378,7 +378,7 @@ func getLyricsDataForCurrentTrack(_ originalPath: String, originalLyrics: Lyrics
         throw LyricsError.noCurrentTrack
     }
 
-    // The player observer doesn't attach on 9.1.x, so the lyrics request is the current-track signal.
+    // The current-track signal until the player observer reports one.
     KaraokePlaybackTracker.shared.updateTrackIdFromLyricsFetch(trackIdentifier)
 
     if capturedTrackId != trackIdentifier {
