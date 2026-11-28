@@ -86,8 +86,8 @@ static NSDictionary *releaseFromFields(NSArray *album,unsigned group) {
     NSString *uri=uriFromGID(SAPProtoData(album,1),@"album"),*title=SAPProtoString(album,2);
     if(!uri || !title.length)return nil;
     uint64_t type=SAPProtoNumber(album,4,0);if(type==5 || type==6)return nil;
-    NSString *category=group==8?@"Appears on":type==4?@"EPs":type==2?@"Singles":type==3?@"Compilations":
-        type==1?@"Albums":group==6?@"Singles & EPs":group==7?@"Compilations":@"Albums";
+    NSString *category=group==8?@"appears_on":type==4?@"eps":type==2?@"singles":type==3?@"compilations":
+        type==1?@"albums":group==6?@"singles_eps":group==7?@"compilations":@"albums";
     NSArray *date=SAPProtoFields(SAPProtoData(album,6));
     NSInteger year=signedNumber(date,1),month=signedNumber(date,2),day=signedNumber(date,3);
     if(year<0 || year>9999 || month<0 || month>12 || day<0 || day>31)year=month=day=0;
@@ -118,7 +118,7 @@ static NSDictionary *withReleases(NSDictionary *base,NSArray *releases) {
     }
     NSMutableArray *selected=[NSMutableArray array];for(NSString *key in keys)[selected addObject:chosen[key]];
     NSMutableArray *sections=[NSMutableArray array];
-    for(NSString *category in @[@"Albums",@"EPs",@"Singles",@"Singles & EPs",@"Compilations",@"Appears on"]) {
+    for(NSString *category in @[@"albums",@"eps",@"singles",@"singles_eps",@"compilations",@"appears_on"]) {
         NSMutableArray *items=[NSMutableArray array];
         for(NSDictionary *release in selected)if([release[@"category"]isEqual:category])[items addObject:release];
         [items sortUsingComparator:^NSComparisonResult(NSDictionary *a,NSDictionary *b){

@@ -1,4 +1,4 @@
-"""Compile opt-in settings/artist UIKit fixtures against the current Pixie modules.
+"""Compile opt-in settings/lyrics/artist UIKit fixtures against the current Pixie modules.
 
 The default and --compile-only paths never query simctl, install, or launch.
 Use --run explicitly only when runtime UI testing has been authorized.
@@ -30,9 +30,9 @@ def compile_fixture(name, out, sdk, target):
     app.mkdir()
     includes = ["-I" + str(p) for p in include_directories()]
     common = ["xcrun", "clang", "-target", target, "-isysroot", sdk, "-fobjc-arc", "-std=gnu11", "-DSAP_TESTING", *includes]
-    if name == "settings":
+    if name in ("settings", "lyrics"):
         sources = [resolve_source(s) for s in ("PixieManagerSettings.m", "PixiePageController.m", "DiagnosticsPreferences.m", "Localization.m", "DiagnosticTrace.m", "NativeKeyTrace.m", "WireProto.m")]
-        sources.extend((ROOT / "tests/trace_platform_stub.m", ROOT / "tests/SettingsFixtureActions.m"))
+        sources.extend((ROOT / "tests/trace_platform_stub.m", ROOT / "tests/SettingsFixtureActions.m", ROOT / "tests/eevee_localized_english.m"))
         objects = []
         for source in sources:
             obj = folder / (source.stem + ".o")
@@ -40,10 +40,10 @@ def compile_fixture(name, out, sdk, target):
             objects.append(obj)
         run("xcrun", "swiftc", "-swift-version", "5", "-parse-as-library", "-target", target,
             "-sdk", sdk, *includes, "-import-objc-header", ROOT / "tests/SettingsFixtureBridge.h",
-            ROOT / "tests/SettingsFixture.swift", *objects, "-framework", "UIKit", "-framework", "SwiftUI", "-o", app / "PixieUIFixture")
-        scene = "SAPFixtureSceneDelegate"
+            ROOT / ("tests/LyricsSettingsFixture.swift" if name == "lyrics" else "tests/SettingsFixture.swift"), *objects, "-framework", "UIKit", "-framework", "SwiftUI", "-o", app / "PixieUIFixture")
+        scene = "SAPLyricsFixtureScene" if name == "lyrics" else "SAPFixtureSceneDelegate"
     else:
-        sources = [*source_group("artist_ui"), resolve_source("WireProto.m"), ROOT / "tests/ArtistDownloadsUIFixture.m"]
+        sources = [*source_group("artist_ui"), resolve_source("WireProto.m"), resolve_source("Localization.m"), ROOT / "tests/eevee_localized_english.m", ROOT / "tests/ArtistDownloadsUIFixture.m"]
         run(*common, *sources, "-framework", "UIKit", "-framework", "QuartzCore", "-framework", "ImageIO", "-framework", "CoreText", "-framework", "CoreGraphics", "-o", app / "PixieUIFixture")
         scene = "ArtistPickerFixtureScene"
     info = {"CFBundleIdentifier": bundle, "CFBundleExecutable": "PixieUIFixture", "CFBundleName": "Pixie UI Fixture",
@@ -71,10 +71,15 @@ def launch_fixture(name, app, bundle, out):
     run("xcrun", "simctl", "launch", udid, bundle, "-AppleLanguages", "(en)")
     deadline = time.monotonic() + 45
     expected = "PASS: entry spacing, mini-player clearance, navigation and native pages rendered" if name == "settings" else "PASS: centered multiline artist load text"
+    if name == "lyrics":
+        expected = "PASS: lyrics header, sole Cancel action, scan/download transition, completion dismissal and reopen progress"
     while time.monotonic() < deadline:
         text = result.read_text() if result.exists() else ""
         if expected in text:
             shutil.copy2(result, out / name / "result.log")
+            if name == "lyrics":
+                for screenshot in result.parent.glob("lyrics-*.png"):
+                    shutil.copy2(screenshot, out / name / screenshot.name)
             return
         time.sleep(.3)
     raise RuntimeError(f"UI fixture {name} did not finish: {text}")
@@ -82,7 +87,7 @@ def launch_fixture(name, app, bundle, out):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--fixture", choices=("settings", "artist", "all"), default="all")
+    parser.add_argument("--fixture", choices=("settings", "lyrics", "artist", "all"), default="all")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--compile-only", action="store_true", help="Compile/link only (the safe default); no simctl access")
     mode.add_argument("--run", action="store_true", help="Explicitly install and run on an already booted simulator")
@@ -96,7 +101,7 @@ def main():
     version = run("xcrun", "--sdk", "iphonesimulator", "--show-sdk-version")
     target = f"arm64-apple-ios{version}-simulator"
     results = []
-    for name in ("settings", "artist") if args.fixture == "all" else (args.fixture,):
+    for name in ("settings", "lyrics", "artist") if args.fixture == "all" else (args.fixture,):
         app, bundle = compile_fixture(name, out, sdk, target)
         if args.run:
             launch_fixture(name, app, bundle, out)

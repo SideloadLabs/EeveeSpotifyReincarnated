@@ -120,9 +120,10 @@ private func loadCustomLyricsForTrackId(_ trackId: String) throws -> Lyrics {
     
     lyricsState = LyricsLoadingState()
 
-    // A fresh fetch starts from nothing, so the custom lyrics button only shows
-    // for lyrics this fetch actually produced.
-    KaraokeLyricsStore.shared.remove(trackId: searchQuery.spotifyTrackId)
+    // The custom lyrics button shows only lyrics this fetch produced; whatever it had
+    // stays until the fetch ends, so asking again for the same song never hides it.
+    let karaokeMark = KaraokeLyricsStore.shared.mark()
+    defer { KaraokeLyricsStore.shared.settle(trackId: searchQuery.spotifyTrackId, since: karaokeMark) }
     
     do {
         lyricsDto = try repository.getLyrics(searchQuery, options: options)
@@ -133,6 +134,7 @@ private func loadCustomLyricsForTrackId(_ trackId: String) throws -> Lyrics {
         } else {
             lyricsState.fallbackError = .unknownError
         }
+        SelectedProviderFailure.shared.record(trackId: searchQuery.spotifyTrackId, error: lyricsState.fallbackError)
 
         // Attempt Genius fallback if enabled and the primary source isn't already Genius.
         // Genius requires title + artist to search — only attempt if we have them.
@@ -156,21 +158,22 @@ private func loadCustomLyricsForTrackId(_ trackId: String) throws -> Lyrics {
     lyricsState.loadedSuccessfully = true
 
     writeDebugLog("[Lyrics] \(trackId): \(source.description), \(lyricsDto.lines.count) lines, synced=\(lyricsDto.timeSynced)")
-    publishLineSyncedKaraokeLyrics(lyricsDto, trackId: searchQuery.spotifyTrackId, source: source)
+    publishLineSyncedKaraokeLyrics(lyricsDto, trackId: searchQuery.spotifyTrackId, source: source, since: karaokeMark)
+    savePlaybackLyrics(trackId: searchQuery.spotifyTrackId, dto: lyricsDto, source: source)
 
     let lyrics = Lyrics.with {
         $0.data = lyricsDto.toSpotifyLyricsData(source: source.description)
     }
-    
+
     return lyrics
 }
 
 /// Feeds the custom lyrics view for sources that only have line-level timing.
-/// Spicy Lyrics publishes its own (word/syllable) data while parsing, so an
-/// existing entry for the track is never overwritten.
-private func publishLineSyncedKaraokeLyrics(_ dto: LyricsDto, trackId: String, source: LyricsSource) {
+/// Spicy Lyrics publishes its own (word/syllable) data while parsing, so what it
+/// set during this fetch is never overwritten.
+private func publishLineSyncedKaraokeLyrics(_ dto: LyricsDto, trackId: String, source: LyricsSource, since mark: Int) {
     guard source.supportsCustomLyricsView, !trackId.isEmpty,
-          KaraokeLyricsStore.shared.lyrics(forTrackId: trackId) == nil else { return }
+          !KaraokeLyricsStore.shared.wasSet(trackId: trackId, since: mark) else { return }
     guard let karaoke = KaraokeLyricsDto.lineSynced(from: dto, providerName: source.description) else { return }
     KaraokeLyricsStore.shared.set(trackId: trackId, lyrics: karaoke)
 }
@@ -216,9 +219,10 @@ private func loadCustomLyricsForCurrentTrack() throws -> Lyrics {
     
     lyricsState = LyricsLoadingState()
 
-    // A fresh fetch starts from nothing, so the custom lyrics button only shows
-    // for lyrics this fetch actually produced.
-    KaraokeLyricsStore.shared.remove(trackId: searchQuery.spotifyTrackId)
+    // The custom lyrics button shows only lyrics this fetch produced; whatever it had
+    // stays until the fetch ends, so asking again for the same song never hides it.
+    let karaokeMark = KaraokeLyricsStore.shared.mark()
+    defer { KaraokeLyricsStore.shared.settle(trackId: searchQuery.spotifyTrackId, since: karaokeMark) }
     
     do {
         lyricsDto = try repository.getLyrics(searchQuery, options: options)
@@ -248,7 +252,7 @@ private func loadCustomLyricsForCurrentTrack() throws -> Lyrics {
     
     lyricsState.loadedSuccessfully = true
 
-    publishLineSyncedKaraokeLyrics(lyricsDto, trackId: searchQuery.spotifyTrackId, source: source)
+    publishLineSyncedKaraokeLyrics(lyricsDto, trackId: searchQuery.spotifyTrackId, source: source, since: karaokeMark)
 
     let lyrics = Lyrics.with {
         $0.data = lyricsDto.toSpotifyLyricsData(source: source.description)
@@ -376,7 +380,7 @@ func getLyricsDataForCurrentTrack(_ originalPath: String, originalLyrics: Lyrics
         throw LyricsError.noCurrentTrack
     }
 
-    // The player observer doesn't attach on 9.1.x, so the lyrics request is the current-track signal.
+    // The current-track signal until the player observer reports one.
     KaraokePlaybackTracker.shared.updateTrackIdFromLyricsFetch(trackIdentifier)
 
     if capturedTrackId != trackIdentifier {
@@ -438,7 +442,14 @@ func getLyricsDataForCurrentTrack(_ originalPath: String, originalLyrics: Lyrics
     guard var lyrics = fetchedLyrics else {
         throw LyricsError.noSuchSong
     }
-    
+
+    applyLyricsColors(&lyrics, originalLyrics: originalLyrics)
+    return try lyrics.serializedData()
+}
+
+/// The colors Spotify's lyrics view gets with a provider's lyrics. Shared with the saved
+/// lyrics that answer a request online (OfflineLyricsSupport), so both look the same.
+func applyLyricsColors(_ lyrics: inout Lyrics, originalLyrics: Lyrics?) {
     let lyricsColorsSettings = UserDefaults.lyricsColors
     
     if lyricsColorsSettings.displayOriginalColors, let originalLyrics = originalLyrics {
@@ -465,6 +476,4 @@ func getLyricsDataForCurrentTrack(_ originalPath: String, originalLyrics: Lyrics
             $0.activeLineColor = Color.white.uInt32
         }
     }
-    
-    return try lyrics.serializedData()
 }
