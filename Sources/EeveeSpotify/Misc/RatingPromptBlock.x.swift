@@ -27,7 +27,7 @@ enum RatingPromptBlock {
 
 extension UserDefaults {
     static var blockRatingPrompts: Bool {
-        get { container.bool(forKey: "eeveeBlockRatingPrompts") }
+        get { container.object(forKey: "eeveeBlockRatingPrompts") as? Bool ?? true }
         set { container.set(newValue, forKey: "eeveeBlockRatingPrompts") }
     }
 }

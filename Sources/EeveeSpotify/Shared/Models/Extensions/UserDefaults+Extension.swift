@@ -117,7 +117,7 @@ extension UserDefaults {
     /// When true, the `si` tracking parameter is stripped from shared Spotify links.
     static var cleanShareLinks: Bool {
         get {
-            container.object(forKey: cleanShareLinksKey) as? Bool ?? false
+            container.object(forKey: cleanShareLinksKey) as? Bool ?? true
         }
         set (cleanShareLinks) {
             container.set(cleanShareLinks, forKey: cleanShareLinksKey)

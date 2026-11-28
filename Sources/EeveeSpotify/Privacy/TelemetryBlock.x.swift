@@ -93,7 +93,7 @@ class SessionConfigurationHook: ClassHook<URLSessionConfiguration> {
 
 extension UserDefaults {
     static var blockTelemetry: Bool {
-        get { container.bool(forKey: "eeveeBlockTelemetry") }
+        get { container.object(forKey: "eeveeBlockTelemetry") as? Bool ?? true }
         set { container.set(newValue, forKey: "eeveeBlockTelemetry") }
     }
 }
