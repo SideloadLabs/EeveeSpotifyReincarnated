@@ -240,7 +240,7 @@ private struct EqualizerBandRow: View {
     }
 }
 
-// the bands' response from 20 Hz to 20 kHz over ±15 dB, with a dot where each slider is, and the headphone
+// the bands from 20 Hz to 20 kHz over ±15 dB, with a dot where each slider is, and the headphone
 // correction as a dashed line. a dot drags up and down; a double tap on it puts it back to 0.
 private struct EqualizerCurveView: View {
     let curve: Equalizer.Curve
@@ -278,6 +278,28 @@ private struct EqualizerCurveView: View {
 
     private static func line(_ values: [Double], _ width: CGFloat, _ height: CGFloat) -> [CGPoint] {
         values.indices.map { CGPoint(x: CGFloat($0) / CGFloat(max(values.count - 1, 1)) * width, y: y(values[$0], height)) }
+    }
+
+    // a smooth line through the dots that never overshoots them (monotone cubic), flat past the end bands. the
+    // played response follows it closely; drawn as is, its small ripples read as dips between equal dots.
+    private func slidersLine(_ path: inout Path, _ width: CGFloat, _ height: CGFloat) {
+        let points = gains.indices.map { CGPoint(x: Self.x(Equalizer.frequencies[$0], width), y: Self.y(gains[$0], height)) }
+        guard let first = points.first, let last = points.last else { return }
+        let steps = zip(points, points.dropFirst()).map { ($1.y - $0.y) / ($1.x - $0.x) }
+        let slopes = points.indices.map { k -> CGFloat in
+            guard k > 0, k < points.count - 1, steps[k - 1] * steps[k] > 0 else { return 0 }
+            let before = points[k].x - points[k - 1].x, after = points[k + 1].x - points[k].x
+            let w1 = 2 * after + before, w2 = after + 2 * before
+            return (w1 + w2) / (w1 / steps[k - 1] + w2 / steps[k])
+        }
+        path.addLine(to: CGPoint(x: 0, y: first.y))
+        path.addLine(to: first)
+        for k in points.indices.dropLast() {
+            let a = points[k], b = points[k + 1], third = (b.x - a.x) / 3
+            path.addCurve(to: b, control1: CGPoint(x: a.x + third, y: a.y + slopes[k] * third),
+                          control2: CGPoint(x: b.x - third, y: b.y - slopes[k + 1] * third))
+        }
+        path.addLine(to: CGPoint(x: width, y: last.y))
     }
 
     private func nearest(_ point: CGPoint, _ width: CGFloat, _ height: CGFloat) -> Int? {
@@ -321,7 +343,6 @@ private struct EqualizerCurveView: View {
     var body: some View {
         GeometryReader { geometry in
             let width = geometry.size.width, height = geometry.size.height
-            let bands = Self.line(curve.bands, width, height)
             let accent = EeveeTheme.accent.opacity(active ? 1 : 0.35)
             ZStack(alignment: .topLeading) {
                 Path { path in
@@ -352,12 +373,15 @@ private struct EqualizerCurveView: View {
                 }
                 Path { path in
                     path.move(to: CGPoint(x: 0, y: height / 2))
-                    bands.forEach { path.addLine(to: $0) }
+                    slidersLine(&path, width, height)
                     path.addLine(to: CGPoint(x: width, y: height / 2))
                     path.closeSubpath()
                 }
                 .fill(accent.opacity(0.15))
-                Path { path in path.addLines(bands) }
+                Path { path in
+                    path.move(to: CGPoint(x: 0, y: Self.y(gains.first ?? 0, height)))
+                    slidersLine(&path, width, height)
+                }
                     .stroke(accent, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
                 ForEach(gains.indices, id: \.self) { band in
                     Circle()

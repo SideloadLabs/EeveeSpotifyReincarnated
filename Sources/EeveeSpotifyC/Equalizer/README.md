@@ -5,7 +5,7 @@ correction from [AutoEq](https://github.com/jaakkopasanen/AutoEq) under them. It
 Listening › Equalizer. It applies as it changes. Off, or with every band at 0 and no correction, the sound passes
 through untouched.
 
-- **The curve** shows what the bands do, with a dot per band. A dot drags up and down, and a double tap puts it
+- **The curve** is a smooth line through the sliders, a dot per band, which the sound follows closely. A dot drags up and down, and a double tap puts it
   back to 0. The correction, when there is one, is the dashed line.
 - **Bands** have a slider each. Tapping a band's value resets it; holding it opens a box to type one.
 - **Presets**: twelve built in, and your own, saved under a name from the current curve and deleted with a swipe.
