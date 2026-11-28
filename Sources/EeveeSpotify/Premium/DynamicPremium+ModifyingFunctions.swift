@@ -414,7 +414,11 @@ func rewriteRemoteConfigurationData(_ data: Data) -> Data? {
     guard var response = try? ResolveResponse(serializedBytes: data),
           !response.configuration.assignedValues.isEmpty else { return nil }
 
-    let replacements = EeveeCrossfade.replacements
+    let replacements = EeveeCrossfade.replacements + [
+        // 9.2's remote config can flip automix off even though ios-feature-settings.
+        // automix_enabled is forced above; keep the Playback settings row visible.
+        EeveePropertyReplacement(name: "automix_enabled", scope: "ios-feature-settings", modification: .forceBool(true))
+    ]
     func summary() -> String {
         replacements.compactMap { replacement in
             guard let scope = replacement.scope, let name = replacement.name else { return nil }
