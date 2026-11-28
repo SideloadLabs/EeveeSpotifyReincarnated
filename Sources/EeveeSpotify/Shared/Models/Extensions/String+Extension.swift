@@ -1,6 +1,12 @@
-import Foundation 
+import Foundation
 import UIKit
 import NaturalLanguage
+
+/// `.localized` for Pixie's Objective-C code (SAPLocalized), which looks it up by this name.
+@_cdecl("EeveeLocalizedString")
+public func eeveeLocalizedString(_ key: NSString) -> NSString {
+    (key as String).localized as NSString
+}
 
 extension String {
     static func ~= (lhs: String, rhs: String) -> Bool {

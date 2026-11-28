@@ -25,7 +25,20 @@ extension EeveeLyricsSettingsViewModel {
             .switchToLatest()
             .receive(on: DispatchQueue.main)
             .assign(to: &$lrclibURLState)
-        
+
+        // Saved lyrics belong to the options they were fetched with.
+        $lyricsOptions
+            .map(\.downloadOptions)
+            .removeDuplicates()
+            .dropFirst()
+            .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
+            .sink { _ in
+                LyricsNotFoundStore.shared.resetForLookupOptionsChange()
+                NativeOfflineLyrics.shared.reconcileAll()
+                EeveeOfflineLyricsDownloader.shared.refreshForCurrentSource(userInitiated: true)
+            }
+            .store(in: &cancellables)
+
         $lyricsSource
             .dropFirst()
             .sink { [weak self] newSource in
@@ -41,6 +54,11 @@ extension EeveeLyricsSettingsViewModel {
                 // view data) must go, or revisiting a song
                 // would keep serving the old provider's lyrics.
                 invalidateLyricsForSourceChange()
+
+                // Queue the new provider's text for every saved track; offline the
+                // old provider's text stays visible until each one is replaced.
+                NativeOfflineLyrics.shared.reconcileAll()
+                EeveeOfflineLyricsDownloader.shared.refreshForCurrentSource(userInitiated: true)
 
                 // Spotify keeps its own copy of lyrics it already loaded, which the tweak
                 // can't clear, so the new source is only used everywhere after a restart.

@@ -14,7 +14,8 @@ struct LyricsDto {
             $0.providedBy = "\(providerCredit ?? source) (EeveeSpotify)"
         }
         
-        let shouldRomanize = UserDefaults.lyricsOptions.romanization
+        let shouldRomanize = UserDefaults.lyricsOptions.romanization && romanization == .canBeRomanized
+        let japanese = shouldRomanize && LyricsRomanization.prefersJapaneseReadings(lines.lazy.map(\.content))
         
         if lines.isEmpty {
             lyricsData.lines = [
@@ -35,8 +36,8 @@ struct LyricsDto {
             }
             lyricsData.lines = sortedLines.map { line in
                 LyricsLine.with {
-                    $0.content = (shouldRomanize && romanization == .canBeRomanized)
-                        ? line.content.applyingTransform(.toLatin, reverse: false)!
+                    $0.content = shouldRomanize
+                        ? LyricsRomanization.romanizeLine(line.content, japanese: japanese)
                         : line.content
                     $0.offsetMs = Int32(line.offsetMs ?? 0)
                 }

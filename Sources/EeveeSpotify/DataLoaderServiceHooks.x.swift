@@ -57,6 +57,18 @@ class SPTDataLoaderServiceHook: ClassHook<NSObject>, SpotifySessionDelegate {
             return
         }
 
+        // Offline, a downloaded song's saved lyrics stand in for the failed request.
+        if let saved = savedLyrics(forFailed: url, error: error) {
+            DispatchQueue.main.async { [self] in
+                if let ok = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "2.0", headerFields: [:]) {
+                    orig.URLSession(session, dataTask: task, didReceiveResponse: ok, completionHandler: { _ in })
+                }
+                orig.URLSession(session, dataTask: task, didReceiveData: saved)
+                orig.URLSession(session, task: task, didCompleteWithError: nil)
+            }
+            return
+        }
+
         guard error == nil, SpotifyResponsePatcher.shouldModify(url) else {
             orig.URLSession(session, task: task, didCompleteWithError: error)
             return
@@ -87,13 +99,19 @@ class SPTDataLoaderServiceHook: ClassHook<NSObject>, SpotifySessionDelegate {
         do {
             // Since 9.1.60 the lyrics consumer is @MainActor; calling orig off-main traps.
             if url.isLyrics {
+                if answerLyricsDownloadAsync(url, buffer: buffer, task: task, deliver: { [self] data in
+                    DispatchQueue.main.async { [self] in
+                        orig.URLSession(session, dataTask: task, didReceiveData: data)
+                        orig.URLSession(session, task: task, didCompleteWithError: nil)
+                    }
+                }) { return }
                 let originalLyrics = try? Lyrics(serializedBytes: buffer)
 
                 let semaphore = DispatchSemaphore(value: 0)
                 var customLyricsData: Data?
 
                 DispatchQueue.global(qos: .userInitiated).async {
-                    customLyricsData = try? getLyricsDataForCurrentTrack(url.path, originalLyrics: originalLyrics)
+                    customLyricsData = try? eeveeLyricsData(url.path, originalLyrics: originalLyrics, task: task)
                     semaphore.signal()
                 }
 
@@ -147,7 +165,7 @@ class SPTDataLoaderServiceHook: ClassHook<NSObject>, SpotifySessionDelegate {
         }
 
         DispatchQueue.global(qos: .userInitiated).async { [self] in
-            let data = try? getLyricsDataForCurrentTrack(url.path)
+            let data = try? eeveeLyricsData(url.path, task: task)
 
             guard let lyricsData = data,
                   let ok = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "2.0", headerFields: [:]) else {

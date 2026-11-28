@@ -77,7 +77,7 @@ BOOL SAPCancelArtistDownloadOwner(NSString *artist,NSString *token){return NO;}
 static void pump(double seconds){NSDate *end=[NSDate dateWithTimeIntervalSinceNow:seconds];while(end.timeIntervalSinceNow>0)[NSRunLoop.currentRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:.001]];}
 static void waitFor(BOOL(^test)(void)){NSDate *end=[NSDate dateWithTimeIntervalSinceNow:3];while(!test() && end.timeIntervalSinceNow>0)pump(.002);assert(test());}
 static BOOL active(void){return [snapshot[@"active"]boolValue];}
-static NSArray *releases(int base){return @[@{@"uri":album(base),@"name":@"Album",@"category":@"Albums"},@{@"uri":album(base+1),@"name":@"Single",@"category":@"Singles"}];}
+static NSArray *releases(int base){return @[@{@"uri":album(base),@"name":@"Album",@"category":@"albums"},@{@"uri":album(base+1),@"name":@"Single",@"category":@"singles"}];}
 static dispatch_block_t observe(NSArray *items){return SAPObservePlaylistReleaseDownloads(items,^(NSDictionary *s){snapshot=s;});}
 static void completePlaylist(NSString *uri){void(^cb)(NSDictionary*)=[nativeObservers[uri]copy];assert(cb);cb(@{@"album_states":@{uri:@{@"active":@NO,@"state":@"downloaded",@"phase":@"downloaded"}}});pump(.01);}
 static void reset(void){loadingReplies=0;submitted=nil;allowAdd=YES;holdMetadata=holdAppend=holdCreate=uncertainCreate=ambiguousAppend=failAppend=changePlaylistDuringRead=NO;heldMetadata=nil;heldMutation=nil;}

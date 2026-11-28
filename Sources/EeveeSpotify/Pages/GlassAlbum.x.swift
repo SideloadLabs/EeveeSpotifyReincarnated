@@ -130,7 +130,41 @@ extension GlassAlbum {
             let frame = $0.convert($0.bounds, to: header)
             return frame.width > 0 && frame.minY >= top && frame.maxY <= bottom
         }
-        if let artist { GlassPlaylist.center(artist, box: artist.bounds, in: header) }
+        if let artist { centerArtist(artist, in: header) }
+    }
+
+    private static var artistMovedKey: UInt8 = 0
+
+    /// iOS delivers a tap to a view only inside every one of its ancestors. The artist control sits in a parent
+    /// as narrow as itself, so moving the control alone leaves it outside that parent and its menu never opens.
+    /// This moves the lowest view whose parent spans the centred position, so the control stays tappable.
+    private static func centerArtist(_ artist: UIView, in header: UIView) {
+        // Position in the header from layout alone, without the transforms this applies.
+        func layoutMinX(_ view: UIView) -> CGFloat {
+            var x: CGFloat = 0
+            var current = view
+            while current !== header, let parent = current.superview {
+                x += current.center.x - current.bounds.width * current.layer.anchorPoint.x - parent.bounds.minX
+                current = parent
+            }
+            return x
+        }
+        let width = artist.bounds.width
+        let targetMinX = (header.bounds.width - width) / 2
+        var moved = artist
+        while let parent = moved.superview, parent !== header {
+            let parentMinX = layoutMinX(parent)
+            if parentMinX <= targetMinX + 0.5, parentMinX + parent.bounds.width >= targetMinX + width - 0.5 { break }
+            moved = parent
+        }
+        // Only a view this moved earlier is put back; Spotify's own transforms are left alone.
+        let previous = (objc_getAssociatedObject(header, &artistMovedKey) as? PageLookup.WeakView)?.view
+        if let previous, previous !== moved, !previous.transform.isIdentity { previous.transform = .identity }
+        if previous !== moved {
+            objc_setAssociatedObject(header, &artistMovedKey, PageLookup.WeakView(moved), .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+        }
+        let dx = targetMinX - layoutMinX(artist)
+        if abs(dx - moved.transform.tx) > 0.5 { moved.transform = CGAffineTransform(translationX: dx, y: 0) }
     }
 }
 

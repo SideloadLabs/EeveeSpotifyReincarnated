@@ -9,6 +9,7 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 
 echo "==> [1/3] Running ResolveConfigurationSnapshot test..."
 python3 Tests/ResolveConfigurationSnapshot/test.py
+python3 Tests/NativeLyricsOfflineCache/test.py
 
 echo "==> [2/3] Compiling and running Swift test suites..."
 for main_swift in Tests/*/main.swift; do
@@ -18,6 +19,57 @@ for main_swift in Tests/*/main.swift; do
 
     extra_sources=()
     case "$suite_name" in
+        LyricsRomanization)
+            extra_sources+=("Sources/EeveeSpotify/Lyrics/Models/LyricsRomanization.swift")
+            ;;
+        NativeOfflineLyricsFormat)
+            extra_sources+=("Sources/EeveeSpotify/Lyrics/Models/NativeOfflineLyricsFormat.swift")
+            ;;
+        NativeOfflineLyricsDatabase)
+            extra_sources+=("Sources/EeveeSpotify/Lyrics/Models/NativeOfflineLyricsDatabase.swift")
+            ;;
+        LyricsProviders)
+            lyrics=Sources/EeveeSpotify/Lyrics
+            ext=Sources/EeveeSpotify/Shared/Models/Extensions
+            extra_sources+=("$lyrics"/Repositories/*.swift "$lyrics"/Models/{Genius,Lrclib,Petit}/*.swift
+                "$lyrics"/Models/{LyricsError,LyricsSearchQuery,LyricsLineDto,LyricsRomanizationStatus,KaraokeLyricsDto}.swift
+                "$lyrics"/Models/Settings/LyricsOptions.swift "$lyrics"/Protocols/LyricsRepository.swift
+                "$lyrics"/{LyricsDownloadHTTP,LyricsRequestGate,LyricsUncensorFill}.swift
+                "$ext"/{CharacterSet,Collection,Dictionary}+Extension.swift)
+            while IFS= read -r file; do extra_sources+=("$file"); done < <(find Sources/EeveeSpotify/Dependencies/XMLCoder -name '*.swift')
+            ;;
+        LyricsRequestGate)
+            extra_sources+=("Sources/EeveeSpotify/Lyrics/LyricsRequestGate.swift")
+            ;;
+        LyricsDownloadHTTP)
+            extra_sources+=("Sources/EeveeSpotify/Lyrics/LyricsRequestGate.swift"
+                "Sources/EeveeSpotify/Lyrics/LyricsDownloadHTTP.swift"
+                # The download context carries the custom view's lyrics.
+                "Sources/EeveeSpotify/Lyrics/Models/KaraokeLyricsDto.swift")
+            ;;
+        LyricsTaskState)
+            extra_sources+=("Sources/EeveeSpotify/Lyrics/LyricsTaskState.swift")
+            ;;
+        LyricsNotFoundStore)
+            extra_sources+=("Sources/EeveeSpotify/Lyrics/LyricsNotFoundStore.swift")
+            ;;
+        OfflineLyricsStore)
+            extra_sources+=("Sources/EeveeSpotify/Lyrics/Models/OfflineLyricsStore.swift"
+                "Sources/EeveeSpotify/Lyrics/Models/Settings/LyricsOptions.swift"
+                "Sources/EeveeSpotify/Lyrics/Models/KaraokeLyricsDto.swift")
+            ;;
+        OfflineLyricsDownloader)
+            extra_sources+=("Sources/EeveeSpotify/Lyrics/OfflineLyricsDownloader.swift"
+                "Sources/EeveeSpotify/Lyrics/LyricsForegroundExecution.swift"
+                "Sources/EeveeSpotify/Lyrics/LyricsRequestGate.swift"
+                "Sources/EeveeSpotify/Lyrics/LyricsNotFoundStore.swift")
+            ;;
+        NativeLyricsMetadata)
+            extra_sources+=("Sources/EeveeSpotify/Lyrics/NativeLyricsMetadata.swift")
+            ;;
+        NativeLyricsCard)
+            extra_sources+=("Sources/EeveeSpotify/Lyrics/NativeLyricsCard.swift")
+            ;;
         BrowsitaSectionStripper)
             extra_sources+=("Sources/EeveeSpotify/Premium/Helpers/BrowsitaSectionStripper.swift")
             ;;

@@ -11,6 +11,7 @@ extension KaraokeLyricsDto {
         guard dto.timeSynced else { return nil }
 
         let romanize = UserDefaults.lyricsOptions.romanization && dto.romanization == .canBeRomanized
+        let japanese = romanize && LyricsRomanization.prefersJapaneseReadings(dto.lines.lazy.map(\.content))
         let timed = dto.lines
             .compactMap { line -> (text: String, startMs: Int)? in
                 guard let offset = line.offsetMs else { return nil }
@@ -23,7 +24,7 @@ extension KaraokeLyricsDto {
             // Some sources end the song with an empty line that only marks when the last lyric stops.
             guard !entry.text.isEmpty else { continue }
 
-            let text = romanize ? (entry.text.applyingTransform(.toLatin, reverse: false) ?? entry.text) : entry.text
+            let text = romanize ? LyricsRomanization.romanizeLine(entry.text, japanese: japanese) : entry.text
             let words = text.split(whereSeparator: { $0.isWhitespace })
             guard !words.isEmpty else { continue }
 

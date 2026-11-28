@@ -85,7 +85,7 @@ enum GlassPlaylist {
 
         let sort = PageLookup.find("Components.Header.UI.Toolbar.ButtonContainer", in: header)
         sort.map { GlassFindField.style($0) }
-        let row = actionRow(host: root, controls: header, scroll: list(in: root))
+        let row = actionRow(host: root, controls: header, scroll: list(in: root), hidesDownload: LocalPlaylistDownload.hidesButton)
         if !logged {
             logged = true
             eeveeLog("[EeveeSpotify][Glass] Playlist header styled, sort %@, action row %@", sort != nil ? "glass" : "absent", row ? "on" : "MISSING")
@@ -194,7 +194,8 @@ extension GlassPlaylist {
         return found
     }
 
-    static func actionRow(host: UIView, controls: UIView, scroll: UIScrollView? = nil, preservePreviewLayout: Bool = false) -> Bool {
+    static func actionRow(host: UIView, controls: UIView, scroll: UIScrollView? = nil, preservePreviewLayout: Bool = false,
+                          hidesDownload: Bool = false) -> Bool {
         let cached = objc_getAssociatedObject(host, &rowKey) as? PlaylistActionRow
         func source(_ identifier: String, previous: UIView?) -> UIView? {
             if let found = PageLookup.find(identifier, in: controls) { return found }
@@ -219,7 +220,10 @@ extension GlassPlaylist {
             objc_setAssociatedObject(host, &rowKey, row, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
             return row
         }()
-        let download = PlaylistDownloadControl.resolve(in: controls)
+        let nativeDownload = PlaylistDownloadControl.resolve(in: controls)
+        // Hidden by the Miscellaneous setting: Spotify's control is left in its own row and vanishes like the others.
+        if hidesDownload, let nativeDownload, let holder = holder(of: nativeDownload) { PlayerDeclutter.vanish(holder) }
+        let download = hidesDownload ? nil : nativeDownload
         let explore = row.sourceRoot === controls && row.hosts(row.explore) ? row.explore : PageLookup.find("Components.UI.WatchFeedEntityExplorerButton", in: controls)
         if row.superview !== host || host.subviews.last !== row { host.addSubview(row) }
         row.bindNative(download: download, preview: explore, root: controls, preservePreviewLayout: preservePreviewLayout)
