@@ -29,7 +29,8 @@ typedef struct {
     EqualizerBiquad sections[kEqualizerSections];  // the bands, then the correction's filters, then pass-throughs
     int count;      // sections in use
     double rate;
-    double gain;    // linear, at most 1: the turn-down that leaves room for the boosts
+    double peak;    // dB, at least 0: the most the sections boost anything, the furthest the limiter's trim goes
+    bool limit;     // clip prevention: the sound goes through the limiter after the sections (README.md)
     bool flat;      // every slider at 0 and no correction: the sections pass the sound as it is
 } EqualizerDesign;
 
@@ -59,10 +60,11 @@ void EqualizerCountRefused(void);
 #pragma mark - for the log, any thread
 
 // buffers since launch: run through it, passed as they were because the design was made for another rate, refused
-// for their format, passed over while another render thread had it, and those whose filters went non-finite and
-// were cleared.
+// for their format, passed over while another render thread had it, those whose filters went non-finite and
+// were cleared, and those the limiter turned down. `trim` is the limiter's slow turn-down now, in dB.
 typedef struct {
-    uint64_t run, otherRate, refused, passedOver, cleared;
+    uint64_t run, otherRate, refused, passedOver, cleared, limited;
+    double trim;
 } EqualizerStats;
 
 EqualizerStats EqualizerReadStats(void);

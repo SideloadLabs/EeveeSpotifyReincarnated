@@ -195,10 +195,11 @@ void EqualizerDesignFor(double rate, const double gains[kEqualizerBands], const 
     design->count = kEqualizerBands + filters;
     design->rate = rate;
     design->flat = flat && filters == 0;
-    design->gain = 1;
+    design->peak = 0;
+    design->limit = false;
     if (design->flat) return;
-    // the loudest the cascade makes anything, up to just under Nyquist, is taken back off (the correction's
-    // own preamp aside).
+    // the loudest the cascade makes anything, up to just under Nyquist: the furthest the limiter's trim turns the
+    // sound down, so it's never quieter than taking the whole boost back off would be.
     double loudest = 0;
     for (int n = 0; n < kScan; n++) {
         loudest = fmax(loudest, cascadeDB(sections, design->count, phaseAt(rate, 20 * pow(0.49 * rate / 20, (double)n / (kScan - 1)))));
@@ -210,7 +211,7 @@ void EqualizerDesignFor(double rate, const double gains[kEqualizerBands], const 
         double f = correction[i].frequency;
         if (f > 0 && f < kHighest * rate) loudest = fmax(loudest, cascadeDB(sections, design->count, phaseAt(rate, f)));
     }
-    design->gain = pow(10, -loudest / 20);
+    design->peak = loudest;
 }
 
 double EqualizerResponse(const EqualizerDesign *design, int first, int count, double frequency) {
@@ -238,8 +239,19 @@ void EqualizerPublish(const EqualizerDesign *design) {
 static const double kFadeSeconds = 0.03;
 enum { kStep = 32 };
 
+// the limiter (README.md, "Clip prevention"): it looks this far ahead, caps peaks at kCeiling and lets go over
+// kRelease. kLimiterMax frames of look-ahead is 3 ms up to 341 kHz.
+static const double kLookahead = 0.003, kRelease = 0.1;
+static const double kCeiling = 0.96605087898981337;     // -0.3 dBFS
+enum { kLimiterMax = 1024 };
+// its trim: the limiter's reduction averaged over kBusyAverage seconds, past kBusy dB, turns the sound down
+// kTrimDown dB a second; under kIdle dB it comes back kTrimUp dB a second. it keeps a loud master from being
+// limited all the time.
+static const double kBusy = 1, kIdle = 0.3, kTrimDown = 3, kTrimUp = 1, kBusyAverage = 1;
+
 static atomic_flag sg_busy = ATOMIC_FLAG_INIT;
-static atomic_uint_fast64_t sg_ran, sg_otherRate, sg_refused, sg_passedOver, sg_cleared;
+static atomic_uint_fast64_t sg_ran, sg_otherRate, sg_refused, sg_passedOver, sg_cleared, sg_limited;
+static _Atomic int32_t sg_trimCentibels;
 
 static void tally(atomic_uint_fast64_t *counter) {
     atomic_fetch_add_explicit(counter, 1, memory_order_relaxed);
@@ -254,12 +266,28 @@ static struct {
     EqualizerBiquad from[kEqualizerSections], to[kEqualizerSections], now[kEqualizerSections];
     int sections;                   // run now: the design's, or while fading the more of the two
     int target;                     // the design's
-    double gainFrom, gainTo, gainNow;
+    bool limitFrom, limitTo;        // whether the design faded from, and the one faded to, want the limiter
+    double peakFrom, peakTo;
     uint32_t at, length;            // frames into the fade, at == length once it's over
     bool flat;                      // the design faded to is flat
     bool idle;                      // flat and faded: nothing runs, the filters are empty
     double state[kEqualizerMaxChannels][kEqualizerSections][2];
 } sg_run;
+
+// the limiter's state. it delays the sound `length` frames to see peaks coming; turning it on or off crossfades
+// the delayed sound with the sound as it is over one buffer, so neither the 3 ms jump nor a gap is heard.
+static struct {
+    bool on;
+    uint32_t length;                // look-ahead frames at the design's rate
+    uint64_t frame;                 // frames since it started, numbering the window's entries
+    float delay[kEqualizerMaxChannels][kLimiterMax];
+    // the gain each coming frame needs, as a sliding minimum: entries `head` to `tail`, needs rising.
+    uint64_t windowFrame[kLimiterMax + 1];
+    double windowNeed[kLimiterMax + 1];
+    uint64_t head, tail;
+    double envelope, envelopes[kLimiterMax + 1];     // the last length + 1, averaged into the gain
+    double trim, busy;              // dB, and the reduction averaged over about a second
+} sg_limit;
 
 static const EqualizerDesign *take(void) {
     if (!(atomic_load_explicit(&sg_shared, memory_order_relaxed) & kFresh)) return NULL;
@@ -274,17 +302,20 @@ static void empty(void) {
 // the fade over at once, the filters empty: for another stream, or one coming back from silence.
 static void startClean(void) {
     memcpy(sg_run.now, sg_run.to, sizeof sg_run.now);
-    sg_run.gainNow = sg_run.gainTo;
     sg_run.at = sg_run.length;
     sg_run.sections = sg_run.target;
     sg_run.idle = sg_run.flat;
+    sg_limit.on = false;
     empty();
 }
 
 static void adopt(const EqualizerDesign *design, bool fade) {
     memcpy(sg_run.to, design->sections, sizeof sg_run.to);
     sg_run.target = design->count;
-    sg_run.gainTo = design->gain;
+    sg_run.limitFrom = sg_run.limitTo;
+    sg_run.peakFrom = sg_run.peakTo;
+    sg_run.limitTo = design->limit && !design->flat;
+    sg_run.peakTo = design->peak;
     sg_run.flat = design->flat;
     sg_run.rate = design->rate;
     if (!fade || (sg_run.idle && design->flat)) {
@@ -296,7 +327,6 @@ static void adopt(const EqualizerDesign *design, bool fade) {
     for (; sg_run.sections < sg_run.target; sg_run.sections++) {
         for (int c = 0; c < kEqualizerMaxChannels; c++) memset(sg_run.state[c][sg_run.sections], 0, sizeof sg_run.state[c][0]);
     }
-    sg_run.gainFrom = sg_run.gainNow;
     sg_run.at = 0;
     sg_run.length = (uint32_t)ceil(kFadeSeconds * design->rate / kStep) * kStep;
     sg_run.idle = false;
@@ -307,24 +337,93 @@ static EqualizerBiquad mix(const EqualizerBiquad *a, const EqualizerBiquad *b, d
                              a->a1 + (b->a1 - a->a1) * t, a->a2 + (b->a2 - a->a2) * t};
 }
 
-// the coefficients step along the fade (a line between stable biquads stays stable); the gain moves every frame.
+#pragma mark - the limiter
+
+static void startLimiter(double rate) {
+    sg_limit.on = true;
+    sg_limit.length = (uint32_t)fmin(kLimiterMax, fmax(1, round(kLookahead * rate)));
+    sg_limit.frame = 0;
+    memset(sg_limit.delay, 0, sizeof sg_limit.delay);
+    sg_limit.head = sg_limit.tail = 0;
+    sg_limit.envelope = 1;
+    for (uint32_t i = 0; i <= sg_limit.length; i++) sg_limit.envelopes[i] = 1;
+    // the trim and how busy it was carry over: a gap between songs restarts the limiter, and the next song from
+    // the same loud album needs the same trim.
+}
+
+// `lanes` through the trim and the limiter, delayed sg_limit.length frames. `fade` 1 crossfades from the sound as
+// it is to the limited sound across the buffer (just started), -1 back (stopping), 0 neither.
+static void limit(float *const *lanes, uint32_t channels, uint32_t frames, double rate, int fade) {
+    uint32_t length = sg_limit.length, slots = length + 1;
+    // the trim moves on the reduction so far, ramped across this buffer; never below the curve's peak.
+    double floor = sg_run.at < sg_run.length ? fmax(sg_run.peakFrom, sg_run.peakTo) : sg_run.peakTo;
+    double seconds = frames / rate, trimFrom = pow(10, sg_limit.trim / 20);
+    if (sg_limit.busy > kBusy) sg_limit.trim -= kTrimDown * seconds;
+    else if (sg_limit.busy < kIdle) sg_limit.trim += kTrimUp * seconds;
+    sg_limit.trim = fmax(-floor, fmin(0, sg_limit.trim));
+    double trimTo = pow(10, sg_limit.trim / 20);
+    double rise = 1 - exp(-1 / (kRelease * rate));
+    // added again each buffer rather than kept running, so rounding can't build up over hours.
+    double sum = 0;
+    for (uint32_t i = 0; i < slots; i++) sum += sg_limit.envelopes[i];
+    double reduction = 0, lowest = 1;
+    for (uint32_t n = 0; n < frames; n++) {
+        double trim = trimFrom + (trimTo - trimFrom) * (n + 1) / frames;
+        double peak = 0;
+        for (uint32_t c = 0; c < channels; c++) peak = fmax(peak, fabs(lanes[c][n] * trim));
+        double need = peak <= kCeiling ? 1 : kCeiling / peak;
+        uint64_t frame = sg_limit.frame;
+        while (sg_limit.tail > sg_limit.head && sg_limit.windowNeed[(sg_limit.tail - 1) % slots] >= need) sg_limit.tail--;
+        sg_limit.windowFrame[sg_limit.tail % slots] = frame;
+        sg_limit.windowNeed[sg_limit.tail % slots] = need;
+        sg_limit.tail++;
+        while (sg_limit.windowFrame[sg_limit.head % slots] + length < frame) sg_limit.head++;
+        // the lowest need from here to `length` frames on: down at once, back up over kRelease.
+        double hold = sg_limit.windowNeed[sg_limit.head % slots];
+        if (hold < sg_limit.envelope) {
+            sg_limit.envelope = hold;
+        } else if (sg_limit.envelope < 1) {
+            sg_limit.envelope += (hold - sg_limit.envelope) * rise;
+            if (sg_limit.envelope > 0.999999) sg_limit.envelope = 1;
+        }
+        // averaged over the last length + 1 frames, every one of which held the need of the frame now leaving the
+        // delay, so the gain is down to that need when it does.
+        double *slot = &sg_limit.envelopes[frame % slots];
+        sum += sg_limit.envelope - *slot;
+        *slot = sg_limit.envelope;
+        double gain = sum / slots;
+        double limited = fade > 0 ? (n + 1.0) / frames : fade < 0 ? 1 - (n + 1.0) / frames : 1;
+        uint32_t ring = (uint32_t)(frame % length);
+        for (uint32_t c = 0; c < channels; c++) {
+            float in = lanes[c][n], delayed = sg_limit.delay[c][ring];
+            sg_limit.delay[c][ring] = (float)(in * trim);
+            lanes[c][n] = (float)(delayed * gain * limited + in * (1 - limited));
+        }
+        sg_limit.frame++;
+        reduction += -20 * log10(gain);
+        lowest = fmin(lowest, gain);
+    }
+    sg_limit.busy += (reduction / frames - sg_limit.busy) * (1 - exp(-seconds / kBusyAverage));
+    if (lowest < 0.98855309465693886) tally(&sg_limited);     // -0.1 dB
+    atomic_store_explicit(&sg_trimCentibels, (int32_t)lround(sg_limit.trim * 100), memory_order_relaxed);
+}
+
+#pragma mark - running a buffer
+
+// the coefficients step along the fade (a line between stable biquads stays stable).
 static void process(float *const *lanes, uint32_t channels, uint32_t frames) {
     for (uint32_t start = 0; start < frames; start += kStep) {
         uint32_t count = frames - start < kStep ? frames - start : kStep;
-        double gainStart = sg_run.gainNow;
         if (sg_run.at < sg_run.length) {
             sg_run.at = sg_run.at + count < sg_run.length ? sg_run.at + count : sg_run.length;
             if (sg_run.at == sg_run.length) {
                 memcpy(sg_run.now, sg_run.to, sizeof sg_run.now);
-                sg_run.gainNow = sg_run.gainTo;
                 sg_run.sections = sg_run.target;
             } else {
                 double t = (double)sg_run.at / sg_run.length;
                 for (int i = 0; i < sg_run.sections; i++) sg_run.now[i] = mix(&sg_run.from[i], &sg_run.to[i], t);
-                sg_run.gainNow = sg_run.gainFrom + (sg_run.gainTo - sg_run.gainFrom) * t;
             }
         }
-        double gainStep = (sg_run.gainNow - gainStart) / count;
         for (uint32_t c = 0; c < channels; c++) {
             float *lane = lanes[c] + start;
             double x[kStep];
@@ -341,7 +440,7 @@ static void process(float *const *lanes, uint32_t channels, uint32_t frames) {
                 sg_run.state[c][i][0] = s1;
                 sg_run.state[c][i][1] = s2;
             }
-            for (uint32_t n = 0; n < count; n++) lane[n] = (float)(x[n] * (gainStart + gainStep * (n + 1)));
+            for (uint32_t n = 0; n < count; n++) lane[n] = (float)x[n];
         }
     }
     // a NaN let in would stay in the filters for good.
@@ -378,9 +477,22 @@ static bool run(const void *owner, double rate, float *const *lanes, uint32_t ch
         startClean();
         return false;
     }
+    // the limiter stays through a fade from a design that wants it.
+    bool limiting = sg_run.limitTo || (sg_run.at < sg_run.length && sg_run.limitFrom);
     process(lanes, channels, frames);
+    if (limiting && !sg_limit.on) {
+        startLimiter(rate);
+        limit(lanes, channels, frames, rate, 1);
+    } else if (sg_limit.on) {
+        limit(lanes, channels, frames, rate, limiting ? 0 : -1);
+        if (!limiting) {
+            sg_limit.on = false;
+            atomic_store_explicit(&sg_trimCentibels, 0, memory_order_relaxed);
+        }
+    }
     tally(&sg_ran);
-    if (sg_run.flat && sg_run.at == sg_run.length) {
+    // not while the limiter is on: the buffer after has to crossfade out of its delay.
+    if (sg_run.flat && sg_run.at == sg_run.length && !sg_limit.on) {
         sg_run.idle = true;
         empty();
     }
@@ -409,6 +521,7 @@ EqualizerStats EqualizerReadStats(void) {
     return (EqualizerStats){
         atomic_load_explicit(&sg_ran, memory_order_relaxed), atomic_load_explicit(&sg_otherRate, memory_order_relaxed),
         atomic_load_explicit(&sg_refused, memory_order_relaxed), atomic_load_explicit(&sg_passedOver, memory_order_relaxed),
-        atomic_load_explicit(&sg_cleared, memory_order_relaxed),
+        atomic_load_explicit(&sg_cleared, memory_order_relaxed), atomic_load_explicit(&sg_limited, memory_order_relaxed),
+        atomic_load_explicit(&sg_trimCentibels, memory_order_relaxed) / 100.0,
     };
 }

@@ -33,7 +33,8 @@ static void EQLog(NSString *format, ...) {
 
 // what it's set to, and what the render thread did with it since the last report. "for another rate" climbing
 // means the design didn't follow the output; "refused" that the hardware's format isn't one the in-place path
-// reads (the speed & pitch lines have the format).
+// reads (the speed & pitch lines have the format). "limited" counts buffers the limiter turned down; the trim is
+// its slow turn-down at the moment of the report.
 static void report(void) {
     static EqualizerStats last;
     EqualizerStats now = EqualizerReadStats();
@@ -42,13 +43,13 @@ static void report(void) {
     NSString *rate = sg_rate > 0 ? [NSString stringWithFormat:@"at %.0f Hz", sg_rate] : @"waiting for Spotify's output";
     // the peak is known once a design is made, for the output's rate.
     NSString *level = sg_rate <= 0          ? (sg_preventClipping ? @"clip prevention on" : @"clip prevention off")
-                      : sg_preventClipping ? [NSString stringWithFormat:@"turned down %.2f dB", sg_peak]
+                      : sg_preventClipping ? [NSString stringWithFormat:@"limiter on, peaks at +%.2f dB, trim %.2f dB", sg_peak, now.trim]
                                            : [NSString stringWithFormat:@"clip prevention off, peaks at +%.2f dB", sg_peak];
-    EQLog(@"%@ %@, bands %@, correction %d filters, %@; since the last report %llu buffers run, %llu for "
+    EQLog(@"%@ %@, bands %@, correction %d filters, %@; since the last report %llu buffers run, %llu limited, %llu for "
           @"another rate, %llu refused, %llu passed over, %llu cleared after a fault",
           sg_on ? @"on" : @"off", rate, [bands componentsJoinedByString:@" "], sg_correctionCount, level,
-          now.run - last.run, now.otherRate - last.otherRate, now.refused - last.refused, now.passedOver - last.passedOver,
-          now.cleared - last.cleared);
+          now.run - last.run, now.limited - last.limited, now.otherRate - last.otherRate, now.refused - last.refused,
+          now.passedOver - last.passedOver, now.cleared - last.cleared);
     last = now;
 }
 
@@ -66,8 +67,8 @@ static void publish(void) {
     static const double flat[kEqualizerBands];
     EqualizerDesign design;
     EqualizerDesignFor(sg_rate, sg_on ? sg_gains : flat, sg_correction, sg_on ? sg_correctionCount : 0, &design);
-    sg_peak = design.gain < 1 ? -20 * log10(design.gain) : 0;
-    if (!sg_preventClipping) design.gain = 1;
+    sg_peak = design.peak;
+    design.limit = sg_preventClipping;
     EqualizerPublish(&design);
 }
 
@@ -127,5 +128,5 @@ double EeveeEqualizerCurve(const double *gains, NSInteger count, double *frequen
         decibels[n] = EqualizerResponse(&design, 0, kEqualizerBands, frequencies[n]);
         correction[n] = EqualizerResponse(&design, kEqualizerBands, design.count - kEqualizerBands, frequencies[n]);
     }
-    return 20 * log10(design.gain);
+    return design.peak;
 }

@@ -164,13 +164,13 @@ enum Equalizer {
     struct Curve {
         var bands: [Double]         // from 20 Hz to 20 kHz, log spaced
         var correction: [Double]    // the same points, the current output's correction alone
-        var peak: Double            // dB, the two together at their highest: what clip prevention turns down
+        var peak: Double            // dB, the two together at their highest boost
     }
 
     static func curve(_ gains: [Double], points: Int = 128) -> Curve {
         var frequencies = [Double](repeating: 0, count: points), bands = frequencies, correction = frequencies
-        let down = EeveeEqualizerCurve(normalized(gains), points, &frequencies, &bands, &correction)
-        return Curve(bands: bands, correction: correction, peak: max(0, -down))
+        let peak = EeveeEqualizerCurve(normalized(gains), points, &frequencies, &bands, &correction)
+        return Curve(bands: bands, correction: correction, peak: max(0, peak))
     }
 
     static func frequencyText(_ frequency: Double) -> String {

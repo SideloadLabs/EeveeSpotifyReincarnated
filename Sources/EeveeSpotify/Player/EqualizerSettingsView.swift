@@ -182,7 +182,7 @@ struct EqualizerSettingsView: View {
         }
     }
 
-    // how far it's turned down, or with clip prevention off, how far the boosts go over.
+    // how far the boosts go, and whether the limiter catches them.
     @ViewBuilder private func level(_ curve: Equalizer.Curve) -> some View {
         if options.enabled && curve.peak >= 0.05 {
             let decibels = String(format: "%.1f", curve.peak)
