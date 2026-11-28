@@ -90,6 +90,7 @@ enum SpeedPitchMenu {
         }
         let width = table.bounds.width
         guard width > 0 else { return }
+        let fontChanged = copyRowFont(from: table)
 
         guard let block = block(of: menu) else {
             let headerFree = (table.tableHeaderView?.bounds.height ?? 0) < 1
@@ -115,10 +116,24 @@ enum SpeedPitchMenu {
 
         // put it back when Spotify replaced the view, or at the table's new width.
         let placed = block.inFooter ? table.tableFooterView : table.tableHeaderView
-        if placed !== block || abs(block.frame.width - width) > 0.5 {
+        if fontChanged { block.fontChanged() }
+        if placed !== block || abs(block.frame.width - width) > 0.5 || fontChanged {
             block.frame = CGRect(x: 0, y: block.frame.minY, width: width, height: SpeedPitchMenuView.height())
             place(block, in: table)
         }
+    }
+
+    // the font and title x most of Spotify's rows share (not a track header's), which already follow the iOS text
+    // size. whether either changed.
+    private static func copyRowFont(from table: UITableView) -> Bool {
+        let titles = table.visibleCells.compactMap { $0.eeveeFirst(UILabel.self, where: { !($0.text ?? "").isEmpty }) }
+        let fonts = Dictionary(grouping: titles, by: \.font)
+        guard let most = fonts.max(by: { $0.value.count < $1.value.count }), let font = most.key else { return false }
+        let x = most.value[0].convert(CGPoint.zero, to: table).x.rounded()
+        guard font != SpeedPitchMenuView.rowFont || x != SpeedPitchMenuView.titleX else { return false }
+        SpeedPitchMenuView.rowFont = font
+        SpeedPitchMenuView.titleX = x
+        return true
     }
 
     private static func place(_ block: SpeedPitchMenuView, in table: UITableView) {
